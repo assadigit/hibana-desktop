@@ -19,6 +19,14 @@ uncheck it and ✕ really quits; the choice is remembered in
 fails to start (it is the first thing in the log), the ✕ falls back to
 quitting so a hidden window is never stranded.
 
+## Dark mode (and its toggle)
+
+The app ships the web's own two looks — light and dark — and follows your
+Windows app mode by default. Toggle it three ways: the board toolbar's
+sun/moon button, the moon button on the sign-in card's corner, or the tray
+menu's `Theme → Light / Dark / Follow system`. The choice persists across
+restarts and never touches the web app's separate preference.
+
 ## Signing in (first launch)
 
 The first launch opens a **sign-in card** — use your **hibana.ir account**

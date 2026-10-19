@@ -26,7 +26,10 @@
 //   4. Applies the transport-seam patches to the COPIES ONLY (guide §4.1/§4.2 — the
 //      12 verified call sites: devboard.js api() choke point + 5 label fetches + 2 XHR
 //      uploads; board-page.js 4 direct fetches). hibana-source is never touched.
-//   5. Generates js/desktop-shim.js (guide §4.3 — the only NEW island file).
+//   5. Generates the desktop-owned island files: js/desktop-shim.js (guide §4.3),
+//      js/desktop-login.js + css/desktop-login.css (guide §5.5 — the login gate),
+//      js/desktop-theme.js (v0.1.5 — the S216 dark-mode round: the FIRST blocking
+//      head script + the two toggle surfaces), and icon.svg.
 //   6. Writes web-ref.json (the sealed pin) + island.checksums.json OUTSIDE dist
 //      (frontend/island.checksums.json — dist stays purely servable; guide §3.3.2,
 //      WINDOWS-PACKAGING-PLAN §7.4: CI re-runs --check to fail on web-island drift).
@@ -212,8 +215,10 @@ function verifyRef(src, ref) {
 // The HTML adaptation ops (guide §3.2 — each is RECORDED + fail-loudly; the output is
 // never hand-edited). board.html@e6661c8 has NO inline scripts at all (verified: the
 // theme/lang bootstrap lives in the STRIPPED boot.js/app.js — html[data-theme] is set
-// by boot.js before first paint on the web; the desktop shell owns theme natively per
-// UI-UX-REPLICATION-SPEC §7.2 + guide §5.6, so NO theme inline script is added here).
+// by boot.js before first paint on the web). The "desktop shell owns theme natively"
+// deferral (UI-UX-REPLICATION-SPEC §7.2 + guide §5.6) ended in v0.1.5: the generated
+// js/desktop-theme.js (HTML_THEME_OPS below) runs as the FIRST blocking head script
+// so the resolution beats the first render — a generated FILE, still no inline script.
 // ---------------------------------------------------------------------------
 const HTML_STRIP_LINES = [
   // The web-chrome <script> tags (board.html:30-42 at the pin) — exact strings incl.
@@ -238,7 +243,7 @@ const HTML_STRIP_LINES = [
   { name: 'strip <div data-nav> block', cite: 'guide §3.2 (board.html:53)', line: '<div data-nav></div>' },
 ]
 
-// The one INSERT: the seam shim loads BEFORE devboard.js/board-page.js (guide §3.2
+// The one BEFORE-anchor INSERT: the seam shim loads BEFORE devboard.js/board-page.js (guide §3.2
 // "Add: the seam shim <script src=\"/js/desktop-shim.js\"> BEFORE devboard.js/
 // board-page.js"). Emitted WITHOUT defer: a blocking head script is guaranteed to
 // evaluate before every deferred island script, and it owns the contracts (bridge,
@@ -334,6 +339,56 @@ const HTML_GATE_INSERT = {
   insert: HTML_LOGIN_GATE,
 }
 
+
+// ---------------------------------------------------------------------------
+// The v0.1.5 additions — S216, the dark-mode round (the owner ask: "The app
+// doesnt have darkmode, add dark mode and it's toggle"). Desktop-owned inserts
+// around the PINNED bytes (the pin does not move), recorded per-round and in the
+// order the head/body chain requires. The generated controller (DESKTOP_THEME_JS
+// below) is the FIRST blocking head script: the pre-paint theme resolution must
+// beat the first render. The floater is the WEB LOGIN PAGE'S OWN affordance
+// (login.html:30 @ pin — present pre-login); the toolbar toggle rides the pin's
+// own nav.themeHint key (FA-native).
+//
+// RECOVERY NOTE: the op bytes below are re-recorded from the byte-exact v0.1.5
+// binary carve (go:embed) — the sync must reproduce that carve bit-for-bit.
+// ---------------------------------------------------------------------------
+const HTML_THEME_OPS = [
+  {
+    name: 'insert /js/desktop-theme.js after the chip-render.js tag — the FIRST blocking head script (immediately before desktop-shim.js)',
+    cite: 'v0.1.5 (S216); desktop-theme.js: the pre-paint resolution must beat the first render',
+    anchor: `    <script src="/js/chip-render.js?v=12" defer></script>`,
+    insert: `<script src="/js/desktop-theme.js"></script>`,
+  },
+  {
+    // An exact-string find→replace (the SEAM_PATCHES discipline) rather than a
+    // line-anchored insert: HTML_GATE_INSERT splices the whole gate in as ONE
+    // element, so no line anchor can reach inside it — and around the gate's
+    // close a single line is ambiguous anyway ('    </div>' also closes the
+    // board toolbar + .db-frame). The find pins the gate's last three lines
+    // exactly; the replace splices the floater between the split close and the
+    // gate close (the web login page's own corner affordance).
+    name: 'insert the .theme-floater button into the login gate (the corner toggle, pre-login)',
+    cite: "v0.1.5 (S216); login.html:30 @ pin — the web login page's own affordance",
+    find: `      </section>
+    </div>
+  </div>`,
+    replace: `      </section>
+    </div>
+    <button type="button" class="theme-floater" aria-label="Toggle theme" data-i18n-aria-label="auth.toggleTheme"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+  </div>`,
+  },
+  {
+    name: 'insert the #db-theme-toggle toolbar button after the labels button',
+    cite: "v0.1.5 (S216); the web rail's own affordance — the pin's nav.themeHint key, FA-native",
+    anchor: `      <button type="button" class="btn ghost small" id="db-labels-btn"><span data-i18n="db.labelsTitle">Labels</span></button>`,
+    insert: `      <!-- v0.1.5 (the owner ask: dark mode + its toggle): the board toolbar's theme toggle —
+           the web rail's own affordance (the S87/S93 round) on the desktop's chrome-less board:
+           a ghost icon button flipping light <-> claude-dark through the Go SetTheme binding
+           (js/desktop-theme.js — the persisted mirror-meta pref is the one source of truth). -->
+      <button type="button" class="btn ghost small" id="db-theme-toggle" data-theme-toggle aria-label="Toggle theme" data-i18n-aria-label="nav.themeHint"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>`,
+  },
+]
 function adaptBoardHtml(html) {
   const lines = html.split('\n')
   const log = []
@@ -374,6 +429,34 @@ function adaptBoardHtml(html) {
     }
     lines.splice(gateIdx + 1, 0, HTML_GATE_INSERT.insert)
     log.push('inserted: ' + HTML_GATE_INSERT.name)
+  }
+  // The v0.1.5 theme round (recorded above, in the order the head/body chain
+  // requires — each op's anchor must already exist when the op runs: the theme
+  // script rides the PINNED chip-render line, the floater rides the gate block
+  // HTML_GATE_INSERT just emitted, and the toolbar toggle rides the PINNED labels line).
+  for (const op of HTML_THEME_OPS) {
+    if (op.anchor !== undefined) {
+      const hits = lines.map((l, i) => (l.includes(op.anchor) ? i : -1)).filter((i) => i !== -1)
+      if (hits.length !== 1) {
+        fail('HTML op "' + op.name + '" (' + op.cite + '): anchor found ' + hits.length +
+          ' times (expected exactly 1) — board.html or a prior insert drifted; re-record the op in sync-island.mjs.')
+      }
+      lines.splice(hits[0] + 1, 0, op.insert)
+      log.push('inserted: ' + op.name)
+    } else {
+      // op.find/op.replace — the SEAM_PATCHES discipline applied to the html: an
+      // exact-string find→replace that must match EXACTLY ONCE or the sync fails
+      // loudly (used where the anchor sits INSIDE a multi-line element this script
+      // already spliced in — a line anchor cannot reach there).
+      const occurrences = lines.reduce((n, l) => n + l.split(op.find).length - 1, 0)
+      if (occurrences !== 1) {
+        fail('HTML op "' + op.name + '" (' + op.cite + '): find string matched ' + occurrences +
+          ' times (expected exactly 1) — board.html or a prior insert drifted; re-record the op in sync-island.mjs.')
+      }
+      const idx = lines.findIndex((l) => l.includes(op.find))
+      lines[idx] = lines[idx].replace(op.find, op.replace)
+      log.push('inserted: ' + op.name)
+    }
   }
   return { html: lines.join('\n'), log }
 }
@@ -489,8 +572,8 @@ function applySeamPatches(fileMap) {
 }
 
 // ---------------------------------------------------------------------------
-// desktop-shim.js — generated below into dist/js/ (guide §4.3: the only NEW island
-// file). Written without template literals/backticks so it can nest in this literal.
+// desktop-shim.js — generated below into dist/js/ (guide §4.3: the M2-era NEW island
+// file — v0.1.5 added desktop-theme.js below). Written without template literals/backticks so it can nest in this literal.
 // ---------------------------------------------------------------------------
 const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lifecycle shim for the embedded island.
 // GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
@@ -1019,8 +1102,188 @@ html[data-desktop-authed='true'] .login-gate {
 }
 `
 
+
 // ---------------------------------------------------------------------------
-// icon.svg — the ISLAND'S FAVICON (v0.1.2 — the owner ask: "use the Hibana logo as
+// desktop-theme.js — generated below into dist/js/ (v0.1.5 — the S216 dark-mode
+// round; the owner ask: "The app doesnt have darkmode, add dark mode and it's
+// toggle"). The FIRST blocking head script (before desktop-shim.js): the pre-paint
+// 'system' resolution (boot.js S87 byte-parity), live OS flips, the TWO toggle
+// surfaces (the login gate's .theme-floater + the board toolbar's
+// #db-theme-toggle), click-time SetTheme resolution (the v0.1.1 parse-time
+// lesson), optimistic apply, the web's own SUN/MOON icons. NO storage: the Go
+// mirror-meta pref is the one source of truth.
+//
+// desktop-sync.js + desktop-sync.css — generated below into dist/js/ + dist/css/
+// (v0.1.6 — the S217 sync round; the owner ask: the physical, visible sync button
+// whose modal proves the round live). The controller: click-time SyncNow
+//
+// RECOVERY NOTE (S216): the v0.1.5 commit was LOCAL-only and
+// lost to a sandbox reset. This file was carved byte-exact out of the
+// surviving v0.1.5 exe (go:embed stores island files verbatim) and is embedded
+// here verbatim — the sync must regenerate it identically:
+//   js/desktop-theme.js  bdfccdf77656cc1bf9dab3f3ea61d3ecac92dc8da625e4aba9c5f8e08ba62bb3
+// Written without backticks/${/backslashes so each nests in its literal.
+// ---------------------------------------------------------------------------
+const DESKTOP_THEME_JS = `// desktop-theme.js — the desktop theme bootstrap + toggle wiring (v0.1.5 — the
+// owner ask: "The app doesnt have darkmode, add dark mode and it's toggle").
+// GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+// into frontend/dist/js/ and checksummed in frontend/island.checksums.json. Loads
+// blocking, FIRST in <head> (before desktop-shim.js), BEFORE every deferred island
+// script — the pre-paint theme resolution must beat the first render.
+//
+// WHY THIS FILE EXISTS: the web sets html[data-theme] in boot.js + app.js (S87 —
+// exactly two looks: light and claude-dark, a CSS TOKEN swap; claude-dark-theme.css
+// + themes.css ship in the island VERBATIM). Both scripts are STRIPPED here (guide
+// §3.2), so without this file the desktop rendered the light baseline forever —
+// the root cause of "the app doesn't have dark mode". The desktop owns theme
+// natively per UI-UX-REPLICATION-SPEC §7.2 + guide §5.6.
+//
+// THE ONE SOURCE OF TRUTH is Go-side: the mirror meta row ui.theme
+// (internal/ui.ThemeMetaKey — 'light' | 'claude-dark' | 'system', default system —
+// the web's own default, S87). The Go shell serves the document with
+// data-desktop-theme="<pref>" on <html> (internal/ui.InjectShellState); explicit
+// prefs ALSO carry data-theme directly (a zero-JS first paint). This file owns:
+//   1. PRE-PAINT: resolve 'system' via the OS scheme (WebView2 follows the Windows
+//      app mode) — exactly boot.js's S87 block, run synchronously before first render.
+//   2. Live OS flips while the pref is 'system' (app.js:235-242 parity).
+//   3. The TWO toggle surfaces: the login gate's .theme-floater (the web login
+//      page's own affordance, login.html:30 — present pre-login) and the board
+//      toolbar's #db-theme-toggle (post-login). Both flip light <-> claude-dark
+//      through the Go SetTheme binding (resolved at CLICK time — the v0.1.1
+//      parse-time lesson) and paint the web's own SUN/MOON icons (app.js:181-182).
+//   4. The hibana:theme event — the Go shell emits it with the new pref (the tray
+//      menu's Light / Dark / Follow system picker, internal/tray).
+//
+// NO localStorage: the desktop pref never forks from the Go meta row (the web's
+// 'hibana-theme' key stays web-only; a dead bridge still flips the live document,
+// the next boot re-reads the persisted pref).
+(function () {
+  'use strict'
+
+  var html = document.documentElement
+  var DARK = 'claude-dark'
+  var LIGHT = 'light'
+  // The web's own icons, byte-parity (app.js:181-182). The convention is
+  // app.js:213's: the icon mirrors the CURRENT look — SUN in light, MOON in dark.
+  var SUN = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
+  var MOON = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>'
+
+  function osDark() {
+    try { return matchMedia('(prefers-color-scheme: dark)').matches } catch (e) { return false }
+  }
+  // pref(): the Go-served stored preference (data-desktop-theme on <html>);
+  // anything else (a raw serve without the middleware) reads as 'system'.
+  function pref() {
+    var p = html.getAttribute('data-desktop-theme')
+    return p === DARK || p === LIGHT || p === 'system' ? p : 'system'
+  }
+  function resolve(p) {
+    if (p === DARK || p === LIGHT) return p
+    return osDark() ? DARK : LIGHT
+  }
+  function apply(p) {
+    html.dataset.theme = resolve(p)
+  }
+  // paintToggles(): app.js paintThemeButton parity (S93: no hover tooltip — the
+  // icon is the label). Both desktop surfaces are icon-only, so only the .icon
+  // child swaps; other children (if a future surface adds one) survive.
+  function paintToggles() {
+    var svg = html.dataset.theme === DARK ? MOON : SUN
+    var els = document.querySelectorAll('[data-theme-toggle], .theme-floater')
+    for (var i = 0; i < els.length; i++) {
+      var b = els[i]
+      b.removeAttribute('title')
+      b.removeAttribute('data-tooltip')
+      var old = b.querySelector('.icon')
+      if (old) old.outerHTML = svg
+      else b.insertAdjacentHTML('afterbegin', svg)
+    }
+  }
+
+  // ---- 1. PRE-PAINT: synchronous in <head>, before first render (S87 parity). ----
+  apply(pref())
+
+  // ---- 2. live OS flips while 'system' (app.js:235-242 parity) ----
+  try {
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+      if (pref() === 'system') {
+        apply('system')
+        paintToggles()
+      }
+    })
+  } catch (e) { /* engines without the matchMedia listener resolve per-load only */ }
+
+  // The bridge resolver — the same defensive chain desktop-login.js uses (both
+  // files are generated + drift-controlled; the duplication is by design so the
+  // theme keeps working even if the shim's internal shape ever evolves).
+  function pick(root, keys) {
+    let cur = root
+    for (let i = 0; i < keys.length; i++) {
+      if (cur == null || typeof cur !== 'object') return null
+      cur = cur[keys[i]]
+    }
+    return typeof cur === 'function' ? cur : null
+  }
+  function resolveBoundMethod(name) {
+    let fn = pick(window, ['go', 'desktop', 'API', name])
+    if (fn) return fn
+    fn = pick(window, ['gohibana', 'api', name])
+    if (fn) return fn
+    fn = pick(window, ['gohibana', 'API', name])
+    if (fn) return fn
+    const go = window.go
+    if (go && typeof go === 'object') {
+      for (const pkg of Object.keys(go)) {
+        fn = pick(go[pkg], ['API', name]) || pick(go[pkg], ['api', name])
+        if (fn) return fn
+      }
+    }
+    return null
+  }
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn)
+    else fn()
+  }
+
+  ready(function () {
+    // ---- 3. the toggle surfaces (the gate floater pre-login, the toolbar button
+    //      post-login — the same flip lands on both). Optimistic apply FIRST: the
+    //      Go persist can never make the toggle feel broken; a dead bridge keeps
+    //      the live document in the chosen look until the next boot. ----
+    function flip(ev) {
+      if (ev) ev.preventDefault()
+      var next = html.dataset.theme === DARK ? LIGHT : DARK
+      html.setAttribute('data-desktop-theme', next) // an explicit flip leaves 'system'
+      apply(next)
+      paintToggles()
+      var setTheme = resolveBoundMethod('SetTheme')
+      if (setTheme) {
+        try { setTheme(next).catch(function () {}) } catch (e) {}
+      }
+    }
+    var buttons = document.querySelectorAll('[data-theme-toggle], .theme-floater')
+    for (var i = 0; i < buttons.length; i++) buttons[i].addEventListener('click', flip)
+
+    // ---- 4. tray-driven changes: Go emits hibana:theme with the new pref
+    //      (Light / Dark / Follow system — internal/tray's submenu). ----
+    if (window.runtime && typeof window.runtime.EventsOn === 'function') {
+      window.runtime.EventsOn('hibana:theme', function (payload) {
+        var p = payload
+        if (p && typeof p === 'object') p = p.pref || ''
+        if (p !== DARK && p !== LIGHT && p !== 'system') p = 'system'
+        html.setAttribute('data-desktop-theme', p)
+        apply(p)
+        paintToggles()
+      })
+    }
+
+    paintToggles()
+  })
+})()
+`
+
+// ---------------------------------------------------------------------------
 // fav icon. and app icon"). GENERATED, not copied: the pin's own icon.svg is the old
 // H-tile art; these bytes are the traced Hibana logo mark (the h-spark squircle,
 // dark tile + white glyph) produced by scripts/make-icons.py — byte-identical to the
@@ -1096,13 +1359,18 @@ function verifyDist(outDir, fileMap) {
   if (JSON.stringify(links) !== JSON.stringify(expectedLinks)) {
     problems.push('index.html CSS manifest mismatch:\n    expected: ' + JSON.stringify(expectedLinks) + '\n    actual:   ' + JSON.stringify(links))
   }
-  if (links[CSS_SHEETS.length - 1] !== '/css/rtl.css') problems.push('index.html: rtl.css is not the last /css/ sheet')
+  if (links[CSS_SHEETS.length - 1] !== '/css/rtl.css') problems.push('index.html: rtl.css is not the last ISLAND /css/ sheet (the desktop-owned sheets follow it)')
+  // The blocking head chain (v0.1.5 grew it): the pre-paint theme bootstrap FIRST,
+  // then the transport shim, the login controller — all blocking, so they own their
+  // contracts before every deferred island script.
+  const themeIdx = indexHtml.indexOf('/js/desktop-theme.js')
   const shimIdx = indexHtml.indexOf('/js/desktop-shim.js')
   const loginIdx = indexHtml.indexOf('/js/desktop-login.js')
   const devIdx = indexHtml.indexOf('/js/devboard.js')
   const bpIdx = indexHtml.indexOf('/js/board-page.js')
-  if (!(shimIdx !== -1 && loginIdx !== -1 && devIdx !== -1 && bpIdx !== -1 && shimIdx < loginIdx && loginIdx < devIdx && devIdx < bpIdx)) {
-    problems.push('index.html: desktop-shim.js → desktop-login.js → devboard.js → board-page.js order broken (got indices ' + shimIdx + '/' + loginIdx + '/' + devIdx + '/' + bpIdx + ')')
+  if (!(themeIdx !== -1 && shimIdx !== -1 && loginIdx !== -1 && devIdx !== -1 && bpIdx !== -1 &&
+      themeIdx < shimIdx && shimIdx < loginIdx && loginIdx < devIdx && devIdx < bpIdx)) {
+    problems.push('index.html: desktop-theme.js → desktop-shim.js → desktop-login.js → devboard.js → board-page.js order broken (got indices ' + themeIdx + '/' + shimIdx + '/' + loginIdx + '/' + devIdx + '/' + bpIdx + ')')
   }
   for (const kept of ['id="db-toolbar"', 'id="db-loading"', 'id="db-board"', 'data-i18n="db.board"', 'data-i18n="db.backToProject"',
     'js/i18n-en.js', 'js/i18n.js', 'vendor/jalaali.min.js', 'js/chip-render.js', 'vendor/general-sans/GeneralSans-400.woff2']) {
@@ -1121,6 +1389,24 @@ function verifyDist(outDir, fileMap) {
   const loginCss = fileMap['css/desktop-login.css'] || ''
   if (!loginCss.includes("html[data-desktop-authed='true'] .login-gate")) problems.push("css/desktop-login.css: the first-paint visibility rule is missing")
 
+  // The v0.1.5 theme round (S216 — the dark-mode + toggle ask): BOTH toggle surfaces
+  // must exist in the markup, and the generated controller must resolve the Go
+  // SetTheme binding at CLICK time (the v0.1.1 parse-time lesson) + listen for the
+  // tray-driven hibana:theme event.
+  for (const kept of ['id="db-theme-toggle"', 'class="theme-floater"', 'data-i18n-aria-label="nav.themeHint"', 'data-i18n-aria-label="auth.toggleTheme"']) {
+    if (!indexHtml.includes(kept)) problems.push('index.html: the theme round is missing "' + kept + '"')
+  }
+  const themeJs = fileMap['js/desktop-theme.js'] || ''
+  if (!themeJs.includes("resolveBoundMethod('SetTheme')")) problems.push('js/desktop-theme.js: the toggles must resolve the Go SetTheme binding at CLICK time, not at parse time')
+  if (!themeJs.includes("EventsOn('hibana:theme'")) problems.push('js/desktop-theme.js: the tray-driven hibana:theme listener is missing')
+
+  // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the
+  // persisted mirror-meta pref is Go-side; the island never forks it). The bare WORD
+  // may appear in comments (desktop-theme.js's header says "NO localStorage:"), so
+  // the gate greps for USAGE — a member/index access on the store.
+  for (const rel of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'css/desktop-login.css', 'index.html']) {
+    if (/\blocalStorage\s*[.[]/.test(fileMap[rel] || '')) problems.push(rel + ': localStorage usage — the island must never touch storage (the Go mirror owns persistence)')
+  }
   // CSS url()/@import refs that are DEFINED in kept sheets but NEVER APPLIED on the
   // board surface at the pin (verified @ e6661c8): a browser only fetches a url()
   // when a RENDERED element applies it, so these cannot 404 in the embedded server.
@@ -1180,9 +1466,9 @@ function verifyDist(outDir, fileMap) {
     if (!fs.existsSync(path.join(outDir, lazy))) problems.push('lazy island asset missing from dist: ' + lazy)
   }
 
-  // (4) the JS is parseable — node --check the shim + login controller + every
-  // copied .js (belt + braces over the patch step; a mangled patch must never ship).
-  for (const js of ['js/desktop-shim.js', 'js/desktop-login.js', ...JS_FILES]) {
+  // (4) the JS is parseable — node --check the shim + login + theme controllers
+  // + every copied .js (belt + braces over the patch step; a mangled patch must never ship).
+  for (const js of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', ...JS_FILES]) {
     try {
       execFileSync(process.execPath, ['--check', path.join(outDir, js)], { stdio: 'pipe' })
     } catch (err) {
@@ -1273,10 +1559,11 @@ function main() {
   // The seam patches (guide §4.1/§4.2) — copies only, never the source.
   const patchLog = applySeamPatches(fileMap)
 
-  // The generated shim (guide §4.3) + the login gate files (guide §5.5).
+  // The generated shim (guide §4.3) + the login gate files (guide §5.5) + the theme controller (v0.1.5 — S216).
   fileMap['js/desktop-shim.js'] = DESKTOP_SHIM_JS
   fileMap['js/desktop-login.js'] = DESKTOP_LOGIN_JS
   fileMap['css/desktop-login.css'] = DESKTOP_LOGIN_CSS
+  fileMap['js/desktop-theme.js'] = DESKTOP_THEME_JS
   fileMap['icon.svg'] = ICON_SVG
 
   // Wipe + regenerate dist (deterministic + idempotent: running twice is byte-identical;
@@ -1306,8 +1593,8 @@ function main() {
   // Report.
   for (const line of adapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
-  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-login.js + css/desktop-login.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), shim → login → devboard → board-page, the login gate markup + hooks, no-404 asset loop, node --check\n')
+process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + icon.svg + web-ref.json\n')
+process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → login → devboard → board-page, the login gate markup + hooks, the theme round (both toggle surfaces, click-time SetTheme, the tray listener, no-storage), no-404 asset loop, node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }

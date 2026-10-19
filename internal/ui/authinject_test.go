@@ -40,8 +40,8 @@ func TestInjectAuthAttrBothStates(t *testing.T) {
 		{true, "true"},
 		{false, "false"},
 	} {
-		out := string(InjectAuthAttr([]byte(cannedIndex), tc.authed))
-		want := "<html lang=\"en\" data-desktop-authed=\"" + tc.attr + "\">"
+		out := string(InjectShellState([]byte(cannedIndex), tc.authed, ThemeSystem))
+		want := "<html lang=\"en\" data-desktop-authed=\"" + tc.attr + "\" data-desktop-theme=\"system\">"
 		if !strings.Contains(out, want) {
 			t.Fatalf("authed=%v: %q missing in %q", tc.authed, want, out)
 		}
@@ -56,7 +56,7 @@ func TestInjectAuthAttrMissingMarkerPassesThrough(t *testing.T) {
 	// login JS then resolves visibility via AuthState — a flash at worst,
 	// never a lockout).
 	body := []byte("<html lang=\"fa\">no marker here</html>")
-	out := InjectAuthAttr(body, true)
+	out := InjectShellState(body, true, ThemeDark)
 	if string(out) != string(body) {
 		t.Fatalf("passthrough broken: %q", out)
 	}

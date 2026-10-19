@@ -8,15 +8,22 @@ import (
 )
 
 // htmlOpenTag is the generated island's exact <html> open tag (sync-island.mjs
-// emits it verbatim from board.html @ pin). The auth state rides on it as a
-// data- attribute so the login card's visibility resolves from CSS at FIRST
-// PAINT — no JS round-trip, no flash in either direction:
+// emits it verbatim from board.html @ pin). The auth state AND the theme
+// preference ride on it as data- attributes so the login card's visibility
+// AND the look resolve from CSS at FIRST PAINT — no JS round-trip, no flash
+// in either direction:
 //
 //   - a live restored session → data-desktop-authed="true" → the card never
 //     appears, the board boots straight in;
 //   - a fresh/dead session → "false" (or the attribute missing entirely) →
 //     the card is up before the island's first paint, and the unauthenticated
-//     board underneath never flashes its 401 error state at the user.
+//     board underneath never flashes its 401 error state at the user;
+//   - the theme (S216): data-desktop-theme carries the stored preference for
+//     js/desktop-theme.js, and an EXPLICIT pref (light | claude-dark) also
+//     carries data-theme directly — the token swap paints before any script
+//     runs. 'system' deliberately carries NO data-theme: the OS scheme must
+//     resolve pre-paint exactly the way boot.js does it for the web (S87
+//     parity — a stale hardcoded look would flash on every dark-mode OS).
 const htmlOpenTag = `<html lang="en">`
 
 // wailsRuntimeScripts is byte-equivalent to what the Wails asset server itself
@@ -42,11 +49,20 @@ const htmlOpenTag = `<html lang="en">`
 // Contains guard below skips an already-injected document).
 const wailsRuntimeScripts = `<script src="/wails/ipc.js"></script><script src="/wails/runtime.js"></script>`
 
-// InjectAuthAttr rewrites the island's index.html bytes with the live auth
-// state. Fail-open by design: if the marker drifted (an island re-pin), the
-// bytes pass through untouched — the login JS then resolves visibility via
-// the AuthState bridge call (a one-frame flash at worst, never a lockout).
-func InjectAuthAttr(body []byte, authed bool) []byte {
+// InjectShellState rewrites the island's index.html bytes with the live
+// auth state AND the theme preference (the v0.1.5 evolution of the v0.1.1
+// InjectAuthAttr — one <html> tag, one rewrite, zero JS either way):
+//
+//	<html lang="en" data-desktop-authed="true|false"
+//	     data-desktop-theme="light|claude-dark|system"
+//	     data-theme="light|claude-dark">   <- explicit prefs ONLY
+//
+// Fail-open by design: if the marker drifted (an island re-pin), the bytes
+// pass through untouched — the login JS then resolves visibility via the
+// AuthState bridge call and js/desktop-theme.js reads a missing
+// data-desktop-theme as 'system' (a one-frame flash at worst, never a
+// lockout, never a wrong-look lock).
+func InjectShellState(body []byte, authed bool, themePref string) []byte {
 	attr := "false"
 	if authed {
 		attr = "true"
@@ -54,7 +70,13 @@ func InjectAuthAttr(body []byte, authed bool) []byte {
 	if !bytes.Contains(body, []byte(htmlOpenTag)) {
 		return body
 	}
-	replacement := `<html lang="en" data-desktop-authed="` + attr + `">`
+	pref := NormalizeTheme(themePref)
+	replacement := `<html lang="en" data-desktop-authed="` + attr + `" data-desktop-theme="` + pref + `">`
+	if pref == ThemeLight || pref == ThemeDark {
+		// Explicit look: paint it with ZERO JS (the token swap is a
+		// data-theme attribute the CSS already branches on).
+		replacement = `<html lang="en" data-desktop-authed="` + attr + `" data-desktop-theme="` + pref + `" data-theme="` + pref + `">`
+	}
 	return bytes.Replace(body, []byte(htmlOpenTag), []byte(replacement), 1)
 }
 
@@ -122,7 +144,7 @@ func (a *API) indexMiddleware(next http.Handler, injectWailsRuntime bool) http.H
 			h[k] = v
 		}
 		if strings.Contains(cw.hdr.Get("Content-Type"), "text/html") {
-			body = InjectAuthAttr(body, a.AuthState().Authenticated)
+			body = InjectShellState(body, a.AuthState().Authenticated, a.ThemePref())
 			if injectWailsRuntime {
 				body = InjectWailsRuntime(body)
 			}

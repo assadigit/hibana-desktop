@@ -52,6 +52,14 @@ type Config struct {
 	// OnQuit is the real exit request ("Quit Hibana"). Main must bypass
 	// OnBeforeClose (its quitRequested flag) and call runtime.Quit.
 	OnQuit func()
+
+	// THE THEME SUBMENU (S216 — v0.1.5): "Theme" → Light / Dark / Follow
+	// system, radio-checked on the current choice. Both hooks are
+	// optional — the submenu is only appended when both are wired; the
+	// choice flows through the SAME SetTheme path the island toggles
+	// use, so the live document flips without a reload.
+	ThemePref func() string     // the current preference (the radio state)
+	OnTheme   func(pref string) // a choice made from the menu
 }
 
 // action is what a tray event means. The pure mapping (mouse message →
@@ -65,6 +73,7 @@ const (
 	actMenu          // show the context menu
 	actToggle        // flip the close-to-tray preference
 	actQuit          // exit the app
+	actTheme         // pick a theme preference (see commandThemePref)
 )
 
 // The popup-menu command ids (TrackPopupMenuEx with TPM_RETURNCMD returns
@@ -73,6 +82,13 @@ const (
 	cmdShow   = int32(1001) // "Open Hibana"
 	cmdToggle = int32(1002) // "Hide to tray on close" (checkable)
 	cmdQuit   = int32(1003) // "Quit Hibana"
+
+	// The S216 Theme submenu (Light / Dark / Follow system — radio-checked
+	// via MF_CHECKED on exactly one item; the choice rides the SAME
+	// SetTheme path the island toggles use).
+	cmdThemeLight  = int32(1004) // "Light"
+	cmdThemeDark   = int32(1005) // "Dark" (claude-dark — the web's own dark look)
+	cmdThemeSystem = int32(1006) // "Follow system"
 )
 
 // The classic (pre-NIF_VERSION_4) Shell_NotifyIcon mouse messages the tray
@@ -107,7 +123,41 @@ func commandAction(id int32) action {
 	case cmdQuit:
 		return actQuit
 	default:
+		if _, ok := commandThemePref(id); ok {
+			return actTheme
+		}
 		return actNone // 0 = dismissed without a choice
+	}
+}
+
+// commandThemePref maps a Theme-submenu command id to the preference it
+// picks (ok=false for every other id — the main switch stays untouched).
+func commandThemePref(id int32) (pref string, ok bool) {
+	switch id {
+	case cmdThemeLight:
+		return "light", true
+	case cmdThemeDark:
+		return "claude-dark", true
+	case cmdThemeSystem:
+		return "system", true
+	default:
+		return "", false
+	}
+}
+
+// themeChoice maps a stored preference to the radio item that must carry
+// the check mark. The vocabulary matches internal/ui's allow-list verbatim
+// (light | claude-dark | system); the legacy 'dark' alias and any garbage
+// read as 'system' here — the shell seeds through ui.NormalizeTheme anyway,
+// so this is belt-and-braces, never a fork of the truth.
+func themeChoice(pref string) int32 {
+	switch pref {
+	case "light":
+		return cmdThemeLight
+	case "claude-dark":
+		return cmdThemeDark
+	default:
+		return cmdThemeSystem
 	}
 }
 

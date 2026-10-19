@@ -16,7 +16,7 @@ This repo is the **build** — the decision record is ADR-001 in that guide.
 |---|---|
 | **M0** — Worker contract hardening (`API-AND-SYNC-CONTRACT.md` §7a-7e) | **NOT STARTED — awaiting the owner's go** (it is hibana-source work, not this repo; this build targets the already-deployed contract) |
 | **M1** — Go API client + auth, no UI | **DONE + live-accepted** (`cmd/acceptance`: login → pull 2 boards → create/move/archive → verified via the web client's API, against prod, self-cleaning) |
-| **M2** — the Wails shell + read-only board | **groundwork done + the login-first boot landed (v0.1.1) + the v0.1.2 dogfood fixes + the v0.1.3 tray**: a live stored session boots straight to the board; otherwise the island-rendered sign-in card opens first — the WEB LOGIN PAGE'S OWN SPLIT LAYOUT (the Login.webp photo panel) (guide §5.5's pick) — sign in against hibana.ir, the kanban loads; a mid-session 401 reopens the card and a re-login wakes the outbox's retry-once. The S214 minimize-to-tray option (notification-area icon, ✕-hides-to-tray with a persisted toggle, second-launch restore) landed in v0.1.3. The windowed side-by-side pixel acceptance still needs the owner's dogfooding on a real Windows host |
+| **M2** — the Wails shell + read-only board | **groundwork done + the login-first boot landed (v0.1.1) + the v0.1.2 dogfood fixes + the v0.1.3 tray + the v0.1.5 dark mode**: a live stored session boots straight to the board; otherwise the island-rendered sign-in card opens first — the WEB LOGIN PAGE'S OWN SPLIT LAYOUT (the Login.webp photo panel) (guide §5.5's pick) — sign in against hibana.ir, the kanban loads; a mid-session 401 reopens the card and a re-login wakes the outbox's retry-once. The S214 minimize-to-tray option (notification-area icon, ✕-hides-to-tray with a persisted toggle, second-launch restore) landed in v0.1.3; the S216 dark-mode round (the web's own claude-dark look + light, a persisted ui.theme preference, toggle surfaces on the board toolbar, the sign-in card, and the tray's Theme submenu, zero-JS first paint, follows-the-OS 'system' default) landed in v0.1.5. The windowed side-by-side pixel acceptance still needs the owner's dogfooding on a real Windows host |
 | M3-M5 | not started (outbox drain engine exists + is table-tested; the offline mutation UI, media pipeline, installer + auto-update follow) |
 
 ## Layout
@@ -26,9 +26,15 @@ main.go                     bootstrap: window (1600×900, min 1100×720), single
                             portable-mode data dir + mode.lock (the never-mix rule),
                             embed.FS island, /kanban asset alias, the 5-minute pull loop,
                             the close-to-tray contract (OnBeforeClose + the tray goroutine
-                            + the persisted ui.hide_on_close preference, S214)
+                            + the persisted ui.hide_on_close preference, S214), the theme
+                            wiring (the ui.theme meta row, the hibana:theme emit, the
+                            boot-frame background, S216)
+theme_windows.go            the boot background: AppsUseLightTheme via pure advapi32
+                            syscalls — 'system' paints the frame before the WebView
+theme_other.go              the non-Windows stub (vet/test/cross-build from Linux)
 trayicon.go                 the embedded build/windows/icon.ico bytes the tray tile wears
 internal/tray/              the notification-area icon: pure user32/shell32 syscalls —
+                            + the Theme submenu (Light/Dark/Follow system, radio-checked, S16) —
                             Shell_NotifyIcon + a hidden window, CreateIconFromResourceEx
                             on the embedded ICO, TPM_RETURNCMD menu (Open / toggle / Quit),
                             TaskbarCreated re-add; pure logic split out + tested

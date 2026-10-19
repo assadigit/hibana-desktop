@@ -88,6 +88,7 @@ const (
 	mfString    = 0x00000000
 	mfChecked   = 0x00000008
 	mfSeparator = 0x00000800
+	mfPopup     = 0x00000010 // a submenu: the id parameter carries the child-menu handle
 
 	tpmReturnCmd   = 0x0100
 	tpmRightAlign  = 0x0008
@@ -355,6 +356,48 @@ func (s *trayState) showMenu(hwnd uintptr) {
 
 	appendMenu(mfString, cmdShow, "Open Hibana")
 	appendMenu(mfSeparator, 0, "")
+
+	// THE THEME SUBMENU (S216 — v0.1.5): "Theme" → Light / Dark / Follow
+	// system, radio-checked on the current choice via MF_CHECKED on exactly
+	// one item. Built fresh per right-click like the rest of the menu; the
+	// submenu rides the same SetTheme path the island toggles use.
+	if s.cfg.ThemePref != nil && s.cfg.OnTheme != nil {
+		sub, _, _ := pCreatePopupMenu.Call()
+		if sub != 0 {
+			current := themeChoice(s.cfg.ThemePref())
+			themeItem := func(flags uintptr, id int32, text string) {
+				var p uintptr
+				if u16, err := syscall.UTF16PtrFromString(text); err == nil {
+					p = uintptr(unsafe.Pointer(u16))
+				}
+				if r, _, _ := pAppendMenuW.Call(sub, flags, uintptr(id), p); r == 0 {
+					log.Printf("hibana tray: AppendMenuW failed on the Theme submenu (id %d)", id)
+				}
+			}
+			light := uintptr(mfString)
+			dark := uintptr(mfString)
+			system := uintptr(mfString)
+			if current == cmdThemeLight {
+				light |= mfChecked
+			} else if current == cmdThemeDark {
+				dark |= mfChecked
+			} else {
+				system |= mfChecked
+			}
+			themeItem(light, cmdThemeLight, "Light")
+			themeItem(dark, cmdThemeDark, "Dark")
+			themeItem(system, cmdThemeSystem, "Follow system")
+			var p uintptr
+			if u16, err := syscall.UTF16PtrFromString("Theme"); err == nil {
+				p = uintptr(unsafe.Pointer(u16))
+			}
+			if r, _, _ := pAppendMenuW.Call(menu, uintptr(mfString|mfPopup), sub, p); r == 0 {
+				log.Printf("hibana tray: AppendMenuW failed on the Theme popup")
+			}
+			appendMenu(mfSeparator, 0, "")
+		}
+	}
+
 	toggle := uintptr(mfString)
 	if s.cfg.IsOn() {
 		toggle |= mfChecked
@@ -386,6 +429,10 @@ func (s *trayState) showMenu(hwnd uintptr) {
 		s.cfg.OnToggle(!s.cfg.IsOn())
 	case actQuit:
 		s.cfg.OnQuit()
+	case actTheme:
+		if pref, ok := commandThemePref(int32(cmd)); ok {
+			s.cfg.OnTheme(pref)
+		}
 	}
 }
 

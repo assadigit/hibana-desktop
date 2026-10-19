@@ -144,3 +144,58 @@ func TestHideOnCloseFromMeta(t *testing.T) {
 		}
 	}
 }
+
+// TestThemeChoice — the radio state: every stored preference maps to
+// exactly one submenu item (the legacy 'dark' alias + garbage read as
+// 'system' here; the shell seeds through ui.NormalizeTheme anyway).
+func TestThemeChoice(t *testing.T) {
+	for _, tc := range []struct {
+		pref string
+		want int32
+	}{
+		{"light", cmdThemeLight},
+		{"claude-dark", cmdThemeDark},
+		{"system", cmdThemeSystem},
+		{"dark", cmdThemeSystem}, // legacy alias → the shell migrates on seed
+		{"", cmdThemeSystem},     // garbage/missing → system (the S87 default)
+		{"junk", cmdThemeSystem}, // never a crash, never a wrong check
+	} {
+		if got := themeChoice(tc.pref); got != tc.want {
+			t.Fatalf("themeChoice(%q) = %d, want %d", tc.pref, got, tc.want)
+		}
+	}
+}
+
+// TestCommandThemePref — the id → preference mapping (ok=false outside the
+// Theme ids so the main dispatch switch stays untouched).
+func TestCommandThemePref(t *testing.T) {
+	for _, tc := range []struct {
+		id   int32
+		pref string
+		ok   bool
+	}{
+		{cmdThemeLight, "light", true},
+		{cmdThemeDark, "claude-dark", true},
+		{cmdThemeSystem, "system", true},
+		{cmdShow, "", false},
+		{cmdToggle, "", false},
+		{cmdQuit, "", false},
+		{0, "", false},
+	} {
+		pref, ok := commandThemePref(tc.id)
+		if pref != tc.pref || ok != tc.ok {
+			t.Fatalf("commandThemePref(%d) = (%q, %v), want (%q, %v)", tc.id, pref, ok, tc.pref, tc.ok)
+		}
+	}
+	// The round trip: choice(pref) → pref, and the action routes as actTheme.
+	for _, pref := range []string{"light", "claude-dark", "system"} {
+		id := themeChoice(pref)
+		got, ok := commandThemePref(id)
+		if !ok || got != pref {
+			t.Fatalf("round trip %q → id %d → (%q, %v)", pref, id, got, ok)
+		}
+		if act := commandAction(id); act != actTheme {
+			t.Fatalf("theme id %d must route as actTheme, got %v", id, act)
+		}
+	}
+}

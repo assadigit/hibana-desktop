@@ -54,7 +54,7 @@ import (
 //	wails build -platform windows/amd64 -ldflags \
 //	  "-s -w -X main.Version=0.1.4 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.4-dev"
+	Version = "0.1.5-dev"
 	WebRef  = "unpinned"
 )
 
@@ -155,11 +155,40 @@ func main() {
 	syncCtx, syncCancel := context.WithCancel(ctx0)
 	defer syncCancel()
 
+	// THE THEME PREFERENCE (S216 — v0.1.5): the mirror meta row is the ONE
+	// source of truth ('light' | 'claude-dark' | 'system'; default system —
+	// the web's own S87 default; a missing/garbage row reads as system).
+	// The seed paints the boot frame BEFORE the WebView exists and serves
+	// on <html> with every document (InjectShellState) — a ZERO-JS first
+	// paint in either look.
+	bootTheme := ui.ThemeSystem
+	if v, _, err := mirror.GetMeta(ctx0, ui.ThemeMetaKey); err != nil {
+		log.Printf("hibana: theme preference read: %v (defaulting to system)", err)
+	} else {
+		bootTheme = ui.NormalizeTheme(v)
+	}
+
 	// The bridge: the transport + the §5.5 login surface + the boot snapshot
 	// the served index.html carries (first-paint card visibility).
 	bridge := ui.New(client, Version, WebRef)
 	bridge.SetSessionStore(sessStore)
 	bridge.SetAuthed(me, live)
+	bridge.SetThemeSeed(bootTheme)
+	// The persist hook writes the meta row; a failure is logged inside
+	// SetTheme and NEVER fails the flip (the live document already
+	// changed — the next boot re-reads the last persisted value).
+	bridge.SetThemePersist(func(pref string) error {
+		return mirror.SetMeta(context.Background(), ui.ThemeMetaKey, pref)
+	})
+	// The change hook flips the LIVE document without a reload (the tray
+	// menu's Light / Dark / Follow system picker rides the same path the
+	// island's two toggles use — js/desktop-theme.js listens).
+	bridge.SetThemeChange(func(pref string) {
+		log.Printf("hibana: theme → %s", pref)
+		if c, ok := appCtxVal.Load().(context.Context); ok {
+			wailsruntime.EventsEmit(c, "hibana:theme", map[string]string{"pref": pref})
+		}
+	})
 	bridge.SetOnLogin(func(u *api.MeUser) {
 		log.Printf("hibana: signed in as %s — pulling boards", u.Email)
 		go func() {
@@ -201,10 +230,20 @@ func main() {
 	}
 	go func() {
 		err := tray.Run(tray.Config{
-			Icon:    trayIconICO,
-			Tooltip: "Hibana Kanban — running",
-			IsOn:    hideOnClose.Load,
-			OnShow:  showWindow,
+			Icon:      trayIconICO,
+			Tooltip:   "Hibana Kanban — running",
+			IsOn:      hideOnClose.Load,
+			OnShow:    showWindow,
+			ThemePref: bridge.ThemePref,
+			OnTheme: func(pref string) {
+				// The tray's Theme submenu rides the SAME SetTheme path —
+				// validate + persist + emit; a garbage id can never land here
+				// (commandThemePref is a pure allow-list map), and a rejected
+				// flip logs — the live look is never left dangling.
+				if _, err := bridge.SetTheme(pref); err != nil {
+					log.Printf("hibana: tray theme %q rejected: %v", pref, err)
+				}
+			},
 			OnToggle: func(on bool) {
 				hideOnClose.Store(on)
 				v := "0"
@@ -234,12 +273,15 @@ func main() {
 	}()
 
 	err = wails.Run(&options.App{
-		Title:            "Hibana Kanban",
-		Width:            1600,
-		Height:           900,
-		MinWidth:         1100, // the board's 5-column grid breakpoint (UI-UX §2)
-		MinHeight:        720,
-		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 255}, // .db-frame is a var(--card) white surface
+		Title:     "Hibana Kanban",
+		Width:     1600,
+		Height:    900,
+		MinWidth:  1100, // the board's 5-column grid breakpoint (UI-UX §2)
+		MinHeight: 720,
+		// The boot frame paints the RESOLVED look (#141413 dark /
+		// #E7E7E7 light — themes.css's own --bg tokens) so a dark-mode
+		// OS never flashes white before the island loads (S216).
+		BackgroundColour: func() *options.RGBA { bg := resolveBootBackground(bootTheme); return &bg }(),
 		OnStartup: func(ctx context.Context) {
 			appCtxVal.Store(ctx)
 		},

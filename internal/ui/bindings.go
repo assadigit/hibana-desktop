@@ -108,12 +108,21 @@ type API struct {
 	// the 30-day rolling refresh (the server re-Set-Cookies on use) survives
 	// restarts without re-writing the file on every request.
 	lastPersisted string
+
+	// theme owns the desktop look preference (S216 — v0.1.5): the allow-list
+	// (light | claude-dark | system, default system), the persist hook (the
+	// mirror meta row ui.theme) + the change hook (the shell's hibana:theme
+	// emit so the live document flips without a reload). See theme.go.
+	theme themeState
 }
 
 // New wires the bridge. The client is the cloud client (cookie jar, Origin
 // stamping, ETag store — all Go-side; the island has no access to them).
 func New(c *api.Client, version, webRef string) *API {
-	return &API{client: c, version: version, webRef: webRef}
+	// The theme starts at the S87 default ('system') so a fresh boot with no
+	// meta row — and a no-op flip onto it — never fires the hooks (the seed
+	// path stays silent too).
+	return &API{client: c, version: version, webRef: webRef, theme: themeState{pref: ThemeSystem}}
 }
 
 // SetSessionStore wires the session persistence (auth.FileStore in the
