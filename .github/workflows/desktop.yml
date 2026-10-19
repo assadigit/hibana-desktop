@@ -155,6 +155,11 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # This job deliberately has NO checkout (download-artifact fills the
+          # workspace) — gh's git-based repo detection fails without a .git dir
+          # ("failed to run git: fatal: not a git repository"), run#17's lesson.
+          # GH_REPO makes the release call pure API, no git context needed.
+          GH_REPO: assadigit/hibana-desktop
         run: |
           TAG="${GITHUB_REF##*/}"
           VER="${TAG#v}"; VER="${VER%-desktop}"
