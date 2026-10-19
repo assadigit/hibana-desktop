@@ -65,9 +65,13 @@ jobs:
           go test ./internal/...
 
       # 3. The wails CLI, pinned (guide §1.2 — the one external dependency
-      #    whose minor versions move).
-      - name: Install wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+      #    whose minor versions move), + NSIS (guide §1.4 — wails build -nsis
+      #    needs makensis on PATH or it silently SKIPS the installer with a
+      #    warning, exactly what the first green run exposed).
+      - name: Install wails CLI + NSIS
+        run: |
+          choco install nsis-unicode -y --no-progress
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
 
       # 4. The two artifacts — same binary, dual stamps (the never-diverge rule:
       #    tag, -X stamps, and wails.json info derive from ONE version source).
