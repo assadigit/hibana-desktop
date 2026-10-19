@@ -71,6 +71,10 @@ jobs:
       - name: Install wails CLI + NSIS
         run: |
           choco install nsis -y --no-progress   # NSIS 3.x — the nsis-unicode package is 2.46 (2011) and wails cannot find its makensis
+          # choco's nsis package deploys makensis to Program Files (x86)\NSIS but does
+          # NOT put it on PATH; the wails CLI resolves makensis via LookPath, so the
+          # directory joins GITHUB_PATH (visible to every subsequent step).
+          Add-Content $env:GITHUB_PATH "C:\Program Files (x86)\NSIS"
           go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
 
       # 4. The two artifacts — same binary, dual stamps (the never-diverge rule:
