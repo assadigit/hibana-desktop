@@ -289,3 +289,77 @@ func TestSetSessionTokenRestores(t *testing.T) {
 		t.Fatalf("restored session should validate: %v", err)
 	}
 }
+
+// TestRequestFreshNeverConditional — the S215 dogfood root cause, as a
+// client-level contract: after the ENGINE's pulls seed the shared ETag store
+// (exactly what the sync loop leaves behind), the ENGINE's next poll stays
+// the §8 cheap-poll (304 → ErrNotModified) while the INTERACTIVE fetch on
+// the very same path carries NO validator and takes the full 200 home.
+func TestRequestFreshNeverConditional(t *testing.T) {
+	fw := newFakeWorker()
+	c := newTestClient(t, fw)
+	ctx := context.Background()
+	if err := c.Login(ctx, "u", "p"); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	// 1) The engine's first pull: 200, validator stored.
+	if _, err := c.Board(ctx, "p1"); err != nil {
+		t.Fatalf("first board pull: %v", err)
+	}
+	if c.ETag(BoardPath("p1")) == "" {
+		t.Fatal("validator not stored after the engine pull")
+	}
+	// 2) The engine's re-pull: still the cheap poll (regression guard — the
+	//    Request path keeps its conditional contract).
+	if _, err := c.Board(ctx, "p1"); err != ErrNotModified {
+		t.Fatalf("engine re-pull must stay ErrNotModified, got %v", err)
+	}
+	// 3) The island's interactive GET of the SAME path (the project switcher):
+	//    no If-None-Match rides along, so the fake (304 only on an exact
+	//    validator match, like http.ts:103-127) must serve the full 200.
+	resp, err := c.RequestFresh(ctx, http.MethodGet, BoardPath("p1"), nil)
+	if err != nil {
+		t.Fatalf("fresh GET after the engine's poll: %v", err)
+	}
+	if resp == nil || resp.Status != http.StatusOK || string(resp.Body) != fw.body {
+		t.Fatalf("fresh GET must be the full 200 body, got %+v", resp)
+	}
+	// 4) The fresh 200 refreshed the validator — the engine's NEXT poll is
+	//    still cheap (304), never a double-pull.
+	if _, err := c.Board(ctx, "p1"); err != ErrNotModified {
+		t.Fatalf("engine poll after a fresh GET must stay ErrNotModified, got %v", err)
+	}
+}
+
+// TestRequestFreshRejectsUnexpected304 — a 304 answering a request that sent
+// NO validator is malformed (RFC 9110 §15.4.5: 304 is a conditional answer);
+// the interactive path errors loudly instead of returning a body-less "ok".
+func TestRequestFreshRejectsUnexpected304(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `W/"x"`)
+		w.WriteHeader(http.StatusNotModified)
+	}))
+	t.Cleanup(srv.Close)
+	c, err := New(srv.URL)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	_, err = c.RequestFresh(context.Background(), http.MethodGet, "/api/x", nil)
+	if err == nil || err == ErrNotModified {
+		t.Fatalf("unexpected 304 must be a loud error, got %v", err)
+	}
+}
+
+// TestRequestFreshWritesStillStampOrigin — the interactive write path is
+// byte-identical to Request: the T6 Origin gate passes on the bridge's writes.
+func TestRequestFreshWritesStillStampOrigin(t *testing.T) {
+	fw := newFakeWorker()
+	c := newTestClient(t, fw)
+	ctx := context.Background()
+	if err := c.Login(ctx, "u", "p"); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if _, err := c.RequestFresh(ctx, http.MethodPatch, "/api/devtasks/t1", []byte(`{"title":"x"}`)); err != nil {
+		t.Fatalf("fresh write without Origin would be 403'd at the gate: %v", err)
+	}
+}

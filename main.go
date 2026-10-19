@@ -52,9 +52,9 @@ import (
 // derives all three). Overridden at build time:
 //
 //	wails build -platform windows/amd64 -ldflags \
-//	  "-s -w -X main.Version=0.1.3 -X main.WebRef=e6661c8"
+//	  "-s -w -X main.Version=0.1.4 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.3-dev"
+	Version = "0.1.4-dev"
 	WebRef  = "unpinned"
 )
 

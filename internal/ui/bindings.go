@@ -303,9 +303,19 @@ func (a *API) AppInfo() AppInfo {
 
 // Request is the ONE transport method the island calls (window.hibanaFetch →
 // window.gohibana.api.Request). It executes an API call with the Go-side
-// session/Origin/ETag machinery and returns the wire result. Validation
-// failures return a Go error — Wails surfaces it as a rejected JS promise,
-// which the shim converts to a thrown error exactly like a failed fetch.
+// session/Origin machinery and returns the wire result. Validation failures
+// return a Go error — Wails surfaces it as a rejected JS promise, which the
+// shim converts to a thrown error exactly like a failed fetch.
+//
+// THE INTERACTIVE TRANSPORT IS ALWAYS FRESH (the S215 dogfood lesson): the
+// bridge shares ONE client with the pull engine, whose §8 cheap-poll seeds
+// an If-None-Match for every board path it mirrors — so the island's own GET
+// of a switched-to project arrived carrying the engine's validator and the
+// server answered 304 to a renderer with no cached copy ("Couldn't load the
+// board — Try again", stuck on every retry). The bridge therefore rides
+// RequestFresh: interactive GETs never conditional-poll (the WEB island's
+// cache:'no-store' semantics), and the 304-with-validator contract stays
+// with the engine, where the mirror actually has the body.
 func (a *API) Request(method, path, body string) (BridgeResponse, error) {
 	method = strings.ToUpper(strings.TrimSpace(method))
 	switch method {
@@ -327,15 +337,17 @@ func (a *API) Request(method, path, body string) (BridgeResponse, error) {
 	if body != "" {
 		bodyBytes = []byte(body)
 	}
-	resp, err := a.client.Request(context.Background(), method, path, bodyBytes)
+	resp, err := a.client.RequestFresh(context.Background(), method, path, bodyBytes)
 	if err == nil {
 		a.noteSessionRefresh()
 		return BridgeResponse{Status: resp.Status, Body: string(resp.Body), ETag: resp.ETag}, nil
 	}
 	// Status errors flow to JS as {status, body} so the island's err.status
 	// branching (404-gone vs transient, devboard.js:56-61) keeps working —
-	// the shim builds the fetch-shaped response from it.
+	// the shim builds the fetch-shaped response from it. Failures log (the
+	// one-line trail future dogfood reports read from data/logs/hibana.log).
 	if se, ok := err.(*api.StatusError); ok {
+		log.Printf("hibana bridge: %s %s → %d", method, path, se.Status)
 		if se.Status == http.StatusUnauthorized {
 			// The island's own read just 401'd while we believed the session
 			// live: the cookie died mid-session — reopen the login card
@@ -345,11 +357,9 @@ func (a *API) Request(method, path, body string) (BridgeResponse, error) {
 		}
 		return BridgeResponse{Status: se.Status, Body: se.Body, ETag: ""}, nil
 	}
-	if err == api.ErrNotModified {
-		// A cheap-poll 304 through the bridge: status 304 + the stored ETag
-		// (the shim's headers.get('etag') contract, guide §4.3).
-		return BridgeResponse{Status: http.StatusNotModified, Body: "", ETag: a.client.ETag(path)}, nil
-	}
+	// ErrNotModified can no longer reach here (RequestFresh rejects an
+	// unexpected 304 loudly); transport errors reject the JS promise and the
+	// shim converts them to the fetch-failed branch the island already knows.
 	return BridgeResponse{}, fmt.Errorf("bridge: transport: %w", err)
 }
 

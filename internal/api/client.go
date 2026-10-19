@@ -161,6 +161,50 @@ func (c *Client) Request(ctx context.Context, method, path string, body []byte) 
 	}
 }
 
+// RequestFresh executes one INTERACTIVE call — the bridge's transport (the
+// S215 dogfood root cause: "change project → Couldn't load the board — Try
+// again"). The engine and the island share ONE client, and the engine's §8
+// cheap-poll seeds an If-None-Match for every board path it pulls — a
+// validator the island's own GET of the SAME path then carried, so the
+// server answered 304 to a renderer that holds no cached copy (the WEB
+// island never sees this: its fetches ride cache:'no-store', which never
+// conditional-polls). Fresh GETs therefore send NO If-None-Match; a 200
+// still refreshes the stored validator (absorb), so the engine's NEXT
+// cheap-poll 304s correctly instead of double-pulling. An unexpected 304
+// (no validator was sent — RFC 9110 §15.4.5 allows 304 only for
+// conditional requests) is a loud error, never a silently-empty board.
+// Writes are byte-identical to Request (Origin stamp, no blind retry).
+func (c *Client) RequestFresh(ctx context.Context, method, path string, body []byte) (*Response, error) {
+	method = strings.ToUpper(method)
+	switch method {
+	case http.MethodGet, http.MethodHead:
+		return c.getFresh(ctx, method, path)
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return c.write(ctx, method, path, body)
+	default:
+		return nil, fmt.Errorf("hibana api: method not allowed: %s", method)
+	}
+}
+
+// getFresh is the conditional-less GET: no validator out, full 200 back.
+func (c *Client) getFresh(ctx context.Context, method, path string) (*Response, error) {
+	resp, err := c.do(ctx, method, path, nil, "", c.getDeadline)
+	if err != nil {
+		// ONE fresh retry on transport failure — the same contract as get().
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		resp, err = c.do(ctx, method, path, nil, "", c.getRetryDeadline)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if resp.status == http.StatusNotModified {
+		return nil, fmt.Errorf("hibana api: unexpected 304 on fresh %s %s (no If-None-Match was sent)", method, path)
+	}
+	return c.absorb(method, path, resp)
+}
+
 func (c *Client) get(ctx context.Context, method, path string) (*Response, error) {
 	etag := c.ETag(path)
 	resp, err := c.do(ctx, method, path, nil, etag, c.getDeadline)

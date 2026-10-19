@@ -336,3 +336,72 @@ func makeBody(n int) string {
 	}
 	return string(b)
 }
+
+// TestBridgeFreshAfterEngineSeededETag — THE S215 DOGFOOD REGRESSION, end to
+// end at the bridge: the sync engine's pull rounds run on the SAME client and
+// leave an If-None-Match cached for every board path (the engine's §8
+// cheap-poll). The owner's report — "when i wanted to change project got
+// this error: couldn't load - try again" — was the island's switcher GET
+// hitting that cached validator: the server answered 304 and the board
+// renderer, which holds no cached copy, threw on the non-ok status. The
+// bridge is the INTERACTIVE transport: the same-path GET through it must
+// come back the full 200 + body, every time, whatever the engine cached.
+func TestBridgeFreshAfterEngineSeededETag(t *testing.T) {
+	const boardPath = "/api/projects/p9/devboard"
+	const etag = `W/"s215"`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != boardPath {
+			w.WriteHeader(404)
+			_, _ = w.Write([]byte(`{"error":"not_found"}`))
+			return
+		}
+		// http.ts:103-127 semantics: exact If-None-Match match → 304, else the
+		// full 200 + validator.
+		if inm := r.Header.Get("If-None-Match"); inm == etag {
+			w.Header().Set("ETag", etag)
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", etag)
+		_, _ = w.Write([]byte(`{"project":{"id":"p9"},"tasks":[]}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := api.New(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	// 1) The engine's first pull seeds the validator (exactly what a sync
+	//    round leaves in the shared client).
+	if _, err := c.Request(ctx, http.MethodGet, boardPath, nil); err != nil {
+		t.Fatalf("engine first pull: %v", err)
+	}
+	// 2) The engine's cheap re-poll 304s (its own contract — unchanged).
+	if _, err := c.Request(ctx, http.MethodGet, boardPath, nil); err != api.ErrNotModified {
+		t.Fatalf("engine re-poll must stay ErrNotModified, got %v", err)
+	}
+
+	// 3) THE BUG SCENARIO: the island's switcher GETs the same path through
+	//    the bridge. Must be the full 200 + body — pre-fix this returned
+	//    {status:304, body:""} and the board showed "Couldn't load the board".
+	a := New(c, "0.1.4-dev", "e6661c8")
+	res, err := a.Request("GET", boardPath, "")
+	if err != nil {
+		t.Fatalf("bridge switcher GET: %v", err)
+	}
+	if res.Status != http.StatusOK {
+		t.Fatalf("the island's interactive GET must be a full 200, got %+v", res)
+	}
+	var wire map[string]any
+	if json.Unmarshal([]byte(res.Body), &wire) != nil || wire["project"] == nil {
+		t.Fatalf("the island must receive the full board body, got %q", res.Body)
+	}
+
+	// 4) Repeat: even after the fresh 200 refreshed the validator, the NEXT
+	//    switch (or any later island fetch of the same path) is still a 200.
+	res2, err := a.Request("GET", boardPath, "")
+	if err != nil || res2.Status != http.StatusOK {
+		t.Fatalf("every interactive GET must stay 200, got err=%v %+v", err, res2)
+	}
+}
