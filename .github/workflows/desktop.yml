@@ -189,6 +189,21 @@ jobs:
             find . -type f | head -50
             exit 1
           fi
+          # THE NOTES RIDE THE ANNOTATED TAG (one mechanism for every release):
+          # the hand-cut ritual writes the round's notes into `git tag -a -m`,
+          # the autorelease lane generates them from the commit range — this job
+          # just reads the tag object's message back. No checkout exists here by
+          # design, so the read is a pure API call (GH_REPO above). A lightweight
+          # tag (no message object) falls back to the minimal hard-9 template.
+          NOTES=""
+          OBJ_SHA="$(gh api "repos/$GH_REPO/git/refs/tags/$TAG" --jq .object.sha 2>/dev/null || true)"
+          if [ -n "$OBJ_SHA" ]; then
+            NOTES="$(gh api "repos/$GH_REPO/git/tags/$OBJ_SHA" --jq .message 2>/dev/null || true)"
+          fi
+          if [ -z "$NOTES" ] || [ "$NOTES" = "null" ]; then
+            NOTES="Desktop $VER — embedded web island pinned at hibana-source $WEB_REF (v$WEB_VERSION). Sign in with your hibana.ir account; once you sign in, the kanban loads, and a live session boots straight to the board. See checksums.txt."
+          fi
+          printf '%s' "$NOTES" > RELEASE-NOTES.md
           gh release create "$TAG" --title "Hibana Kanban $VER (island @ $WEB_REF)" \
-            --notes "Desktop $VER — embedded web island pinned at hibana-source $WEB_REF (v$WEB_VERSION). NEW in $VER: THE PROJECT SWITCHER FIX — changing projects said \"Couldn't load the board — try again\" and never recovered; the sync engine's cached If-None-Match validator was riding the board's own fetch, so the server answered 304 to a renderer with no cached copy. Interactive fetches are now always fresh (no conditional polling) — switching projects loads every board reliably. Bridge failures also log to data/logs/hibana.log now. Minimize to tray (from $VER's predecessor): the Hibana icon sits in the notification area; the close button hides to the tray with a persisted toggle; left-click or a second exe launch restores. Sign in with your hibana.ir account; once you sign in, the kanban loads, and a live session boots straight to the board. See checksums.txt." \
+            --notes-file RELEASE-NOTES.md \
             "$INSTALLER" "$PORTABLE" "$CKSUM"
