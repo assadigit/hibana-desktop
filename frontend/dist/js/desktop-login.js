@@ -55,19 +55,22 @@
     return null
   }
 
-  var bridgeLogin = resolveBoundMethod('Login')
-  var bridgeAuthState = resolveBoundMethod('AuthState')
+  // ---- bridge resolution: LAZY, at USE time — never a parse-time snapshot (the
+  // v0.1.1 dogfood lesson: "The desktop bridge is not wired — restart the app." fired
+  // with a live bridge one script tag away, because the snapshot ran on a document
+  // whose Wails runtime tags were missing; v0.1.2 both injects them on every lane
+  // AND makes the gate resolve at submit time like the shim resolves per call). ----
 
   // ---- language resolution (i18n.js:69-77): the hook wins, no island network ----
-  if (bridgeAuthState) {
-    window.__hibanaMe = async function () {
-      try {
-        const st = await bridgeAuthState()
-        if (st && st.authenticated && st.user) return { ok: true, body: { user: st.user } }
-        return { ok: false, body: null }
-      } catch (e) {
-        return { ok: false, body: null }
-      }
+  window.__hibanaMe = async function () {
+    const authState = resolveBoundMethod('AuthState')
+    if (!authState) return { ok: false, body: null }
+    try {
+      const st = await authState()
+      if (st && st.authenticated && st.user) return { ok: true, body: { user: st.user } }
+      return { ok: false, body: null }
+    } catch (e) {
+      return { ok: false, body: null }
     }
   }
 
@@ -118,6 +121,7 @@
         fail('Enter your email and password.')
         return
       }
+      var bridgeLogin = resolveBoundMethod('Login')
       if (!bridgeLogin) {
         fail('The desktop bridge is not wired — restart the app.')
         return

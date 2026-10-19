@@ -19,6 +19,29 @@ import (
 //     board underneath never flashes its 401 error state at the user.
 const htmlOpenTag = `<html lang="en">`
 
+// wailsRuntimeScripts is byte-equivalent to what the Wails asset server itself
+// injects into every "/"-suffix HTML document (pkg/assetserver/assetserver.go
+// processIndexHTML: insertScriptInHead(runtimeJSPath) then
+// insertScriptInHead(ipcJSPath) — the second insert lands FIRST, so the served
+// order is ipc.js → runtime.js as <head>'s first children, i.e. before every
+// island script tag).
+//
+// WHY WE MUST REPLICATE IT BY HAND: the asset server's top-level
+// isRuntimeInjectionMatch() only fires for paths ending in "/" or
+// "/index.html". The island's own entry guard (board-page.js:29
+// `location.replace('/kanban')` when neither ?project= nor the /kanban entry
+// is present) boots the WebView at "/" for a flash and then NAVIGATES it to
+// /kanban — the document the user actually lands on. For /kanban the Wails
+// matcher never runs, so without this injection window.go is never defined on
+// the live page: the shim's hibanaFetch dies with HibanaBridgeNotWired and the
+// login card fails with "The desktop bridge is not wired — restart the app."
+// (the v0.1.0 white board + the v0.1.1 dogfood report — ONE root cause, fixed
+// here). main.go aliases /kanban (+ /kanban.html, /board.html) to the root
+// document and serves them through KanbanIndexMiddleware, which adds these
+// tags; the true "/" keeps Wails' own injection (never duplicated — the
+// Contains guard below skips an already-injected document).
+const wailsRuntimeScripts = `<script src="/wails/ipc.js"></script><script src="/wails/runtime.js"></script>`
+
 // InjectAuthAttr rewrites the island's index.html bytes with the live auth
 // state. Fail-open by design: if the marker drifted (an island re-pin), the
 // bytes pass through untouched — the login JS then resolves visibility via
@@ -35,14 +58,52 @@ func InjectAuthAttr(body []byte, authed bool) []byte {
 	return bytes.Replace(body, []byte(htmlOpenTag), []byte(replacement), 1)
 }
 
+// InjectWailsRuntime splices the Wails runtime script tags in right after
+// <head> — the same position (head's first children) the asset server puts
+// them for "/" documents, so the aliased /kanban document parses in exactly
+// the order Wails guarantees: ipc.js → runtime.js → the island's own tags.
+// Fail-open by design; idempotent: an already-injected document (a future
+// Wails release matching /kanban itself, or a double hop) passes through.
+func InjectWailsRuntime(body []byte) []byte {
+	if bytes.Contains(body, []byte("/wails/ipc.js")) {
+		return body
+	}
+	i := bytes.Index(body, []byte("<head>"))
+	if i < 0 {
+		return body
+	}
+	at := i + len("<head>")
+	out := make([]byte, 0, len(body)+len(wailsRuntimeScripts))
+	out = append(out, body[:at]...)
+	out = append(out, wailsRuntimeScripts...)
+	out = append(out, body[at:]...)
+	return out
+}
+
 // IndexMiddleware wraps the asset handler for the HTML root: every GET of /
 // (or /index.html) is served with the CURRENT auth state injected into the
 // <html> tag. Conditional-request headers (If-Modified-Since / If-None-Match
 // / Range) are stripped for the root document so the WebView can never
 // revalidate into a 304 whose cached copy would bypass the injection (the
 // gate state would go stale across a sign-in); the rewritten response is
-// explicitly no-store.
+// explicitly no-store. The Wails runtime scripts are NOT injected here — the
+// asset server's own top-level recorder handles "/" documents.
 func (a *API) IndexMiddleware(next http.Handler) http.Handler {
+	return a.indexMiddleware(next, false)
+}
+
+// KanbanIndexMiddleware serves the root document for the /kanban entry
+// aliases (main.go rewrites /kanban, /kanban.html and /board.html to /): the
+// same live-auth injection as IndexMiddleware PLUS the Wails runtime scripts,
+// because the asset server's isRuntimeInjectionMatch() never fires for the
+// aliased paths (see wailsRuntimeScripts) — without them the page the WebView
+// actually boots on carries no window.go and every bridge call dies with
+// "bridge not wired".
+func (a *API) KanbanIndexMiddleware(next http.Handler) http.Handler {
+	return a.indexMiddleware(next, true)
+}
+
+func (a *API) indexMiddleware(next http.Handler, injectWailsRuntime bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || (r.URL.Path != "/" && r.URL.Path != "/index.html") {
 			next.ServeHTTP(w, r)
@@ -62,6 +123,9 @@ func (a *API) IndexMiddleware(next http.Handler) http.Handler {
 		}
 		if strings.Contains(cw.hdr.Get("Content-Type"), "text/html") {
 			body = InjectAuthAttr(body, a.AuthState().Authenticated)
+			if injectWailsRuntime {
+				body = InjectWailsRuntime(body)
+			}
 			// The document is per-session dynamic: never let the WebView cache
 			// a stale gate state or revalidate into a body-less 304.
 			h.Del("Last-Modified")

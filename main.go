@@ -53,7 +53,7 @@ import (
 //	wails build -platform windows/amd64 -ldflags \
 //	  "-s -w -X main.Version=0.1.1 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.1-dev"
+	Version = "0.1.2-dev"
 	WebRef  = "unpinned"
 )
 
@@ -190,17 +190,30 @@ func main() {
 			// board-page.js:28 — so the asset server aliases the route exactly
 			// like the Worker does (app.ts:370-385). A bare "/" boot bounces
 			// once via the island's own guard (:29) — by design, so the deep
-			// link state matches the web app byte-for-byte. The root document
-			// is then served through the bridge's IndexMiddleware: the live
-			// auth state rides on the <html> tag so the login card's
-			// visibility is a first-paint CSS decision (never a JS flash).
+			// link state matches the web app byte-for-byte.
+			//
+			// TWO document lanes (the v0.1.0/v0.1.1 dogfood lesson — ONE root
+			// cause, fixed in v0.1.2): Wails injects its runtime scripts
+			// (ipc.js + runtime.js — the window.go bindings) ONLY into
+			// "/"-suffix documents (assetserver.isRuntimeInjectionMatch), but
+			// the island's guard lands the WebView on /kanban, where they are
+			// never injected — window.go was missing on the page the user
+			// actually sees and every bridge call died with "bridge not wired".
+			// The aliased document therefore carries the runtime tags itself
+			// (KanbanIndexMiddleware); the true "/" keeps Wails' own injection.
+			// Both lanes put the live auth state on the <html> tag (the login
+			// card's visibility is a first-paint CSS decision, never a JS
+			// flash).
 			Middleware: func(next http.Handler) http.Handler {
-				injected := bridge.IndexMiddleware(next)
+				root := bridge.IndexMiddleware(next)
+				kanban := bridge.KanbanIndexMiddleware(next)
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if p := r.URL.Path; p == "/kanban" || p == "/kanban.html" || p == "/board.html" {
 						r.URL.Path = "/"
+						kanban.ServeHTTP(w, r)
+						return
 					}
-					injected.ServeHTTP(w, r)
+					root.ServeHTTP(w, r)
 				})
 			},
 		},

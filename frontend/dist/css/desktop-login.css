@@ -2,34 +2,33 @@
    GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
    into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
 
-   The card itself reuses the WEB LOGIN PAGE'S OWN classes — .auth-page (base.css:304,
-   the centered grid + var(--bg) backdrop) and .auth-card (base.css:312, the var(--card)
-   surface) and .error (components.css:228, var(--err)) — so it is theme-aware
-   (light/claude-dark) and RTL-correct for free. This sheet only owns the gate wrapper,
-   the first-paint visibility rule, and the busy spinner state. */
+   v0.1.2: the gate is the WEB LOGIN PAGE'S OWN SPLIT LAYOUT now (login.html @ pin —
+   the owner ask: the same login background as the web login): .auth-page +
+   .auth-split-page (base.css + quicknotes.css), .auth-split / .auth-visual (the
+   Login.webp photo panel) / .auth-form / .auth-brand / .auth-logo — ALL quicknotes.css
+   + base.css rules, and both sheets ship in the island VERBATIM, so the gate is
+   theme-aware (light/claude-dark) and RTL-correct for free. This sheet only owns the
+   gate wrapper, the first-paint visibility rule, and the busy spinner state. */
 
 /* The gate: a full-viewport overlay above every island surface (the toast in
    components.css sits far below this z-index; the board beneath never shows
-   its unauthenticated error state through the card). */
+   its unauthenticated error state through the gate). var(--bg) backdrop so a
+   sub-pixel split seam can never flash the board behind. */
 .login-gate {
   position: fixed;
   inset: 0;
   z-index: 2147483646;
   overflow: auto;
+  background: var(--bg);
 }
 
 /* First-paint visibility is a CSS-ONLY decision (never a JS flash): the Go shell
    serves index.html with the live auth state on the <html> tag
-   (internal/ui.IndexMiddleware) — a live restored session hides the card before
+   (internal/ui.IndexMiddleware) — a live restored session hides the gate before
    the first paint; a fresh session shows it before the island's first fetch can
-   401. A missing attribute (a drifted island) shows the card: fail-visible. */
+   401. A missing attribute (a drifted island) shows the gate: fail-visible. */
 html[data-desktop-authed='true'] .login-gate {
   display: none;
-}
-
-.login-gate .auth-card {
-  margin-inline: auto;
-  box-shadow: 0 12px 48px rgb(0 0 0 / 0.1);
 }
 
 .login-gate #login-error {

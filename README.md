@@ -16,7 +16,7 @@ This repo is the **build** — the decision record is ADR-001 in that guide.
 |---|---|
 | **M0** — Worker contract hardening (`API-AND-SYNC-CONTRACT.md` §7a-7e) | **NOT STARTED — awaiting the owner's go** (it is hibana-source work, not this repo; this build targets the already-deployed contract) |
 | **M1** — Go API client + auth, no UI | **DONE + live-accepted** (`cmd/acceptance`: login → pull 2 boards → create/move/archive → verified via the web client's API, against prod, self-cleaning) |
-| **M2** — the Wails shell + read-only board | **groundwork done + the login-first boot landed (v0.1.1)**: a live stored session boots straight to the board; otherwise the island-rendered sign-in card opens first (guide §5.5's pick) — sign in against hibana.ir, the kanban loads; a mid-session 401 reopens the card and a re-login wakes the outbox's retry-once. The windowed side-by-side pixel acceptance still needs the owner's dogfooding on a real Windows host |
+| **M2** — the Wails shell + read-only board | **groundwork done + the login-first boot landed (v0.1.1) + the v0.1.2 dogfood fixes**: a live stored session boots straight to the board; otherwise the island-rendered sign-in card opens first — now the WEB LOGIN PAGE'S OWN SPLIT LAYOUT (the Login.webp photo panel) (guide §5.5's pick) — sign in against hibana.ir, the kanban loads; a mid-session 401 reopens the card and a re-login wakes the outbox's retry-once. The windowed side-by-side pixel acceptance still needs the owner's dogfooding on a real Windows host |
 | M3-M5 | not started (outbox drain engine exists + is table-tested; the offline mutation UI, media pipeline, installer + auto-update follow) |
 
 ## Layout
@@ -65,7 +65,7 @@ release. Both versions (desktop semver + web ref) are stamped into the binary:
 
 ```bash
 wails build -platform windows/amd64 \
-  -ldflags "-s -w -X main.Version=0.1.1 -X main.WebRef=e6661c8"
+  -ldflags "-s -w -X main.Version=0.1.2 -X main.WebRef=e6661c8"
 ```
 
 A plain-Go cross-build from Linux works too (the Windows target is cgo-free):

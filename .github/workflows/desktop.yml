@@ -190,5 +190,5 @@ jobs:
             exit 1
           fi
           gh release create "$TAG" --title "Hibana Kanban $VER (island @ $WEB_REF)" \
-            --notes "Desktop $VER — embedded web island pinned at hibana-source $WEB_REF (v$WEB_VERSION). NEW in $VER: the login-first boot — the first launch opens a sign-in card (your hibana.ir account); once you sign in, the kanban loads, and a live session boots straight to the board afterwards. A mid-session expiry reopens the card. See checksums.txt." \
+            --notes "Desktop $VER — embedded web island pinned at hibana-source $WEB_REF (v$WEB_VERSION). NEW in $VER: the desktop bridge wires on the /kanban page you actually boot on (the 'bridge not wired' sign-in failure is gone), the sign-in gate now uses the WEB login's own background (the split photo panel), and the app + favicon wear the Hibana logo. Sign in with your hibana.ir account; once you sign in, the kanban loads, and a live session boots straight to the board afterwards. A mid-session expiry reopens the card. See checksums.txt." \
             "$INSTALLER" "$PORTABLE" "$CKSUM"
