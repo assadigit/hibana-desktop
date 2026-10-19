@@ -91,7 +91,7 @@ jobs:
           # Locate the three artifacts wherever wails put them (the NSIS
           # product lands in build/bin/) and hash them with Get-FileHash —
           # no name/location assumptions, sha256 lowercased like sha256sum.
-          $artifacts = Get-ChildItem -Path 'build/bin/hibana.exe', 'build/bin/hibana-setup-*.exe', 'hibana-setup-*.exe', 'hibana-portable-*.zip' -ErrorAction SilentlyContinue | Sort-Object FullName -Unique
+          $artifacts = Get-ChildItem -Path 'build/bin/hibana.exe', 'build/bin/*setup*.exe', '*setup*.exe', 'hibana-portable-*.zip' -ErrorAction SilentlyContinue | Sort-Object FullName -Unique
           $artifacts | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $(Split-Path -Leaf $_.FullName)" } | Out-File checksums.txt -Encoding utf8
           Get-Content checksums.txt
 
@@ -100,8 +100,8 @@ jobs:
           name: hibana-windows
           path: |
             build/bin/hibana.exe
-            build/bin/hibana-setup-*.exe
-            hibana-setup-*.exe
+            build/bin/*setup*.exe
+            *setup*.exe
             hibana-portable-*.zip
             checksums.txt
           retention-days: 7
@@ -125,4 +125,4 @@ jobs:
           VER="${TAG#v}"; VER="${VER%-desktop}"
           gh release create "$TAG" --title "Hibana Kanban $VER (island @ $env:WEB_REF)" \
             --notes "Desktop $VER — embedded web island pinned at hibana-source $env:WEB_REF (v$env:WEB_VERSION). See checksums.txt." \
-            hibana-setup-*.exe hibana-portable-*.zip checksums.txt
+            *setup*.exe hibana-portable-*.zip checksums.txt
