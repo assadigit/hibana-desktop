@@ -3,6 +3,16 @@
 > For the installed build, none of this applies: data lives in
 > `%LOCALAPPDATA%\hibana\` and the NSIS uninstaller owns removal.
 
+## Signing in (first launch)
+
+The first launch opens a **sign-in card** — use your **hibana.ir account**
+(email or username + password). Signing in is what loads your boards: the
+kanban appears once you're connected. The app keeps its own session in
+`data\session.bin` (0600), so you stay signed in across restarts; the cloud
+refreshes the session while you use the app, and it expires after 30 days
+unused — the card simply reopens, you sign in again, the board reloads. The
+password itself is never stored anywhere.
+
 ## Where your data lives
 
 The portable build keeps **everything** in a `data\` folder **next to the .exe**:

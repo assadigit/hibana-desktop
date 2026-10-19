@@ -102,12 +102,24 @@ jobs:
 
       # 4. The two artifacts — same binary, dual stamps (the never-diverge rule:
       #    tag, -X stamps, and wails.json info derive from ONE version source).
+      #    The tag IS that source: v0.1.1-desktop → 0.1.1 everywhere. Branch
+      #    builds stamp the dev placeholder instead.
+      - name: Derive the build version (hard rule 9)
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $v = ($env:GITHUB_REF -replace '^refs/tags/v', '') -replace '-desktop$', ''
+          } else {
+            $v = '0.1.1-dev'
+          }
+          Add-Content $env:GITHUB_ENV "BUILD_VERSION=$v"
+          Write-Host "BUILD_VERSION=$v"
+
       - name: Build portable exe
-        run: wails build -platform windows/amd64 -ldflags "-s -w -X main.Version=0.1.0 -X main.WebRef=$env:WEB_REF"
+        run: wails build -platform windows/amd64 -ldflags "-s -w -X main.Version=$env:BUILD_VERSION -X main.WebRef=$env:WEB_REF"
 
       - name: Build NSIS installer
         run: |
-          wails build -platform windows/amd64 -nsis -ldflags "-s -w -X main.Version=0.1.0 -X main.WebRef=$env:WEB_REF"
+          wails build -platform windows/amd64 -nsis -ldflags "-s -w -X main.Version=$env:BUILD_VERSION -X main.WebRef=$env:WEB_REF"
           # wails exits 0 with a mere warning when makensis is missing — assert the PRODUCT.
           $installer = Get-ChildItem -Path 'build/bin','.' -Filter '*installer*.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $installer) { Write-Error "NSIS installer not produced (wails silently skipped — makensis missing?)"; exit 1 }
@@ -115,7 +127,7 @@ jobs:
 
       - name: Portable zip + checksums
         run: |
-          pwsh scripts/make-portable.ps1 -Version 0.1.0
+          pwsh scripts/make-portable.ps1 -Version $env:BUILD_VERSION
           # Locate the three artifacts wherever wails put them (the NSIS
           # product lands in build/bin/) and hash them with Get-FileHash —
           # no name/location assumptions, sha256 lowercased like sha256sum.
@@ -178,5 +190,5 @@ jobs:
             exit 1
           fi
           gh release create "$TAG" --title "Hibana Kanban $VER (island @ $WEB_REF)" \
-            --notes "Desktop $VER — embedded web island pinned at hibana-source $WEB_REF (v$WEB_VERSION). See checksums.txt." \
+            --notes "Desktop $VER — embedded web island pinned at hibana-source $WEB_REF (v$WEB_VERSION). NEW in $VER: the login-first boot — the first launch opens a sign-in card (your hibana.ir account); once you sign in, the kanban loads, and a live session boots straight to the board afterwards. A mid-session expiry reopens the card. See checksums.txt." \
             "$INSTALLER" "$PORTABLE" "$CKSUM"

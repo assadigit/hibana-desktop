@@ -1,0 +1,48 @@
+/* desktop-login.css — the login gate's desktop-owned styles.
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
+
+   The card itself reuses the WEB LOGIN PAGE'S OWN classes — .auth-page (base.css:304,
+   the centered grid + var(--bg) backdrop) and .auth-card (base.css:312, the var(--card)
+   surface) and .error (components.css:228, var(--err)) — so it is theme-aware
+   (light/claude-dark) and RTL-correct for free. This sheet only owns the gate wrapper,
+   the first-paint visibility rule, and the busy spinner state. */
+
+/* The gate: a full-viewport overlay above every island surface (the toast in
+   components.css sits far below this z-index; the board beneath never shows
+   its unauthenticated error state through the card). */
+.login-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  overflow: auto;
+}
+
+/* First-paint visibility is a CSS-ONLY decision (never a JS flash): the Go shell
+   serves index.html with the live auth state on the <html> tag
+   (internal/ui.IndexMiddleware) — a live restored session hides the card before
+   the first paint; a fresh session shows it before the island's first fetch can
+   401. A missing attribute (a drifted island) shows the card: fail-visible. */
+html[data-desktop-authed='true'] .login-gate {
+  display: none;
+}
+
+.login-gate .auth-card {
+  margin-inline: auto;
+  box-shadow: 0 12px 48px rgb(0 0 0 / 0.1);
+}
+
+.login-gate #login-error {
+  margin: 0;
+  white-space: pre-line;
+}
+
+#login-gate-sub {
+  margin: 0.1rem 0 1.4rem;
+}
+
+/* components.css's .spinner is display:none until the STRIPPED htmx chrome tags it;
+   the gate uses its own busy state instead (never the stripped-web class names). */
+.login-gate .spinner.busy {
+  display: inline-block;
+}

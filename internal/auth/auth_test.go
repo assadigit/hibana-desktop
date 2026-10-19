@@ -56,11 +56,56 @@ func TestRestoreValidatesAndClearsDeadSessions(t *testing.T) {
 	if err := fs.SaveSession("dead-token"); err != nil {
 		t.Fatal(err)
 	}
-	live, err := Restore(context.Background(), c, fs)
+	me, live, err := Restore(context.Background(), c, fs)
 	if err != nil || live {
 		t.Fatalf("dead session: live=%v err=%v", live, err)
 	}
+	if me != nil {
+		t.Fatal("dead session must return a nil identity")
+	}
 	if tok, _ := fs.LoadSession(); tok != "" {
 		t.Fatal("Restore must Clear a dead session")
+	}
+}
+
+func TestRestoreReturnsTheIdentityOnALiveSession(t *testing.T) {
+	// A live stored token validates against /me and comes back WITH the
+	// identity — the bridge's boot snapshot (AuthState) needs the
+	// email/language_pref so the login card's visibility and the island's
+	// language hook resolve before any island code runs.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ck, err := r.Cookie(api.SessionCookie)
+		if err != nil || ck.Value == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"user":{"id":"u1","username":"user","email":"user@example.com","role":"member","language_pref":"fa","calendar_pref":"gregorian"}}`))
+	}))
+	defer srv.Close()
+	c, _ := api.New(srv.URL)
+	fs := &FileStore{Path: filepath.Join(t.TempDir(), "session.bin")}
+	if err := fs.SaveSession("live-token"); err != nil {
+		t.Fatal(err)
+	}
+	me, live, err := Restore(context.Background(), c, fs)
+	if err != nil || !live {
+		t.Fatalf("live session: live=%v err=%v", live, err)
+	}
+	if me == nil || me.User.Email != "user@example.com" || me.User.LanguagePref != "fa" {
+		t.Fatalf("identity lost: %+v", me)
+	}
+	// The token rode into the jar (the client is session-live immediately).
+	if c.SessionToken() != "live-token" {
+		t.Fatalf("jar token: %q", c.SessionToken())
+	}
+}
+
+func TestRestoreWithoutStoredSessionIsQuiet(t *testing.T) {
+	c, _ := api.New("https://hibana.example")
+	fs := &FileStore{Path: filepath.Join(t.TempDir(), "session.bin")}
+	me, live, err := Restore(context.Background(), c, fs)
+	if err != nil || live || me != nil {
+		t.Fatalf("empty store: me=%v live=%v err=%v", me, live, err)
 	}
 }

@@ -94,24 +94,28 @@ func (f *FileStore) Clear() error {
 }
 
 // Restore loads a stored token into the client and validates it against the
-// API. Returns (true, nil) when the session is live; (false, nil) when there
-// is no stored session or it is dead (the store is cleared — a fresh login is
-// needed); an error only for real I/O/network trouble.
-func Restore(ctx context.Context, c *api.Client, s Store) (bool, error) {
+// API. Returns the identity + (true, nil) when the session is live; (nil,
+// false, nil) when there is no stored session or it is dead (the store is
+// cleared — a fresh login is needed, the login card opens); an error only
+// for real I/O/network trouble. The returned Me seeds the bridge's boot
+// snapshot (AuthState) so the login card's visibility resolves at first
+// paint and the island's language hook has the user's language_pref.
+func Restore(ctx context.Context, c *api.Client, s Store) (*api.Me, bool, error) {
 	tok, err := s.LoadSession()
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	if tok == "" {
-		return false, nil
+		return nil, false, nil
 	}
 	c.SetSessionToken(tok)
-	if _, err := c.Me(ctx); err != nil {
+	me, err := c.Me(ctx)
+	if err != nil {
 		if se, ok := err.(*api.StatusError); ok && se.Status == 401 {
 			_ = s.Clear() // dead session — drop it so the login path runs
-			return false, nil
+			return nil, false, nil
 		}
-		return false, err
+		return nil, false, err
 	}
-	return true, nil
+	return me, true, nil
 }
