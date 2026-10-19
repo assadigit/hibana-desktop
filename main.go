@@ -54,7 +54,7 @@ import (
 //	wails build -platform windows/amd64 -ldflags \
 //	  "-s -w -X main.Version=0.1.4 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.5-dev"
+	Version = "0.1.6-dev"
 	WebRef  = "unpinned"
 )
 
@@ -188,6 +188,23 @@ func main() {
 		if c, ok := appCtxVal.Load().(context.Context); ok {
 			wailsruntime.EventsEmit(c, "hibana:theme", map[string]string{"pref": pref})
 		}
+	})
+	// THE MANUAL SYNC ROUND (S217 — v0.1.6): the toolbar's physical Sync
+	// button → ui.SyncNow → engine.SyncRound, every transition relayed to
+	// the modal live (js/desktop-sync.js paints the step rows). A session
+	// outcome reopens the login card ABOVE the modal (NotifyAuthLost) so a
+	// re-login recovers without dismissing the proof.
+	bridge.SetSyncEmit(func(step, state, detail string) {
+		if c, ok := appCtxVal.Load().(context.Context); ok {
+			wailsruntime.EventsEmit(c, "hibana:sync-progress", map[string]string{"step": step, "state": state, "detail": detail})
+		}
+	})
+	bridge.SetSyncRun(func(ctx context.Context, emit sync.Emit) (sync.RoundOutcome, error) {
+		out, err := engine.SyncRound(ctx, emit)
+		if out.Code == sync.OutcomeSession {
+			bridge.NotifyAuthLost("sync-session")
+		}
+		return out, err
 	})
 	bridge.SetOnLogin(func(u *api.MeUser) {
 		log.Printf("hibana: signed in as %s — pulling boards", u.Email)

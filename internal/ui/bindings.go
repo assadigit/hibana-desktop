@@ -37,10 +37,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"hibana/desktop/internal/api"
 	"hibana/desktop/internal/auth"
+	hibanasync "hibana/desktop/internal/sync"
 )
 
 // maxBridgeBody mirrors the server's own rejection boundary: uploads are
@@ -114,6 +116,13 @@ type API struct {
 	// mirror meta row ui.theme) + the change hook (the shell's hibana:theme
 	// emit so the live document flips without a reload). See theme.go.
 	theme themeState
+
+	// THE MANUAL SYNC ROUND (S217 — v0.1.6): single-flight state + the two
+	// hooks (runner + transition relay). See sync.go.
+	syncMu   sync.Mutex
+	syncBusy atomic.Bool
+	syncRun  func(ctx context.Context, emit hibanasync.Emit) (hibanasync.RoundOutcome, error)
+	syncEmit func(step, state, detail string)
 }
 
 // New wires the bridge. The client is the cloud client (cookie jar, Origin

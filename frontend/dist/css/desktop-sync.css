@@ -1,0 +1,121 @@
+/* desktop-sync.css — the manual sync modal's step rows + result panels (v0.1.6).
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
+   The dialog + .modal card are the island's own (components.css) — this sheet
+   starts INSIDE the card. */
+
+/* The three step rows: pending (muted ring) → active (the accent ring spins)
+   → done (the green check) / failed (the red cross). */
+.db-sync-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.8rem;
+}
+.db-sync-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  transition: color 0.18s ease;
+}
+.db-sync-steps li .db-sync-label { flex: 1 1 auto; }
+.db-sync-steps li[data-state='active'] { color: var(--fg); }
+.db-sync-steps li[data-state='done'] { color: var(--fg); }
+.db-sync-steps li[data-state='failed'] { color: var(--err); }
+
+.db-sync-mark {
+  flex: none;
+  inline-size: 1.4rem;
+  block-size: 1.4rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: inherit;
+  background: transparent;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+.db-sync-mark .icon { width: 0.95rem; height: 0.95rem; stroke-width: 2.6; }
+.db-sync-steps li[data-state='active'] .db-sync-mark { border-color: var(--accent); }
+.db-sync-steps li[data-state='done'] .db-sync-mark {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.db-sync-steps li[data-state='failed'] .db-sync-mark {
+  border-color: var(--err);
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+}
+
+/* The small activity ring (NOT .hibana-spinner — that one is the big pulsing
+   loading ring, layout.css:1143; the modal needs the mark-sized one). */
+.db-sync-spin {
+  display: block;
+  inline-size: 0.85rem;
+  block-size: 0.85rem;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-block-start-color: var(--accent);
+  animation: db-sync-rotate 0.7s linear infinite;
+}
+@keyframes db-sync-rotate { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .db-sync-spin { animation-duration: 1.6s; }
+}
+
+/* The live fact under a step ("hibana.ir reached", "3 change(s) uploaded"…). */
+.db-sync-note {
+  flex: none;
+  font-size: 0.82em;
+  color: var(--muted);
+  max-inline-size: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The result panel (one element, three kinds): ok = the green "Everything
+   synced — will not vanish" verdict; warn = held outbox ops named honestly;
+   err = the failure with the in-place retry. */
+.db-sync-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+.db-sync-panel .icon { width: 1.5rem; height: 1.5rem; flex: none; margin-top: 0.1rem; stroke-width: 2.2; }
+.db-sync-panel strong { display: block; font-size: var(--fs-md); color: var(--fg); }
+.db-sync-panel p { margin: 0.15rem 0 0; white-space: pre-line; }
+.db-sync-panel[data-kind='ok'] {
+  border-color: color-mix(in srgb, var(--ok) 38%, transparent);
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+}
+.db-sync-panel[data-kind='ok'] .icon { color: var(--ok); }
+.db-sync-panel[data-kind='warn'] {
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.db-sync-panel[data-kind='warn'] .icon { color: var(--accent); }
+.db-sync-panel[data-kind='err'] {
+  border-color: color-mix(in srgb, var(--err) 38%, transparent);
+  background: color-mix(in srgb, var(--err) 7%, transparent);
+}
+.db-sync-panel[data-kind='err'] .icon { color: var(--err); }
+
+.db-sync-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+[dir='rtl'] .db-sync-actions { justify-content: flex-start; }
+
+/* The modal card is a compact result dialog — the base .modal padding breathes
+   a little tighter. */
+.db-sync-modal h2 { margin: 0; }

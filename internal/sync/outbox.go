@@ -43,6 +43,18 @@ type DrainResult struct {
 	RateHit bool  // a 429 stopped the round
 	Stopped bool  // the round stopped early (see LastErr)
 	LastErr error // the surfaced reason for the stop, if any
+
+	// HeldOps names the still-queued entries ("entity id", e.g.
+	// "devtask.create t12") in hold order — the manual sync round's pending
+	// verdict quotes them (S217: held ops are NAMED, never hidden).
+	HeldOps []string
+}
+
+// hold records a still-queued entry: the count + its NAME ("entity id") so
+// the manual sync round's pending verdict can quote it (S217).
+func hold(res *DrainResult, entry *store.OutboxEntry) {
+	res.Held++
+	res.HeldOps = append(res.HeldOps, entry.Entity+" "+entry.ID)
 }
 
 // pathFor maps an outbox entry to its API path (op = the HTTP method).
@@ -109,7 +121,7 @@ func (e *Engine) Drain(ctx context.Context) (DrainResult, error) {
 		// never blind-replay; hold + attempts++ (backoff is the loop's).
 		if err != nil && !isStatus(err) {
 			_ = e.store.MarkOutboxAttempt(ctx, entry.Seq, "transport: "+err.Error())
-			res.Held++
+			hold(&res, entry)
 			res.Stopped = true
 			res.LastErr = err
 			return res, nil
@@ -119,7 +131,7 @@ func (e *Engine) Drain(ctx context.Context) (DrainResult, error) {
 		if se == nil && err == nil {
 			// A non-2xx that came back without an error object (defensive).
 			_ = e.store.MarkOutboxAttempt(ctx, entry.Seq, fmt.Sprintf("unexpected status %d", resp.Status))
-			res.Held++
+			hold(&res, entry)
 			continue
 		}
 
@@ -137,7 +149,7 @@ func (e *Engine) Drain(ctx context.Context) (DrainResult, error) {
 					}
 					if err2 != nil && !isStatus(err2) {
 						_ = e.store.MarkOutboxAttempt(ctx, entry.Seq, "transport(retry): "+err2.Error())
-						res.Held++
+						hold(&res, entry)
 						res.Stopped = true
 						res.LastErr = err2
 						return res, nil
@@ -148,7 +160,7 @@ func (e *Engine) Drain(ctx context.Context) (DrainResult, error) {
 			// Still 401 (or no relogin hook): hold + surface — the shell
 			// opens the session-expiry dialog; the entry survives.
 			_ = e.store.MarkOutboxAttempt(ctx, entry.Seq, "unauthorized: session expired")
-			res.Held++
+			hold(&res, entry)
 			res.Stopped = true
 			res.LastErr = se
 			return res, nil
@@ -156,7 +168,7 @@ func (e *Engine) Drain(ctx context.Context) (DrainResult, error) {
 		case http.StatusForbidden:
 			// Our client always sends Origin (the T6 gate) — a 403 is a ban.
 			_ = e.store.MarkOutboxAttempt(ctx, entry.Seq, "forbidden: "+se.Code)
-			res.Held++
+			hold(&res, entry)
 			res.Stopped = true
 			res.LastErr = se
 			return res, nil
@@ -177,7 +189,7 @@ func (e *Engine) Drain(ctx context.Context) (DrainResult, error) {
 			// Back off to the next 60s window (ratelimit.ts fixed windows):
 			// stop the round, keep the entry.
 			_ = e.store.MarkOutboxAttempt(ctx, entry.Seq, "rate-limited: waiting for the next window")
-			res.Held++
+			hold(&res, entry)
 			res.RateHit = true
 			res.Stopped = true
 			res.LastErr = se
@@ -195,14 +207,14 @@ func (e *Engine) Drain(ctx context.Context) (DrainResult, error) {
 					res.LastErr = fmt.Errorf("sync: dead-lettered %s %s after %d attempts: %v", entry.Op, path, after.Attempts, after.LastError)
 					continue
 				}
-				res.Held++
+				hold(&res, entry)
 				res.Stopped = true
 				res.LastErr = se
 				return res, nil
 			}
 			// Any other 4xx: unexpected but permanent-ish — surface + hold.
 			_ = e.store.MarkOutboxAttempt(ctx, entry.Seq, fmt.Sprintf("status %d: %s", se.Status, se.Code))
-			res.Held++
+			hold(&res, entry)
 			res.Stopped = true
 			res.LastErr = se
 			return res, nil

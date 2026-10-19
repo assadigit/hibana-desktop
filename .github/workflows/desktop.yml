@@ -109,7 +109,7 @@ jobs:
           if ($env:GITHUB_REF -like 'refs/tags/v*') {
             $v = ($env:GITHUB_REF -replace '^refs/tags/v', '') -replace '-desktop$', ''
           } else {
-            $v = '0.1.5-dev'
+            $v = '0.1.6-dev'
           }
           Add-Content $env:GITHUB_ENV "BUILD_VERSION=$v"
           Write-Host "BUILD_VERSION=$v"

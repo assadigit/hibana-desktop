@@ -1,0 +1,118 @@
+# autorelease.yml — "after every update auto-release on github" (the owner's
+# standing ask, S218). The hand ritual (push main, cut a vX.Y.Z-desktop tag,
+# the tag lane builds + publishes) stays exactly as it was — this workflow
+# ADDS the automation on top: every push to main that is not itself a
+# release-bump commit and does not already carry a release tag gets the
+# NEXT patch release cut automatically:
+#
+#   1. guards: skip the bump commits this workflow creates (the loop guard),
+#      skip a HEAD already tagged by the hand ritual, skip a non-tip push
+#      (a raced push is covered by its own descendant's run);
+#   2. next patch: latest vX.Y.Z-desktop tag + 1;
+#   3. bump the version files IN LOCKSTEP on the bumped commit (hard rule 9:
+#      wails.json + versioninfo.json + the desktop.yml dev placeholder +
+#      make-portable's default + main.go's stamp all read the same version);
+#   4. the notes: the annotated tag message = the commit-range log since the
+#      previous tag (the release job at that tag reads it back verbatim);
+#   5. push main + tag → the EXISTING tag-driven lane in desktop.yml builds
+#      the exe + installer + portable zip and publishes the GitHub Release.
+#
+# The push of the bump commit lands on main with the subject
+# "chore(release): bump to X.Y.Z (auto-release)" — guard 1 recognizes that
+# prefix and exits, so the loop closes after exactly one bump per update.
+name: autorelease
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # the bump commit + the annotated tag push
+
+concurrency:
+  group: autorelease
+  cancel-in-progress: false # serialize: a queued run re-checks the guards
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the full history: the version ladder needs every tag
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cut the next release (auto-release on every update)
+        run: |
+          set -eu
+
+          # ---- GUARD 1: never re-trigger on this workflow's own bumps ----
+          HEAD_SUBJECT="$(git log -1 --pretty=%s)"
+          case "$HEAD_SUBJECT" in
+            "chore(release):"*)
+              echo "HEAD ('$HEAD_SUBJECT') is a release-bump commit — the loop guard exits."
+              exit 0 ;;
+          esac
+
+          # ---- GUARD 2: a hand-cut release already covers this HEAD ----
+          if git describe --exact-match --tags --match 'v*-desktop' HEAD >/dev/null 2>&1; then
+            echo "HEAD already carries a v*-desktop tag — the hand ritual's release covers it."
+            exit 0
+          fi
+
+          # ---- GUARD 3: only the branch tip releases ----
+          git fetch origin main --tags
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            echo "HEAD is not origin/main's tip — the newer push's own run covers this tree."
+            exit 0
+          fi
+
+          # ---- the next patch from the release ladder ----
+          LATEST="$(git tag -l 'v*-desktop' | sed -e 's/^v//' -e 's/-desktop$//' | sort -V | tail -1)"
+          if [ -z "$LATEST" ]; then
+            echo "::error::no vX.Y.Z-desktop tag exists — the ladder needs a seed release."
+            exit 1
+          fi
+          IFS='.' read -r MA MI PA <<< "$LATEST"
+          NEXT="$MA.$MI.$((PA + 1))"
+          TAG="v$NEXT-desktop"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "tag $TAG already exists — nothing to cut."
+            exit 0
+          fi
+          echo "cutting $TAG (from $LATEST)"
+
+          # ---- bump the version files in lockstep (hard rule 9) ----
+          jq --arg v "$NEXT" '.info.productVersion = $v' wails.json > wails.json.tmp && mv wails.json.tmp wails.json
+          jq --arg v "$NEXT.0" \
+             '.fixed.file_version = $v | .fixed.product_version = $v | .info["0409"].FileVersion = $v | .info["0409"].ProductVersion = $v' \
+             build/windows/versioninfo.json > vi.tmp && mv vi.tmp build/windows/versioninfo.json
+          sed -i -E "s/\\$v = '[0-9]+\\.[0-9]+\\.[0-9]+-dev'/\$v = '$NEXT-dev'/" .github/workflows/desktop.yml
+          sed -i -E 's/\[string\]\$Version = "[0-9]+\.[0-9]+\.[0-9]+"/[string]$Version = "'"$NEXT"'"/' scripts/make-portable.ps1
+          sed -i -E 's/Version = "[0-9]+\.[0-9]+\.[0-9]+-dev"/Version = "'"$NEXT"'-dev"/' main.go
+
+          # ---- the notes: the commit range since the previous release ----
+          WEB_REF="$(grep -m1 -E '^[[:space:]]*WEB_REF:' .github/workflows/desktop.yml | awk '{print $2}')"
+          WEB_VERSION="$(grep -m1 -E '^[[:space:]]*WEB_VERSION:' .github/workflows/desktop.yml | awk -F'"' '{print $2}')"
+          PREV_TAG="v$LATEST-desktop"
+          {
+            echo "Desktop $NEXT — auto-release: every update to main ships a release."
+            echo ""
+            echo "Changes since $PREV_TAG:"
+            echo ""
+            git log --format='- %s' "$PREV_TAG..HEAD" | head -40
+            echo ""
+            echo "Embedded web island: hibana-source $WEB_REF (v$WEB_VERSION). Sign in with your hibana.ir account; once you sign in, the kanban loads, and a live session boots straight to the board. See checksums.txt."
+          } > TAG-NOTES.md
+
+          # ---- the bump commit + the annotated tag (the release lane's notes
+          #      source — desktop.yml reads the tag message back) ----
+          git config user.name "hibana-release-bot"
+          git config user.email "195278966+hibana-release-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(release): bump to $NEXT (auto-release)"
+          git tag -a "$TAG" -F TAG-NOTES.md
+          git push origin main "$TAG"
+          echo "RELEASE CUT: $TAG — the desktop.yml tag lane builds + publishes it now."

@@ -37,6 +37,16 @@ refreshes the session while you use the app, and it expires after 30 days
 unused — the card simply reopens, you sign in again, the board reloads. The
 password itself is never stored anywhere.
 
+## The Sync button
+
+The toolbar's refresh-button opens a small window that PROVES a sync live:
+connecting to the Hibana (Cloudflare) server, then uploading any queued
+changes, then re-checking every board — ending on "Everything synced — your
+boards are saved on the Hibana cloud — they will not vanish". If some
+changes are still uploading (a slow line, a rate-limit window) it says so
+by name instead of pretending. Closing the window never cancels the sync;
+the app keeps syncing every 5 minutes anyway.
+
 ## Where your data lives
 
 The portable build keeps **everything** in a `data\` folder **next to the .exe**:
