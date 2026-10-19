@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"hibana/desktop/internal/api"
@@ -20,12 +21,15 @@ func TestFileStoreRoundTrip(t *testing.T) {
 	if err := fs.SaveSession("tok-123"); err != nil {
 		t.Fatal(err)
 	}
-	// The file must exist with 0600 perms (sensitive local state).
+	// The file must exist with 0600 perms on POSIX (sensitive local state).
+	// Windows ignores POSIX write bits (the real protection there is the
+	// per-user ACL on %LOCALAPPDATA% — hardened for real by the M5 DPAPI
+	// wiring per WINDOWS-PACKAGING-PLAN §8), so only existence is asserted.
 	info, err := os.Stat(fs.Path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("session file perms = %v, want 0600", info.Mode().Perm())
 	}
 	if tok, err := fs.LoadSession(); err != nil || tok != "tok-123" {
