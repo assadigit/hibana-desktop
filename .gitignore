@@ -1,0 +1,16 @@
+# build outputs
+build/bin/
+dist/
+*.exe
+*.syso
+hibana-portable-*.zip
+# local state (runtime only — never commit)
+data/
+*.db
+*.db-wal
+*.db-shm
+mode.lock
+portable.marker
+# tooling
+node_modules/
+.DS_Store

@@ -1,0 +1,96 @@
+# The desktop CI (GO-DESKTOP-IMPLEMENTATION-GUIDE.md §9 + WINDOWS-PACKAGING-PLAN §7).
+# Conventions inherited from the verified web CI (hibana-source ci.yml):
+# pinned toolchains, frozen deps, timeouts, failure-only artifacts, tag-driven Releases.
+#
+# The island drift check is the highest-value gate (WPP §7.4): it clones the
+# web repo AT THE PINNED REF and fails if frontend/dist differs by one byte.
+
+name: desktop
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+env:
+  WEB_REF: e6661c8          # the island pin (must match scripts/sync-island.mjs)
+  WEB_VERSION: "0.4.1.35"   # the pin's package version (Release notes carry BOTH)
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod   # honors the toolchain pin
+          cache: true
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22          # the island-sync + checksum scripts only
+
+      # 1. The island drift gate: clone hibana-source at the pinned ref and
+      #    verify the committed island is byte-identical to a fresh sync.
+      - name: Island drift check
+        run: |
+          git clone --no-checkout https://github.com/assadigit/hibana-source.git $env:RUNNER_TEMP\hibana-source
+          node scripts/sync-island.mjs --ref $env:WEB_REF --src $env:RUNNER_TEMP\hibana-source --check
+
+      # 2. Frozen deps + the pure-Go gates.
+      - name: Verify + vet + test
+        run: |
+          go mod verify
+          go vet ./...
+          go test ./internal/...
+
+      # 3. The wails CLI, pinned (guide §1.2 — the one external dependency
+      #    whose minor versions move).
+      - name: Install wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+
+      # 4. The two artifacts — same binary, dual stamps (the never-diverge rule:
+      #    tag, -X stamps, and wails.json info derive from ONE version source).
+      - name: Build portable exe
+        run: wails build -platform windows/amd64 -ldflags "-s -w -X main.Version=0.1.0 -X main.WebRef=$env:WEB_REF"
+
+      - name: Build NSIS installer
+        run: wails build -platform windows/amd64 -nsis -ldflags "-s -w -X main.Version=0.1.0 -X main.WebRef=$env:WEB_REF"
+
+      - name: Portable zip + checksums
+        run: |
+          pwsh scripts/make-portable.ps1 -Version 0.1.0
+          sha256sum build/bin/hibana.exe hibana-setup-0.1.0.exe hibana-portable-0.1.0.zip > checksums.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hibana-windows
+          path: |
+            build/bin/hibana.exe
+            hibana-setup-*.exe
+            hibana-portable-*.zip
+            checksums.txt
+          retention-days: 7
+          if-no-files-found: error
+
+  # Tag-driven release (v0.x.y-desktop tags → both artifacts + checksums +
+  # notes carrying BOTH versions — desktop semver + embedded web ref, WPP §7.5).
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') && endsWith(github.ref, '-desktop')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: hibana-windows }
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          VER="${TAG#v}"; VER="${VER%-desktop}"
+          gh release create "$TAG" --title "Hibana Kanban $VER (island @ $env:WEB_REF)" \
+            --notes "Desktop $VER — embedded web island pinned at hibana-source $env:WEB_REF (v$env:WEB_VERSION). See checksums.txt." \
+            hibana-setup-*.exe hibana-portable-*.zip checksums.txt

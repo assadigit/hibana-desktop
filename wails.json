@@ -1,0 +1,15 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "hibana",
+  "outputfilename": "hibana",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "auto",
+  "info": {
+    "productName": "Hibana Kanban",
+    "productVersion": "0.1.0",
+    "copyright": "Ali",
+    "comments": "The Hibana Kanban Windows desktop port — Go + Wails v2 + WebView2 + modernc.org/sqlite"
+  }
+}
