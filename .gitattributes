@@ -1,0 +1,6 @@
+# Byte-exact checkout for the whole repo. The island (frontend/dist) is
+# CHECKSUM-GATED (island.checksums.json) — any EOL conversion corrupts every
+# text file against its sha256 (the first windows-latest CI run failed on
+# exactly this: core.autocrlf rewrote 32 text files at checkout while the 14
+# binary .woff2 fonts matched). `-text` disables all conversion.
+* -text
