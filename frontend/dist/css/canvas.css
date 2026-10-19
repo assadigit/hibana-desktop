@@ -1,0 +1,862 @@
+/* --- canvas (Phase 2) ------------------------------------------------------- */
+.canvas-page { background: var(--bg-soft); overflow: hidden; height: 100dvh; display: flex; flex-direction: column; }
+.canvas-page .topbar { flex: 0 0 auto; }
+#canvas-wrap { flex: 1; position: relative; }
+/* Session 19: empty-canvas affordance — a centered faint hint that disappears once the
+   user draws anything. canvas.js adds .has-content to #canvas-wrap to hide it. */
+#canvas-wrap .canvas-empty-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+#canvas-wrap .canvas-empty-hint .icon { width: 2rem; height: 2rem; opacity: 0.7; }
+#canvas-wrap.has-content .canvas-empty-hint { opacity: 0; }
+/* GOLDEN RULE (2026-08-26): the drawing surface itself is direction-neutral — Latin text
+   must always lay out and type LTR even on the Farsi (rtl) page. Canvas 2D inherits
+   direction from the element (an rtl canvas flips Fabric's text alignment semantics and
+   makes Latin typing feel reversed), so the board and Fabric's editing textarea are
+   pinned LTR. Farsi glyphs still shape and order correctly inside the text itself. */
+#canvas-wrap canvas,
+#canvas-wrap textarea { direction: ltr; }
+#board { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* Dot grid (2026-08-26 user request; restyled 2026-09-02; fixed 2026-09-02 after two
+   "solid grey board" reports): ONE uniform layer of grey dots — the classic
+   design-canvas pattern (Figma/Miro/Excalidraw). The pattern is painted ON THE FABRIC
+   LOWER CANVAS ITSELF — the exact surface every stroke/note draws over — because the
+   old sibling .canvas-dots div sat under the fabric container and could be (and was)
+   covered, leaving a flat grey board. 28px pitch reads as a roomy, calm grid; dots are
+   1.8px, visible on every screen, both themes, without competing with content.
+   canvas.js keeps the tile size/offset in sync with the zoom/pan transform so the grid
+   travels with the content. Scoped to #canvas-wrap so the notebook sheet (#nb-page)
+   is untouched. */
+#canvas-wrap .lower-canvas {
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, var(--dot-grid) 1.8px, transparent 1.8px);
+  background-size: 28px 28px; /* synced with the viewport transform by canvas.js */
+}
+:root {
+  /* dots, (t) 2026-09-01: Ali asked to lower them again — 0.75 → 0.35 (light) reads as
+     a faint grid that guides without greying the paper. */
+  --dot-grid: rgb(181 181 178 / 0.35);
+}
+@media (prefers-color-scheme: dark) {
+  /* :not([data-theme='light']) — the canvas theme bug (2026-08-31): the header toggle
+     always writes an explicit theme, so OS-dark + app-light must NOT re-darken the
+     canvas. Same guard batch (g) established for the kanban tints. */
+}
+
+/* ===== squig batch (2026-08-31): paper variants + board popovers ====================
+   Paper picker (user request: squig.sh "same checkered and dotted pattern"). Four papers,
+   all painted on the same fabric lower canvas; the checkered one layers a conic-gradient
+   checker UNDER the dots — both tiles are 28px, so the single background-size/position
+   sync canvas.js already does moves the two layers together (no JS changes needed).
+   Order matters: base → per-paper colors → dots-off → checkered+dots-off override. */
+:root {
+  --paper-white: #ffffff;
+  --paper-checkered: #f4f0e4;   /* warm cream — squig's "subtle paper" */
+  --paper-shaded: #e9e1cf;      /* deeper warm beige — squig's "shaded paper" */
+  --checker-a: rgb(28 28 26 / 0.02);
+  --checker-b: rgb(28 28 26 / 0.045);
+}
+@media (prefers-color-scheme: dark) {
+  /* guarded (canvas theme bug 2026-08-31): explicit app-light must beat the OS media
+     query — without the :not() the dark-OS + light-app combination served DARK paper
+     vars on the light-themed canvas page */
+}
+#canvas-wrap.paper-white .lower-canvas { background-color: var(--paper-white); }
+#canvas-wrap.paper-shaded .lower-canvas { background-color: var(--paper-shaded); }
+#canvas-wrap.paper-checkered .lower-canvas {
+  background-color: var(--paper-checkered);
+  background-image:
+    radial-gradient(circle, var(--dot-grid) 1.8px, transparent 1.8px),
+    conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0);
+}
+#canvas-wrap.dots-off .lower-canvas { background-image: none; }
+#canvas-wrap.paper-checkered.dots-off .lower-canvas {
+  background-image: conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0);
+}
+
+/* Board popovers (blocks / paper / export / comment) — anchored inside #canvas-wrap by
+   canvas.js. z-index sits above the sticky palette (45). */
+.board-popover {
+  position: absolute;
+  z-index: 46;
+  min-inline-size: 210px;
+  max-inline-size: 300px;
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.18);
+  /* Session 28 polish: entrance animation (pop-in, defined near the sticky palette —
+     reduced-motion guarded there). Replays on every open: [hidden] display flips restart
+     CSS animations. The comment popover's per-frame position updates compose with the
+     one-shot transform without conflict. */
+  animation: pop-in 0.14s ease-out;
+}
+/* THE GHOST POPOVER BUG (Ali, 2026-08-31 (j)): the display:grid above beats the UA
+   [hidden] sheet (the Task-17 / fab-menu / sticky-palette lesson — the squig batch
+   missed it), so a "closed" comment popover kept rendering WITH its buttons over the
+   canvas. The save handler ran once and early-returned afterwards → save/delete/×
+   looked dead; the ghost textarea also swallowed canvas clicks. Explicit [hidden]
+   wins. Same guard blocks/paper/export already rely on for tall windows (never-opened
+   popovers sat rendered at their static position at the wrap bottom). */
+.board-popover[hidden] { display: none; }
+.pop-title { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.pop-hint { font-size: 0.75rem; color: var(--muted); }
+.pop-group-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+/* paper picker */
+.paper-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.paper-grid button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: start;
+}
+.paper-grid button:hover { background: var(--bg-soft); }
+.paper-grid button.active { border-color: var(--accent); background: var(--accent-soft); }
+.paper-pv {
+  inline-size: 26px;
+  block-size: 18px;
+  flex: none;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+}
+.paper-pv-plain { background-color: var(--bg); }
+.paper-pv-white { background-color: var(--paper-white); }
+.paper-pv-checkered {
+  background-color: var(--paper-checkered);
+  background-image: conic-gradient(var(--checker-b) 25%, var(--checker-a) 0 50%, var(--checker-b) 0 75%, var(--checker-a) 0);
+  background-size: 10px 10px;
+}
+.paper-pv-shaded { background-color: var(--paper-shaded); }
+.pop-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.pop-toggle input { inline-size: 16px; block-size: 16px; accent-color: var(--accent); }
+/* wireframe blocks */
+.blocks-pop { max-inline-size: 300px; max-block-size: min(430px, 62vh); overflow-y: auto; }
+.blocks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; }
+.blocks-grid button {
+  min-inline-size: 0;
+  min-block-size: 34px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: start;
+}
+.blocks-grid button:hover { background: var(--bg-soft); border-color: var(--accent); }
+/* export scope rows */
+.export-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 0.4rem 0.55rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  text-align: start;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.export-row:hover { background: var(--bg-soft); border-color: var(--accent); }
+.export-row:active { transform: scale(0.985); }
+.export-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Session 28 polish: label group = leading icon + text (scan-ability: download vs
+   clipboard reads at a glance). The icon tints with the row's accent on hover. */
+.export-main { display: flex; align-items: center; gap: 0.45rem; min-inline-size: 0; }
+.export-ic {
+  inline-size: 0.95rem;
+  block-size: 0.95rem;
+  flex: none;
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+.export-row:hover .export-ic { color: var(--accent); }
+.export-label { font-size: 0.85rem; }
+.export-sub { font-size: 0.72rem; color: var(--muted); flex: none; }
+/* comment pin popover */
+.comment-pop { min-inline-size: 250px; }
+.comment-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.comment-pop-head button {
+  min-inline-size: 0;
+  min-block-size: 0;
+  inline-size: 26px;
+  block-size: 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.comment-pop-head button:hover { background: var(--bg-soft); color: var(--text); }
+.comment-pop textarea {
+  inline-size: 100%;
+  min-block-size: 72px;
+  resize: vertical;
+  padding: 0.5rem;
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.comment-pop textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.comment-pop-actions { display: flex; justify-content: flex-end; gap: 0.4rem; }
+.comment-pop-actions button {
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.comment-pop-actions button:hover { background: var(--bg-soft); }
+.comment-pop-actions button.danger { color: var(--danger); border-color: rgb(180 35 24 / 0.35); }
+.comment-pop-actions button.danger:hover { background: var(--danger-soft); }
+/* (k) 2026-09-06: image-from-link popover (canvas toolbar) — URL row + inline error.
+   The input is dir=ltr in the markup so URLs read correctly on the FA canvas too. */
+.image-form { display: flex; gap: 0.4rem; align-items: stretch; min-inline-size: 15rem; }
+.image-form input[type='url'] {
+  flex: 1; min-inline-size: 0; padding: 0.45rem 0.55rem;
+  font: inherit; font-size: 0.88rem; direction: ltr; text-align: start;
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.image-form input[type='url']:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.image-form button[type='submit'] {
+  flex: none; padding: 0.35rem 0.9rem; font-size: 0.85rem;
+  border-radius: var(--radius-sm); border: 1px solid transparent;
+  background: var(--cta, var(--accent)); color: var(--btn-text); cursor: pointer;
+}
+.image-form button[type='submit']:hover { background: var(--cta-hover, var(--accent-hover)); }
+.image-form button[type='submit']:disabled { opacity: 0.6; cursor: wait; }
+.image-form input:disabled { opacity: 0.6; }
+.image-error {
+  margin: 0.45rem 0 0; font-size: var(--fs-xs); line-height: 1.4;
+  color: var(--danger); overflow-wrap: anywhere;
+}
+.image-error[hidden] { display: none; }
+/* toolbar button "popover open" state (blocks/paper/export) */
+.canvas-toolbar button.pop-open {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Floating note-color palette (2026-09-02 request): appears under a selected sticky
+   note; canvas.js positions/reveals it. [hidden] guard because display:flex would
+   otherwise beat the UA [hidden] sheet (the Task-17 popover lesson). */
+.sticky-palette {
+  position: absolute;
+  z-index: 45;
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.3rem 0.4rem;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 0.16);
+  /* Session 28 polish: pop in like the board popovers (fade + slight drop). */
+  animation: pop-in 0.14s ease-out;
+}
+.sticky-palette[hidden] { display: none; }
+.sticky-palette button {
+  /* Session 28 polish: 24px hit areas (was 21.6px) + hover lift + focus ring — the
+     canvas AND notebook palettes share this rule; keyboard users previously got
+     NO visible focus on the swatches at all. */
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.16);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.sticky-palette button:hover { transform: translateY(-1px) scale(1.08); }
+.sticky-palette button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.sticky-palette button.active { box-shadow: inset 0 0 0 2px var(--accent); }
+.sticky-palette button.active:focus-visible { outline-offset: 1px; }
+
+/* Session 28 polish: one entrance animation for the floating board surfaces (popovers,
+   palettes) — a fast fade + 4px settle. Guarded for reduced motion below. */
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sticky-palette, .board-popover { animation: none; }
+}
+
+.canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--card);
+  border-block-end: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+/* Functional clusters with dividers (2026-08-26 toolbar rework): tools · text props ·
+   stroke width · color · history · object actions · more. */
+.tb-group { display: inline-flex; align-items: center; gap: 0.5rem; } /* ≥8px between icons */
+.tb-sep { inline-size: 1px; block-size: 1.75rem; background: var(--line); flex: none; }
+
+/* F9 (session 9): at ≤420px the first tool cluster alone is ~472px wide — the
+   toolbar wraps BETWEEN groups but a group never wraps INSIDE itself, so the page
+   scrolled sideways (audit: scrollW 484 @390). Let the clusters wrap their own
+   buttons into rows; dividers would dangle at row edges so they fold away. */
+@media (max-width: 420px) {
+  .canvas-toolbar { gap: 0.4rem; padding: 0.4rem 0.5rem; }
+  .tb-group { flex-wrap: wrap; gap: 0.4rem; }
+  .tb-sep { display: none; }
+  .tb-select { max-inline-size: 8.5rem; }
+}
+.canvas-toolbar button {
+  font-size: 1rem;
+  min-inline-size: 40px; min-block-size: 40px; /* ≥40px touch/click targets (2026-08-26) */
+  padding: 0 0.5rem;
+  display: inline-grid; place-items: center;
+  background: transparent; color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  position: relative;
+}
+.canvas-toolbar button:hover { background: var(--bg-soft); }
+/* ONE exclusive active treatment for tools — the filled pill (2026-08-26: was a pastel
+   fill that also lit up color swatches and pen widths, so several things looked selected
+   at once). Properties (color/width) use their quieter ring indicators instead. */
+.canvas-toolbar [data-tool].active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--brand);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--accent) inset; /* Session 19: clearer active-tool ring (was subtle pastel) */
+}
+.canvas-toolbar button.active:not([data-tool]) { background: transparent; } /* properties stay quiet */
+.width-pick { display: inline-flex; align-items: center; gap: 0.5rem; }
+.width-pick button { padding: 0; } /* 40px target comes from the toolbar rule */
+.width-pick button.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.width-pick .dot { display: block; width: var(--dot-size, 8px); height: var(--dot-size, 8px); border-radius: 50%; background: currentColor; }
+/* S46 (user request 2026-09-14): pen widths + colors grouped behind a <details>
+   toggle so the toolbar stays compact (was 4 width buttons + 7 color buttons inline).
+   The summary shows the active selection; the list expands inline when open. */
+.tb-popover { display: inline-flex; align-items: center; position: relative; gap: 0; }
+.tb-pop-summary {
+  appearance: none; list-style: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-block-size: 2.5rem; min-inline-size: 2.5rem; padding: 0;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--text);
+  transition: border-color .15s ease, color .15s ease;
+}
+.tb-pop-summary::-webkit-details-marker, .tb-pop-summary::marker { display: none; content: ''; }
+.tb-popover[open] .tb-pop-summary { border-color: var(--accent); color: var(--accent); }
+.tb-pop-summary .tb-pop-dot { display: block; width: var(--dot-size, 8px); height: var(--dot-size, 8px); border-radius: 50%; background: currentColor; }
+.tb-pop-summary .tb-pop-swatch { display: block; inline-size: 1.15rem; block-size: 1.15rem; border-radius: 50%; border: 1px solid var(--line); box-shadow: inset 0 0 0 1px var(--bg); }
+.tb-pop-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-block-start: 0.3rem;
+  display: inline-flex; align-items: center; gap: 0.4rem; flex-wrap: nowrap;
+  padding: 0.3rem 0.45rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,.14);
+  z-index: 20;
+  max-inline-size: calc(100vw - 1rem);
+}
+/* the popover list is hidden by <details> when closed; only show when open. */
+.tb-popover:not([open]) .tb-pop-list { display: none; }
+/* S46 fix: the popover overlays (absolute) — JS (canvas.js) dynamically picks left/right
+   alignment on open so the list never overflows the viewport, regardless of where the
+   trigger sits (the toolbar wraps on mobile so a trigger's position varies by viewport).
+   The CSS default (right:0) is the fallback if JS doesn't run — it fits the palette at
+   the visual right edge, the most common mobile position. */
+/* S46 fix: the popover must OVERLAY (absolute) — not push the toolbar inline. On a
+   390px mobile toolbar the inline expansion (was display:inline-flex + position:static)
+   shoved the palette list onto the same row as the trigger, displacing sibling toolbar
+   buttons + reading as a "floating/disconnected" popover. Absolute positioning drops
+   it neatly below its trigger (the .tb-popover is position:relative). */
+.canvas-toolbar button.arrow-on { cursor: crosshair; }
+/* Text-property cluster: only visible with the text tool / a selected text object
+   (canvas.js toggles .text-props-on on the toolbar). */
+.tb-text-props { display: none; }
+.canvas-toolbar.text-props-on .tb-text-props { display: inline-flex; }
+.tb-select { min-block-size: 40px; padding-block: 0; }
+/* ⋯ overflow for low-frequency actions (image, zoom, reset view) */
+.tb-more { position: relative; }
+.tb-more summary {
+  list-style: none;
+  display: inline-grid; place-items: center;
+  min-inline-size: 40px; min-block-size: 40px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  color: var(--text); cursor: pointer;
+}
+.tb-more summary::-webkit-details-marker { display: none; }
+.tb-more summary:hover { background: var(--bg-soft); }
+.tb-more-pop {
+  position: absolute; z-index: 60;
+  inset-block-start: calc(100% + 0.4rem); inset-inline-end: 0;
+  min-inline-size: 13rem;
+  background: var(--card);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.22);
+  display: grid; gap: 0.15rem; padding: 0.35rem;
+}
+.tb-more-pop button {
+  min-inline-size: 0; min-block-size: 0;
+  width: 100%; text-align: start; justify-items: start;
+  border: 0; border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem; font-weight: 500;
+}
+.tb-more-pop button:hover { background: var(--bg-soft); }
+/* Mobile callout: the pen limitation as a real dismissible banner (icon + background),
+   shown only on touch devices — never a floating unstyled text node with a spec ID. */
+.palette button {
+  width: 1.6rem;
+  height: 1.6rem;
+  /* compact visual inside the 40px toolbar grid — the hit area grows via the pseudo below */
+  min-inline-size: 0; min-block-size: 0;
+  position: relative;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  /* luminance-aware glyph color (roast P5): dark glyphs on the pale pastel fills;
+     the black swatch overrides to near-white below. There are no glyphs in the
+     swatches today, but the color must never be near-white-on-pastel. */
+  color: rgb(20 20 18 / 0.88);
+}
+.palette button::after { content: ""; position: absolute; inset: -0.45rem; } /* ≥40px hit target */
+.palette button.active { border-color: var(--text); }
+/* the black swatch needs a thin outline so it reads on dark toolbars too */
+.palette button.swatch-black {
+  color: #f2f2f1;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.palette button.swatch-black.active { border-color: var(--line-strong); }
+/* Dark mode: light fills swallow a near-white ring (measured 1.04:1), so the
+   selection becomes a dark inset ring + light hairline — visible on every swatch,
+   including the black one. */
+@media (prefers-color-scheme: dark) {
+}
+/* Blue pen icon: the drawn ink stays #2f6fd1 (the sheet's ink filter handles dark
+   paper); the toolbar icon needs a lighter blue on the dark toolbar (was 3.39:1). */
+.pen-blue { color: #2f6fd1; }
+@media (prefers-color-scheme: dark) {
+}
+/* Board text-font picker (user request): Bebas Notes default, Classic opt-out. */
+.font-pick { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.font-pick select {
+  background: var(--bg-soft);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.4rem;
+  font-size: var(--fs-md);
+  height: 2rem;
+}
+
+.sync-badge {
+  position: fixed;
+  inset-block-end: 1rem;
+  inset-inline-start: 1rem;
+  background: var(--text);
+  color: var(--bg);
+  font-size: var(--fs-sm);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  z-index: 70;
+}
+/* Moving “Saving…” cue: a small ring spinner inside the pill (currentColor stays
+   readable on the badge's inverted fill in both themes). */
+.sync-badge .sync-spin {
+  display: inline-block;
+  inline-size: 0.7rem;
+  block-size: 0.7rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: hibana-sync-spin 0.8s linear infinite;
+  vertical-align: -0.1em;
+  margin-inline-end: 0.4rem;
+}
+@keyframes hibana-sync-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* F2 (session 9): the offline banner — the auth guard's "stay on page" state. Same
+   fixed-pill pattern as the queue badge above, stacked one slot higher so both can
+   show at once (offline + N unsynced changes); amber pastel reads as a warning, not
+   the queue's inverted "status" fill. Cleared on the browser's 'online' event, which
+   is the same cue the queue uses to re-flush. */
+.offline-banner {
+  position: fixed;
+  inset-block-end: 3.6rem; /* one slot above the sync badge (1rem + its pill height) */
+  inset-inline-start: 1rem;
+  background: var(--pastel-tool);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  font-size: var(--fs-sm);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  z-index: 70;
+  max-inline-size: min(22rem, calc(100vw - 2rem));
+  overflow-wrap: anywhere;
+}
+
+/* P6: boards show a small pill while the first fetch is in flight — the boundless
+   canvas and the blank sheet are empty by design, but must not read as stalled. */
+.board-loading {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: 50%;
+  translate: -50% -50%;
+  background: var(--text);
+  color: var(--bg);
+  font-size: var(--fs-sm);
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* 2026-09-09: the spinner inside .board-loading rides the bg-contrast color so the
+   rotating arc is visible against the dark pill background. Bumped to 1.4rem (was 1rem)
+   so it's more eye-catching, matching the user's "bigger" request. */
+.board-loading .hibana-spinner {
+  inline-size: 1.4rem;
+  block-size: 1.4rem;
+  border-width: 2px;
+  color: var(--bg);
+}
+
+/* --- notebook page (separate blank brain-dump sheet) ----------------------- */
+.notebook-page {
+  flex: 1;
+  position: relative;
+  margin: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background-color: var(--nb-paper, #fdfdfb); /* theme-aware paper (dark sheet in dark mode) */
+  background-image:
+    linear-gradient(var(--nb-grid, rgb(28 28 26 / 0.05)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--nb-grid, rgb(28 28 26 / 0.05)) 1px, transparent 1px);
+  background-size: 26px 26px;
+  overflow: hidden;
+}
+/* Ink stays legible on the dark sheet: black pen → light, blue keeps its hue
+   (invert + hue-rotate is the standard hue-preserving dark-mode flip). A brightness
+   tail stops the inverted whites from being pure #fff (user request 2026-08-24). */
+#nb-board { display: block; filter: var(--nb-ink, none); }
+
+/* Session 28 (closes the cropped-notes report): the notebook sheet grows with its
+   content — whiteboard.js (fitSheetToContent) stretches #nb-page's min-height to the
+   content's bottom edge, and the page itself SCROLLS (the canvas is a fixed bitmap, so
+   a tall note used to be cut off at the sheet's bottom edge, unreachable). The toolbar
+   stays pinned to the top while the sheet scrolls under it. The Canvas board keeps the
+   overflow:hidden no-scroll page — it pans internally. */
+.notebook-scroll { height: auto; min-height: 100dvh; overflow-y: auto; }
+.notebook-scroll .canvas-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg-soft);
+  border-block-end: 1px solid var(--line);
+}
+/* Keep the sheet's own overflow boundary (the paper edge) while allowing the window
+   to scroll — no clip of children beyond the paper's bottom edge. */
+.notebook-scroll .notebook-page { overflow: visible; }
+/* The board-loading pill + sticky palette are anchored to #nb-page — visible overflow
+   keeps them positioned even when the sheet is taller than the viewport. */
+.notebook-scroll .board-loading { position: sticky; }
+
+/* --- Phase 3 — sticky, kanban ------------------------------------------------ */
+.sticky-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-soft);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+.sticky-note {
+  /* Session 17 (2026-09-18): the projects/sparks "Sticky Notes" corkboard joins the
+     ONE sticky-paper style — the owner's reference mockup, same tokens as the quicknote /
+     canvas / notebook papers above: true square (aspect-ratio 1/1), near-sharp 2px
+     corners, layered directional shadow (light from the top-left). Fill is the theme's
+     paper surface (var(--card)) — these are project cards, not user-colored notes; the
+     shadow stays neutral black regardless.
+     S77 (owner: "the sticky-note settings menu opens into a portion of the note's area
+     — not readable"): overflow is now VISIBLE — the old overflow:hidden clipped the ⋯
+     spark-menu-pop to the small square. The hard square boundary is preserved on the
+     CONTENT instead (line-clamps below). */
+  aspect-ratio: 1 / 1;
+  padding: 0.9rem;
+  border-radius: 2px;
+  border: 0;
+  background: var(--card);
+  box-shadow: 1px 2px 3px rgb(0 0 0 / 0.08), 2px 6px 10px rgb(0 0 0 / 0.10); /* Session 19 (user report): was 1px 3px 4px / 4px 12px 20px — too much spread, clipped hard by container-type containment. Reduced spread + opacity so the shadow stays soft + fits in the card's padding. */
+  overflow: visible;
+  cursor: pointer;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  color: var(--text);
+  transition: background-color 0.12s ease;
+}
+/* S77: the square's hard boundary moves onto the CONTENT (title clamp 3, description
+   clamp 3) — long text still stops at the paper's edge, but the ⋯ menu can now render
+   outside the note. overflow-wrap guards unbroken URLs. */
+.sticky-note strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.sticky-note .muted.small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+/* S77: with overflow visible, the ⋯ menu button's hover pill + the pop must sit ABOVE
+   the note's neighbors — bump the menu's z so the floating pop is never under an
+   adjacent square. The NOTE itself also has to rise while its menu is open: sibling
+   notes are position:relative with z-index auto, so a later-DOM note would otherwise
+   paint OVER this note's floating pop. */
+.sticky-note .spark-menu { z-index: 6; }
+.sticky-note .spark-menu-pop { z-index: 40; }
+.sticky-note:has(.spark-menu [data-menu-open][data-open]),
+.sticky-note:has(.spark-menu [data-menu-open]:focus-visible) { z-index: 10; }
+.sticky-note:hover { background: var(--bg-soft); }
+
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+.kanban-col {
+  /* S94 (owner item 3): the column wrapper wears the SHARED pale well — the exact same
+     color/opacity as the rail panel's group heads (--well-bg, a 55% bg-soft veil over
+     the page background; was solid bg-soft). The CARDS inside keep their own fills —
+     this rule is the lane, not its content. S138: the base well now serves the sparks
+     folder board only — its lanes carry data-spark-folder and no status semantics. */
+  background: var(--well-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem;
+  min-block-size: 10rem;
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+/* S138 (owner correction on the S137 redesign): the STATUS board's lane wears the
+   page's exact white — var(--card), the same surface the summary cards use — and the
+   CARD inside it is the color-coded box again (notifications.css, --kanban-tint
+   color-mix rules). The owner's stacking is [white lane [tinted card]]: white lane +
+   tinted card, not the S137 gray-well + white-card arrangement. The tint derives from
+   the one canonical --st-* token, so lane, card, badge and donut cannot drift. */
+.kanban-col[data-status] { background: var(--card); }
+/* S137 (owner redesign): the column head = the ov-box head pattern (misc.css) —
+   [status dot] [label] [count pill]. The dot wears the ONE canonical --st-<status>
+   hue (variables.css) — the same token the status badge and the overview donut
+   segment/legend swatch reference — so board, badges and chart share one color per
+   status. The count rides the shared dark .board-count pill, tinted per column via
+   the same --badge-*-fg inks the dashboard's stage columns use. */
+.kanban-col-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  min-inline-size: 0;
+}
+.kanban-col-label { overflow-wrap: anywhere; }
+/* S159: the sparks FOLDER board's head joins the shared board-column convention
+   (S85/S137 — [glyph] [label] [count pill]; it was a bare <h4> with a .chip pill
+   glyph and a plain muted count, the pre-S85 convention). The glyph slot sizes BOTH
+   faces: the folder's EMOJI (the user-chosen identity, the .sf-emoji register) and
+   the muted folder-plus fallback icon. The count rides the shared .board-count pill
+   with its NEUTRAL muted ink (the --badge-fg fallback) — folders carry no status
+   role, so no --badge-fg assignment: same shape as every board pill, honest tint. */
+.spark-kb-glyph {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.45rem;
+  block-size: 1.45rem;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.spark-kb-glyph .icon { inline-size: 1rem; block-size: 1rem; color: var(--muted); }
+.kanban-dot {
+  inline-size: 0.65rem;
+  block-size: 0.65rem;
+  border-radius: 50%;
+  flex: none;
+  background: var(--line-strong);
+}
+.kanban-dot[data-status='spark']        { background: var(--st-idea); }
+.kanban-dot[data-status='planning']     { background: var(--st-planning); }
+.kanban-dot[data-status='queued']       { background: var(--st-queued); }
+.kanban-dot[data-status='developing']   { background: var(--st-developing); }
+.kanban-dot[data-status='awaiting_dev'] { background: var(--st-awaiting_dev); }
+.kanban-dot[data-status='operational']  { background: var(--st-operational); }
+/* The head's count pill wears the column's status role (the dashboard stat-box recipe). */
+.kanban-col[data-status='spark'] .board-count        { --badge-fg: var(--badge-spark-fg); }
+.kanban-col[data-status='planning'] .board-count     { --badge-fg: var(--badge-planning-fg); }
+.kanban-col[data-status='queued'] .board-count       { --badge-fg: var(--badge-queued-fg); }
+.kanban-col[data-status='developing'] .board-count   { --badge-fg: var(--badge-developing-fg); }
+.kanban-col[data-status='awaiting_dev'] .board-count { --badge-fg: var(--badge-awaiting_dev-fg); }
+.kanban-col[data-status='operational'] .board-count  { --badge-fg: var(--badge-operational-fg); }
+.kanban-card {
+  margin: 0;
+  cursor: grab;
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.2rem;
+}
+/* Empty kanban column: a dashed drop zone instead of a bare dash (roast P6) */
+.kanban-empty {
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  padding: 0.6rem;
+  text-align: center;
+}
+
+/* --- drag & drop reorder ------------------------------------------------ */
+[data-project-id][draggable='true'],
+[data-hurdle-id][draggable='true'] { cursor: grab; }
+[data-project-id][draggable='true']:active,
+[data-hurdle-id][draggable='true']:active { cursor: grabbing; }
+.dragging { opacity: 0.45; }
+.drag-over { outline: 2px dashed var(--line-strong); outline-offset: 2px; }
+
+/* --- reports chart ----------------------------------------------------------- */
+.bar-chart {
+  display: flex;
+  align-items: end;
+  gap: 0.5rem;
+  block-size: 9rem;
+  margin-block-start: 1.25rem;
+  overflow-x: auto; /* Session 19: many bars (year=12) used to clip/overlap labels */
+  overflow-y: hidden;
+  padding-block-end: 0.25rem;
+  scrollbar-width: thin;
+}
+.bar-row { flex: 1; display: flex; flex-direction: column; justify-content: end; gap: 3px; min-inline-size: 2.6rem; }
+.bar-row .bar { display: block; block-size: calc(var(--v) * 100%); min-block-size: 3px; border-radius: 4px 4px 0 0; background: var(--text); opacity: 0.85; }
+.bar-row .bar-2 { display: block; block-size: 0.4rem; min-block-size: 0.4rem; border-radius: 3px; background: var(--accent-soft); border: 1px solid var(--line-strong); inline-size: calc(var(--w2, 0.5) * 100%); min-inline-size: 0.35rem; }
+.bar-label { font-size: var(--fs-xs); color: var(--muted); text-align: center; margin-block-start: 0.35rem; white-space: nowrap; }
+
+/* --- misc ---------------------------------------------------------------- */
+.narrow { max-inline-size: 40rem; }
+/* Settings screen (the only page using .shell.narrow): extra breathing room between items. */
+.shell.narrow .card { margin-block-end: clamp(2.5rem, 5vw, 3.5rem); }
+.shell.narrow .card > h3 { margin-block-end: 1.1rem; }
+.shell.narrow label { display: block; margin-block-end: 1.25rem; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  font-size: var(--fs-lg);
+}
+.btn:hover { background: var(--bg-soft); text-decoration: none; color: var(--text); /* reset: .btn hover bg is light grey, not teal — keep dark text, not the button:hover white */ }
+summary { cursor: pointer; color: var(--muted); font-size: var(--fs-lg); }
+cite { font-style: normal; }
+
+
+/* S29 (agenda 5 — kanban color weights): the project card's bottom progress strip.
+   Same bucket thresholds as the timeline badges (pd-pl-pct in project-header.css) —
+   one visual language across the board, the project page, and the Activity tab.
+   Auto-computed (dev tasks → hurdles) or the manual override; 4px tall, never grabs
+   the pointer from the card's drag affordance. */
+.kanban-progress {
+  position: relative;
+  block-size: 4px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  overflow: hidden;
+  pointer-events: none;
+  margin-block-start: 0.15rem;
+}
+.kanban-progress span { display: block; block-size: 100%; border-radius: inherit; background: var(--line-strong); transition: inline-size 0.25s ease; }
+.kanban-progress.is-zero span { background: var(--line); }
+.kanban-progress.is-low span { background: var(--accent-2); }
+.kanban-progress.is-mid span { background: var(--brand); }
+.kanban-progress.is-high span { background: var(--brand); box-shadow: 0 0 0 1px var(--accent-soft); }
+.kanban-progress.is-done span { background: var(--ok, var(--cta)); }

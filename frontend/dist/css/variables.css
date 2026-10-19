@@ -1,0 +1,542 @@
+/* Hibana design base — the Sadhana design system, unified app-wide (2026-08-29):
+   near-white warm background, white cards, medium-teal interactive accent, the canonical
+   quadrant palette (teal · amber · rose · lavender), 16px radii and soft warm
+   shadows. CSS logical properties (Farsi/RTL ready). The board page (/to-do-list)
+   is the reference implementation — these tokens are its palette, extracted so
+   every page re-skins together.
+
+   UI/UX R5 — Semantic color system (2026-09-12):
+   ──────────────────────────────────────────────────────────────────────────────
+   Every accent color in the app maps to EXACTLY ONE semantic role. Multiple states
+   may share a color when they share the role, but no color encodes two different
+   meanings.
+
+     RED (urgent / overdue)        → prio-urgent, bug-bubble (overdue/urgent bugs),
+                                     halted status (project stopped, needs attention)
+     ORANGE (warning)              → prio-medium, awaiting status (waiting on input)
+     TEAL (brand / primary)        → sig-backlog chip, brand elements, accent fills,
+                                     doing status (the active primary stage)
+     GRAY (plain count / neutral)   → prio-low, sig-ideas count chip, sig-hurdles count
+                                     chip, plain count pills anywhere in the UI
+     STATUS HUES (info per stage)   → spark amber, unreviewed slate, investigating violet,
+                                     operational green (each is a unique hue, never reused)
+
+   The pink #E59AA5 that previously encoded prio-high is GONE — high-priority items
+   now share RED with prio-urgent (both signal urgency at different intensities, and
+   prio-urgent gets the additional red-tinted background to distinguish it). The two
+   ORANGE sig-chips (.sig-ideas, .sig-hurdles) are GONE — both were plain sub-item
+   counts, now converted to neutral gray pills per WCAG 1.4.1 (color is never the
+   sole carrier of meaning for a count). See polish-batch.css + layout.css for the
+   per-class definitions.
+   ────────────────────────────────────────────────────────────────────────────── */
+
+/* Vazir available on EVERY page and in EVERY language (user checklist: "Vazir font
+   displays for Farsi text even in English mode"). Previously the @font-face was
+   linked only on sadhana.html and injected by i18n.js for fa users — Farsi content
+   viewed by an EN user fell back to system fonts. The base stack below consults
+   Vazir only for glyphs Manrope lacks, so EN-only users never download the files. */
+@import url('/vendor/vazir/font-face.css');
+
+/* General Sans on EVERY page (S155 typography system — the owner's spec): the
+   primary UI family. Loaded via @import for the same reason as Vazir — ONE edit
+   here wires every page, no per-page <link> churn. Weights 400/500/600 only
+   (the scale's full weight set; 700 stays in reserve). General Sans has no
+   Arabic glyphs, so Farsi text falls through to VazirFA/Vazir below. */
+@import url('/vendor/general-sans/font-face.css');
+
+/* L13 fix (2026-09-10): skip-to-main-content link — REMOVED in Session 21 (owner request:
+   the focused pill covered the header avatar in RTL). Keyboard users still reach main
+   content via normal Tab order; the a11y.skipToMain key and per-page anchors are gone. */
+
+:root {
+  /* S95 r2 (owner item 1 — the reference's "restrained" neutral canvas): the page
+     background left the warm off-white register for a TRUE neutral light gray —
+     every other color now pops against gray, not against cream. Panels/cards stay
+     pure white (--card), so the card-on-canvas step reads clean in both themes. */
+  --bg: #E7E7E7;
+  /* "slightly deeper surface" must stay DEEPER than the new gray canvas (the old
+     #F2F0EA was WARMER and LIGHTER — a hover wash that vanished on #E7E7E7). */
+  --bg-soft: #DEDEDE;
+  /* S94 (owner item 3): ONE shared "pale well" wash — the rail panel's group heads AND
+     the projects kanban's stage columns wear the EXACT same color/opacity (a 55%
+     bg-soft veil over whatever surface sits underneath), so the two list anatomies
+     read as one system. Referenced by .rail-group-head (layout.css) and .kanban-col
+     (canvas.css); re-resolves automatically per theme (bg-soft is overridden in
+     claude-dark-theme.css — no second declaration needed there). */
+  --well-bg: color-mix(in srgb, var(--bg-soft) 55%, transparent);
+  --card: #FFFFFF;             /* white cards float on the near-white base */
+  /* Session 15 (user request): the dashboard stage-box task cards get ONE neutral surface
+     (#F5F6F7, light mode) regardless of status — status color now lives ONLY in the
+     per-card indicator bar (--stage-bar-*). Same register in both themes, so the bar
+     tokens are defined once here and cascade into dark; only --statcard-bg flips. */
+  --statcard-bg: #F5F6F7;
+  /* S179 (advisor block 6 — surface tokens): THREE named surfaces, no more. Every
+     dashboard fill resolves through these aliases so the panel/notebook/hero tint
+     experiments can never reintroduce a fourth near-neutral: page = the canvas the
+     sections float on, card = the white content surface, row = the quiet in-card
+     row fill the task rows sit on. Values are the EXISTING tokens — no new hex; the
+     aliases are the contract (the sticky-note yellows stay the ONLY tinted surfaces). */
+  --surface-page: var(--bg);      /* the page canvas */
+  --surface-card: var(--card);    /* cards / panels */
+  --surface-row: var(--statcard-bg); /* row fill inside a card */
+  /* S179 (advisor block 15 — focus visibility): the one focus-ring ink, mixed toward
+     the theme's own text so it clears 3:1 against BOTH the card and the row fill in
+     BOTH themes (the bare --accent rides ~3.1:1 on white and ~2.9:1 on the row fill —
+     under the WCAG 2.4.11 non-text floor). Direction-safe: light theme mixes toward
+     the dark text (darker ring), claude-dark toward its light text (lighter ring). */
+  --focus-ring: color-mix(in srgb, var(--accent) 72%, var(--text));
+  --stage-bar-spark: #E8CFA0;         /* pastel amber — ideas (Session 21: softened) */
+  --stage-bar-planning: #BCD5EF; /* pastel azure (was #9DC7FF — saturated) */
+  --stage-bar-queued: #EFDEA5;      /* pastel butter yellow (was #FFD658 — neon) */
+  --stage-bar-developing: #AEE0B8;         /* pastel mint green (was #6FE983 — neon) */
+  --stage-bar-awaiting_dev: #EFC2B5;        /* pastel peach — stopped */
+  --stage-bar-operational: #B7DFBC;   /* pastel sage green (Session 21: whole set softened) */
+  /* S155 INK RUNGS (the owner's typography spec — "opacity carries hierarchy, not
+     a second color"): the neutral black-opacity ladder from the Scandinavian audit.
+     Primary = titles/body/labels · Secondary = supporting text/sidebar labels ·
+     Tertiary = metadata/timestamps/counts (lifted from the default 44% — real
+     content, not decoration). AA check on this canvas: 0.92→14.8:1 on #E7E7E7 ·
+     0.64→6.2:1 · 0.56→4.6:1. */
+  --ink-primary: rgba(0, 0, 0, 0.92);
+  --ink-secondary: rgba(0, 0, 0, 0.64);
+  --ink-tertiary: rgba(0, 0, 0, 0.56);
+  /* --text/--muted are the rungs FLATTENED ON WHITE (0.92→#141414, 0.64→#5C5C5C) and
+     deliberately OPAQUE: the app's ~25 ink-anchored color-mix recipes (quadrant title
+     inks, counter inks, sub-note inks) and their computed-color e2e pins assume an
+     opaque anchor — this round's first cut aliased them onto the translucent rungs
+     and S102's quadrant-title mix came back translucent (color(srgb …/0.959)). Same
+     rendering as the rungs on every surface (≤2 gray levels), mix-safe everywhere.
+     New typography-layer code consumes the --ink-* rungs directly. */
+  --text: #141414;  /* was #262118 warm near-black — the neutral primary rung, flattened */
+  --muted: #5C5C5C; /* was #5A5248 warm medium — the secondary rung, flattened (6.7:1 on white, 5.4:1 on the canvas — AA holds) */
+  /* S95 r2 (owner item 8): ONE consistent hairline weight + color across the app —
+     a light neutral gray (no warm cast) at a uniform 1px. --line-strong stays one
+     step deeper for the few surfaces that need a firmer edge (menus, inputs). */
+  --line: #D4D4D4;
+  --line-strong: #BFBFBF;
+  --accent: #4A9FA3;           /* medium teal — the Sadhana interactive accent */
+  /* S200 (UX-3): the ACCENT-AS-TEXT ink. --accent (#4A9FA3) is 3.10:1 on white —
+     fine for icons/strokes (WCAG 1.4.11 non-text floor is 3:1) but NOT for text
+     (AA needs 4.5:1). Text that speaks in the accent's hue uses --accent-ink
+     (#297073 = 5.74:1 on white — the same ink as --link, one hue family with the
+     link register). Icons, borders, fills, tints KEEP --accent. Convert per-sheet
+     as touched; the a11y contrast gate (e2e/a11y.spec.ts) ratchets every page it
+     measures — new accent-as-text fails CI until it uses --accent-ink. */
+  --accent-ink: #297073;
+  --accent-hover: #3D8D91;
+  --accent-soft: rgba(74, 159, 163, 0.13);
+  /* S189 (owner, CHANGE 7 — the rail's active SHAPE): the icon rail's own active
+     family, deliberately SEPARATE from --accent/--brand (the sidebar's rows) and
+     from --cta (the button fills): the active rail item paints a soft FILLED
+     rounded shape — the teal at LOW alpha (14% here; the saturated teal stays
+     reserved for call-to-action fills), the ICON at the full #2F7B7F teal, and
+     the LABEL one rung darker (#1F5A5D — 6.56:1 on its own tint, 4.5:1+ by
+     construction; the icon clears the 3:1 non-text floor at 4.12:1). The
+     inactive hover is the SAME teal at a quieter 7%. Alpha rides the background
+     COLOR ONLY (rgba) — never the opacity property, which would fade the icon
+     and label with it. claude-dark-theme.css overrides all five (higher alpha
+     + lighter teals — the dark-tint lesson); proofs: qa/s189-rail-active.mjs +
+     the identity-palette S189 block. */
+  --nav-active-bg: rgba(47, 123, 127, 0.14);
+  --nav-active-bg-hover: rgba(47, 123, 127, 0.18);
+  --nav-hover-bg: rgba(47, 123, 127, 0.07);
+  --nav-active-icon: #2F7B7F;
+  --nav-active-label: #1F5A5D;
+  --cta: #2E7B7F;              /* F6 (session 9): one shade deeper — white-on-CTA
+                                  3.9 → 4.93:1 (AA for 12–14px button labels).
+                                  Teal stays teal; hover is one step darker again. */
+  --cta-hover: #276A6D;
+  --pastel-tool: #fef3c7;         /* pastel active-highlight for board toolbars */
+  --pastel-tool-strong: #fde68a;
+  --ok: #1f7a34;              /* AA-verified (roast P1): 5.40 on white, 4.73 on accent-soft */
+  --err: #c02626;             /* AA-verified (roast P1): 5.92 on white, 5.19 on accent-soft */
+  --danger: #b42318;             /* delete actions: pastel-red chip (icon) */
+  --warn: #b45309;                /* S83: connection-hiccup states (amber — distinct from --err red) */
+  /* S83 (owner request — "code parts must have different fonts, colors, size — like
+     Notion/Obsidian"): inline + fenced code get their own fg/bg pair. Rust/terracotta
+     against the teal accent — the warm side of the quadrant palette, instantly
+     readable as "this is code" at a glance. AA-checked: #A5422B on #F4EDE4 ≈ 5.0:1. */
+  --code-fg: #A5422B;
+  --code-bg: #F4EDE4;
+  --code-border: #E3D5C6;
+  --code-panel-bg: #2D2A26;
+  --code-panel-fg: #E8E3DC;
+  /* S88: the code-block grammar — one mono stack + the five syntax token inks the
+     tokenizer emits (keyword rust / string olive / comment taupe / number amber /
+     fn teal / op warm grey). These sit on the DARK panel (--code-panel-bg) in light
+     mode — hence the light values; claude-dark flips them for its own panel. */
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, 'Liberation Mono', monospace;
+  --md-kw: #F09B7E;
+  --md-str: #A3B98F;
+  --md-com: #8F8A80;
+  --md-num: #E3B36B;
+  --md-fn: #7FB5B7;
+  --md-op: #A9A296;
+  --danger-soft: #fdeaea;        /*   …pastel red fill */
+  --danger-soft-hover: #fbdddd;
+  /* Status badge tints — session 12 (2026-09-15, user: "the phase colors all look
+     greyish — more pronounced, more distinguishing"): every hue pushed to real chroma
+     (the old ~95%-lightness pastels read as grey). Each fg stays AA (≥4.5:1) on its bg:
+       spark amber · unreviewed blue-slate · investigating violet · awaiting gold ·
+       doing teal · halted brick · operational green. */
+/* ══ SEMANTIC COLOR SYSTEM (UI/UX R5, 2026-09-12 · S137 revision) ═══════════════
+   Each accent color has exactly ONE meaning across the entire dashboard:
+
+   • RED (--err, --danger, --st-bug) → DESTRUCTIVE actions + problem status ONLY (S179 block 13: overdue/attention left red — it never means time)
+   • ORANGE (--warn) → warning / waiting / attention-needed
+   • ORANGE (--st-developing) → Developing status
+   • TEAL (--brand, --accent) → brand / primary action / active state / current page
+   • SLATE-TEAL (--st-queued) → Up Next status (muted, distinct from the brand teal)
+   • GREEN (--ok, --st-operational) → success / done / Operational
+   • YELLOW (--st-planning) → Planning status
+   • BLUE (--st-idea) → Ideas status
+   • GRAY (--st-awaiting_dev, --muted) → On Hold / plain count / neutral pill
+
+   Rule: a badge that is just a plain sub-item count (not a status) MUST use the gray
+   neutral pill (background: rgba(0,0,0,0.06); color: var(--muted)). Only a genuinely
+   urgent/status signal gets a "loud" color.
+
+   S137 (owner redesign — one token per status): the --st-* hues below are THE
+   canonical status colors. The status badges (--badge-*-bg/-fg pastel/ink pairs),
+   the kanban column dots (.kanban-dot), the overview donut segments + legend
+   swatches (.ov-seg/.ov-dot) and the overview's project dots (.ov-proj-dot) all
+   reference the SAME token per status, so no surface can hardcode its own shade of
+   a status the chart already speaks. Warning-amber consumers (stale banners, sync
+   pill, streak fire, trash purge, medium priority) use --warn/--err — NOT the
+   status tokens. ════ */
+
+  /* One canonical hue per status — dots, donut segments, legend swatches, pglance. */
+  --st-idea: #5B8DEF;            /* Ideas — blue (the overview donut's idea blue) */
+  --st-planning: #E9B93B;        /* Planning — yellow */
+  --st-queued: #17799E;          /* Up Next — clear cyan-blue (S141 chroma raise) */
+  --st-developing: #E08A54;      /* Developing — orange */
+  --st-awaiting_dev: #75689E;    /* On Hold — muted violet-slate (S141: the gray read too close to Up Next) */
+  --st-operational: #279E49;     /* Operational — green (S141 chroma raise) */
+  --st-bug: #E54D4D;             /* Problems — red (the ov donut's bug red) */
+
+  /* S138 (owner correction on the S137 redesign): the tinted kanban CARD is back —
+     the owner's stacking is [white lane [color-coded card]]. The tint is NOT a
+     separate hardcoded shade: every card background mixes the ONE canonical
+     --st-<status> token over var(--card) at --kanban-tint strength (24% light;
+     claude-dark raises it one notch, the S88 one-notch-stronger lesson), so the
+     tint can never drift from the token the head dot, the badge and the donut
+     segment all reference. S139 (owner round 2): 12% read washed-out — the five
+     tints looked alike at a glance; the dial rides to 24% (compared 20/24/28 live
+     with the owner's seeded board: 24% is the pastel band where every hue is
+     clearly distinguishable without going saturated). S141 (owner round 3 —
+     'increase the saturation… up next and on hold are too similar'): the dial was
+     never the whole story — the QUEUED and AWAITING_DEV tokens themselves carried
+     almost no chroma (38%/8%), so no tint strength could separate them. The tokens
+     ride up instead (queued #3D7A8A → #17799E cyan-blue; awaiting_dev #859098 →
+     #75689E violet-slate — the on-hold violet the owner chose long ago; operational
+     → #279E49), so dots, badges, the donut and the cards sharpen together and every
+     hue is unmistakable while the 24% mixes stay pastel. */
+  --kanban-tint: 24%;
+
+  /* S144 (owner: "I want the priority of the tasks to be shown like the given
+     screenshot"): the task cards wear a PRIORITY BANNER — a colored strip across the
+     card's top carrying the label (URGENT / HIGH / MEDIUM / LOW PRIORITY), instead of
+     the old left-border accent + tiny dot. One token per priority, consumed by the
+     banner on every surface (board.html, project.html's server fragments) so no
+     surface can hardcode its own shade.
+     S145 (owner: "use this colors"): the fills were the owner's pastel legend —
+     Low #A8C995 (sage) · Medium #E8C15A (gold) · High #E99169 (coral) · Urgent
+     #D9365B (crimson) — where three fills were light enough that the banner ink had
+     to flip to a dark self-contained color per priority.
+     S149 (owner: "Use this new colors for priority color-coding" + the exact
+     legend): the fills were the AA-WITH-WHITE set — Low #4F6E8C (steel) ·
+     Medium #9C6B1F (bronze) · High #A85023 (rust) · Urgent #B23A34 (brick) —
+     all four clearing AA normal-text with a WHITE label, so the banner ink was
+     WHITE on every priority.
+     S150 (owner: "Use this for color-coding priorities" + the exact bg/ink
+     table): each priority is now a FILL+INK PAIR — the fill carries the label,
+     the ink is the color the label is set in, and the pair is self-contained
+     (AA-checked by the owner against the fill, theme-independent):
+       Low    fill #D3D9DF (pale slate-blue) · ink #45525E (dark — 210°, 25% sat, 89→38% light)
+       Medium fill #F4E5BD (pale gold)       · ink #604910 (dark — 44°, 69% sat, 87→28% light)
+       High   fill #C14E1B (burnt orange)    · ink #FFFFFF (4.8:1 AA)
+       Urgent fill #BF2A1E (saturated red)   · ink #FFFFFF (5.9:1 AA)
+     The canonical tokens are the owner's --color-* names (fill) plus the new
+     --color-*-ink companions; --prio-banner-ink stays #ffffff as the default
+     while --prio-banner-ink-<p> aliases carry the per-priority ink to the
+     banner/dot/chip consumers. The whole priority family (banner, dots, filter
+     segments, composer chips, detail chip) reads these tokens — no priority hue
+     is hardcoded anywhere else. The two PALE fills (low/medium) gain a hairline
+     ring in their ink where they render as bare dots, so the dots keep their
+     at-a-glance presence on light cards (the ring is token-driven, dark rides free). */
+  --color-low: #d3d9df;
+  --color-low-ink: #45525e;
+  --color-medium: #f4e5bd;
+  --color-medium-ink: #604910;
+  --color-high: #c14e1b;
+  --color-high-ink: #ffffff;
+  --color-urgent: #bf2a1e;
+  --color-urgent-ink: #ffffff;
+  --prio-banner-urgent: var(--color-urgent);
+  --prio-banner-high: var(--color-high);
+  --prio-banner-medium: var(--color-medium);
+  --prio-banner-low: var(--color-low);
+  --prio-banner-ink: #ffffff;
+  --prio-banner-ink-urgent: var(--color-urgent-ink);
+  --prio-banner-ink-high: var(--color-high-ink);
+  --prio-banner-ink-medium: var(--color-medium-ink);
+  --prio-banner-ink-low: var(--color-low-ink);
+
+  /* S152: the 16 curated CATEGORY swatch pairs (the owner's table — every pair
+     pre-verified WCAG AA). This is the design-token home for the picker tiles;
+     the server's validation constant (src/lib/categories.ts) carries the same 16
+     and a unit test pins the two lists together (no drift). Categories store their
+     pair in DB rows; these tokens feed the swatch GRID + the quick-add UI. */
+  --cat-sw-1-fill: #F0CCCC;  --cat-sw-1-ink: #682727;
+  --cat-sw-2-fill: #F0D9CC;  --cat-sw-2-ink: #683F27;
+  --cat-sw-3-fill: #F0E7CC;  --cat-sw-3-ink: #685727;
+  --cat-sw-4-fill: #ECF0CC;  --cat-sw-4-ink: #5F6827;
+  --cat-sw-5-fill: #DEF0CC;  --cat-sw-5-ink: #476827;
+  --cat-sw-6-fill: #D0F0CC;  --cat-sw-6-ink: #2F6827;
+  --cat-sw-7-fill: #CCF0D5;  --cat-sw-7-ink: #276837;
+  --cat-sw-8-fill: #CCF0E2;  --cat-sw-8-ink: #27684F;
+  --cat-sw-9-fill: #CCF0F0;  --cat-sw-9-ink: #276868;
+  --cat-sw-10-fill: #CCE2F0; --cat-sw-10-ink: #274F68;
+  --cat-sw-11-fill: #CCD5F0; --cat-sw-11-ink: #273768;
+  --cat-sw-12-fill: #D0CCF0; --cat-sw-12-ink: #2F2768;
+  --cat-sw-13-fill: #DECCF0; --cat-sw-13-ink: #472768;
+  --cat-sw-14-fill: #ECCCF0; --cat-sw-14-ink: #5F2768;
+  --cat-sw-15-fill: #F0CCE7; --cat-sw-15-ink: #682757;
+  --cat-sw-16-fill: #F0CCD9; --cat-sw-16-ink: #68273F;
+
+  /* Status badge colors — pastel wash + AA ink of the SAME hue as --st-<status>.
+     (unreviewed stays the devboard lane tint it always was — not a project stage.) */
+  --badge-spark-bg: #E8EFFB;         --badge-spark-fg: #2E5FA3;
+  --badge-unreviewed-bg: #E8EEF6;    --badge-unreviewed-fg: #46618C;
+  --badge-planning-bg: #FAF1CF; --badge-planning-fg: #77590A;
+  --badge-queued-bg: #D6ECF3;      --badge-queued-fg: #14536C;   /* S141: cyan family, AA 6.9 */
+  --badge-developing-bg: #FBE9DA;         --badge-developing-fg: #96511A;
+  --badge-awaiting_dev-bg: #E9E5F2;        --badge-awaiting_dev-fg: #4C4370;  /* S141: violet family, AA 7.2 */
+  --badge-operational-bg: #DFF2E4;  --badge-operational-fg: #277334; /* S141: AA 5.0 */
+  /* S191: the missing amber pair, defined at last — --badge-pending-bg/-fg was
+     REFERENCED (notifications.css R2.1 chips/icons/accents + --status-warning-soft
+     → task-controls status dots) but never defined, so every "Soon"/warning surface
+     silently rendered unstyled (transparent chips, inherited inks, NO accent bar).
+     Amber = "waiting/due soon" per the --warn/--color-warning family; fg #7A580C on
+     bg #FBF0D4 = 5.7:1 (AA), proven in qa/s191-attention-surface.mjs. */
+  --badge-pending-bg: #FBF0D4;  --badge-pending-fg: #7A580C;
+  /* S138 supersedes the S137 retirement: the old per-status --kanban-*-bg/-line
+     hex tokens stay deleted — the card tint now DERIVES from --st-* via color-mix
+     (notifications.css), so a re-hardcoded shade is still impossible. */
+  /* notebook sheet: paper + grid stay theme-aware; ink inverts in dark so black/blue pens stay visible */
+  --nb-paper: #fdfdfb;
+  --nb-grid: rgb(28 28 26 / 0.05);
+  --nb-ink: none;
+  /* More rounded boxes/sections (user request 2026-09-02): softer, modern, minimal.
+     S95 r2 (owner item 5): --radius-lg joins the ramp for the DASHBOARD's large
+     category surfaces (the to-do quadrant panels + the Quick Notebook) — the
+     reference's big-radius signature (cards stay --radius, rows --radius-sm). */
+  --radius: 20px;
+  --radius-sm: 14px;
+  --radius-lg: 24px;
+  --shadow: 0 2px 14px rgb(30 20 10 / 0.07);          /* soft warm shadows (Sadhana) */
+  --shadow-soft: 0 2px 14px rgb(30 20 10 / 0.06);
+  --shadow-card: 0 2px 14px rgb(30 20 10 / 0.07);
+  --shadow-dropdown: 0 8px 36px rgb(30 20 10 / 0.12);
+  --btn-text: #ffffff;
+  /* Text-safe teal for inline links: 4.7:1 on the sandy bg, 6:1 on white —
+     --accent itself stays the brighter Sadhana teal for fills/borders/icons. */
+  --link: #297073;
+  /* S155 — the owner's typography spec, font-family block. --font-family is the
+     spec's exact stack; --font-sans (the stack every app surface consumes) keeps
+     the family FIRST but holds 'VazirFA'/'Vazir' BEFORE the system fallbacks —
+     the generic sans-serif/system-ui entries would otherwise swallow Arabic
+     glyphs before the Persian faces could claim them, regressing the EN-mode FA
+     display contract. Manrope leaves the stack (its @font-face stays for legacy
+     Canvas text objects); the spec's fallbacks ride behind the Vazir pair. */
+  --font-family: "General Sans", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: 'General Sans', 'VazirFA', 'Vazir', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* UI/UX R7 (2026-09-12): VERIFIED — the Persian font stack is correct.
+     `--font-fa` lists 'Vazir' FIRST (the self-hosted Persian-shaped sans at
+     /vendor/vazir/*.woff2 — font-face.css declares every weight from 100 to 900).
+     'VazirFA' is the same glyphs under a separate family name with a unicode-range
+     restricted to Arabic/Persian blocks (0600-06FF, FB50-FDFF, FE70-FEFF) — added to
+     --font-sans so any FA text in an EN document auto-uses Vazir without EN-only
+     users downloading the woff2. The @import url('/vendor/vazir/font-face.css') at
+     the top of this file + i18n.js's ensureVazir() (re-injects the link when lang=fa
+     is toggled) are both in place. No changes needed — this comment documents the
+     audit confirmation. */
+  --font-fa: 'Vazir', 'VazirFA', 'General Sans', Tahoma, system-ui, sans-serif;
+  /* Brand accent = the Sadhana teal: active nav underline, link hovers, identity
+     marks. CTA fills sit one shade deeper (--cta) for white-text contrast. */
+  --brand: #4A9FA3;
+  --brand-hover: #3D8D91;
+  /* Semantic color tokens (UI audit 2026-08-25): exactly one hex per meaning, reused
+     wherever that color appears (borders, icons, badges). Quadrants map 1:1 onto these
+     via their q-<color> class. Theme-agnostic accents — surfaces adapt via color-mix. */
+  --color-primary: #4A9FA3;         /* Q1 teal — the Sadhana primary */
+  --color-primary-strong: #166b60;  /* AA text shade of primary: 5.71:1 on the primary tint (#EAF5F4) */
+  --color-secondary: #8A7CAA;       /* Q4 dusty lavender — 6.7:1 on white, distinct from Q1's teal */
+  --color-accent: #2bd46b;
+  --color-success: #2a9d3c;
+  --color-warning: #d29828;
+  --color-error: #ac2c1b;
+  --color-info: #2a669d;
+  /* Dashboard quadrant customization palette = the canonical Sadhana quadrant colors
+     (these are token names persisted by the API, never user-supplied hex values):
+     Q1 teal · Q2 amber · Q3 rose · Q4 lavender, plus the board's tag family. */
+  --accent-1: #4A9FA3; --accent-2: #C4893A; --accent-3: #B85A54; --accent-4: #8A7CAA;
+  --accent-green: #5A9E80; --accent-purple: #7C6FAE; --accent-pink: #C77F86; --accent-teal: #3D8D91;
+  /* S94 (owner items 7+8 — the Quick Notebook's identity moves OFF the khaki/amber
+     register ONTO the green-teal CTA register, in BOTH themes): light mode keeps the
+     deep CTA teal itself (#2E7B7F — the exact --cta hue; AA on white at 5.5:1);
+     claude-dark-theme.css swaps in a lightened teal of the same family. The amber
+     accent-2 token itself is untouched (it is a user-pickable QUADRANT swatch). */
+  --quicknote-accent: #2E7B7F;
+  /* S93 (owner round, item 6 — "offer 16 colors, PASTEL"): the swatch palette's second
+     octave. Same mid-tone register as the first eight so the low-opacity washes read in
+     BOTH themes; named tokens (persisted by the API, never user hex). */
+  --accent-sky: #6E9BC5; --accent-mint: #7FB89A; --accent-lilac: #A793C9; --accent-coral: #D08A77;
+  --accent-sand: #C9AE7C; --accent-sage: #93A98B; --accent-plum: #9D7B9B; --accent-slate: #7C93A8;
+  /* S181 (the /color-palette-advisor hex pass — block 13's exact palette, delivered):
+     the PROJECT IDENTITY family — twelve curated hues, ONE register per project id
+     (hash-of-id → token, src/routes/projects/helpers.ts PROJECT_HUE_TOKENS). A DEDICATED
+     family, deliberately NOT the quadrant accent-* swatches above (those are user-picked
+     surface washes; identity is system-assigned and must obey laws the swatches never
+     needed). Five laws, all machine-verified by qa/s181-ident-palette.mjs + the vitest
+     pin (identity-palette.test.ts):
+       1. CONTRAST — every hue ≥3:1 on the light card (#FFFFFF) AND the claude-dark card
+          (#1f1e1c) — the WCAG 1.4.11 non-text floor for a meaningful 8px dot.
+       2. FAMILY — no red/orange/yellow hues (70°–355° only) — identity never reads as
+          destructive/problem/warning/status color.
+       3. DISTINCT — pairwise CIEDE2000 ≥10 across the whole set (the OLD borrowed set's
+          minimum was 6.0 — accent-1 vs accent-teal, two projects reading as one).
+       4. BRAND — every hue ≥10 ΔE from the brand teal #4A9FA3 — a dot may never read as
+          "selected/current page".
+       5. STATUS — every hue ≥8 ΔE from every --st-* token — a dot may never read as a
+          task state (the old set sat 3.8 from On Hold, 6.3 from Ideas).
+     Structure: an alternating DEEP/LIFTED lightness ladder down the hue wheel (deep
+     ~4.5:1 on white, lifted ~3.2:1) so same-register neighbors sit ≥40° apart and
+     adjacent-register neighbors ≥18° — categorical-palette spacing at dot size. */
+  --ident-leaf: #61702E;       /* deep olive-leaf, h74 */
+  --ident-fern: #709E51;       /* lifted fern green, h96 */
+  --ident-moss: #337731;       /* deep moss green, h118 */
+  --ident-jade: #31775E;       /* deep jade teal-green, h159 */
+  --ident-ocean: #5C96BC;      /* lifted ocean blue, h204 */
+  --ident-azure: #4E66B7;      /* deep azure, h226 */
+  --ident-cornflower: #8C88CE; /* lifted dusty cornflower, h243 */
+  --ident-iris: #8055B9;       /* deep iris violet, h266 */
+  --ident-orchid: #B679C8;     /* lifted orchid mauve, h286 */
+  --ident-mulberry: #A7449D;   /* deep mulberry magenta, h306 */
+  --ident-rose: #C775A4;       /* lifted dusty rose, h326 */
+  --ident-blush: #AE475F;      /* deep blush berry, h346 */
+  /* Dashboard task semantics: one spacing value and one pastel confirmation surface for every card. */
+  --task-row-gap: 0.5rem;
+  --task-complete-bg: var(--badge-working-bg);
+  --status-info-soft: var(--badge-spark-bg);
+  --status-warning-soft: var(--badge-pending-bg);
+  --status-success-soft: var(--badge-working-bg);
+  /* Neutral scale (dark → light) — the single ramp for grays, per the audit. */
+  --neutral-900: #0e1010;
+  --neutral-800: #222625;
+  --neutral-700: #485150;
+  --neutral-600: #788785;
+  --neutral-500: #aeb7b6;
+  --neutral-300: #d9dddd;
+  --neutral-100: #f4f5f5;
+  /* ── S155 TYPE SCALE (the owner's typography spec — verbatim tokens) ──────
+     Single family, weight/size-driven hierarchy. Two breakpoints: desktop ≥768px
+     and mobile <768px — ONLY H1/H2 shrink on mobile; Body/Label/Caption don't
+     (working text never drops below 16px/1rem). Weight 700 is deliberately
+     absent — reserved, unused, so a genuine fourth level stays available. */
+  --text-h1-size: 1.5rem;             /* 24px desktop — page title */
+  --text-h1-size-mobile: 1.25rem;     /* 20px mobile */
+  /* S157 (owner report: "use lesser weight for headings, they're too bold"): the
+     heading rungs drop one weight rung, 600 → 500 — headings lead by size + ink,
+     not weight; 500 is the app's label register so the ladder stays coherent and
+     700 remains in reserve. Card titles (.pc-title) ride this rung and follow. */
+  --text-h1-weight: 500;
+  --text-h1-line-height: 1.2;
+  --text-h1-tracking: -0.01em;
+  --text-h2-size: 1.125rem;           /* 18px desktop — section/card title */
+  --text-h2-size-mobile: 1rem;        /* 16px mobile */
+  --text-h2-weight: 500; /* S157: 600 → 500, the owner's lighter-heading ladder */
+  --text-h2-line-height: 1.3;
+  --text-h2-tracking: -0.005em;
+  --text-h3-size: 0.875rem;           /* 14px, both breakpoints — minor heading/nav item */
+  --text-h3-weight: 500;
+  --text-h3-line-height: 1.4;
+  --text-body-size: 1rem;             /* 16px, both breakpoints */
+  --text-body-weight: 400;
+  --text-body-line-height: 1.55;
+  --text-body-secondary-size: 0.875rem; /* 14px */
+  --text-body-secondary-weight: 400;
+  --text-body-secondary-line-height: 1.5;
+  --text-label-size: 0.875rem;        /* 14px — buttons, controls, tabs */
+  --text-label-weight: 500;
+  --text-label-line-height: 1.3;
+  --text-eyebrow-size: 0.75rem;       /* 12px — section group labels */
+  --text-eyebrow-weight: 500;
+  --text-eyebrow-line-height: 1.3;
+  --text-eyebrow-tracking: 0.03em;
+  --text-caption-size: 0.75rem;       /* 12px — count badges, timestamps */
+  --text-caption-weight: 500;
+  --text-caption-line-height: 1.2;
+
+  /* Type scale — 5 tokens (roast P5): the previous ~12 fractional rem steps
+     (0.7/0.72/0.78/0.8/0.84/0.85/0.9/0.92/0.95/1.02/1.1/1.12) collapsed into one
+     step per purpose. Body text stays 1rem; headings keep their own ramp.
+     S155: the five rungs now RESOLVE ONTO the owner's scale above (the two
+     systems are one — no second ladder): meta/caption → 12px, secondary/label
+     → 14px, subheadings/card titles → 18px. Deltas vs the old values: xs
+     11.5→12px, sm 12.8→12px, md 13.6→14px, lg 15.2→14px (the spec's Label
+     register for buttons/nav), xl 17.9→18px. */
+  --fs-xs: var(--text-caption-size);        /* meta — badges, table headers, tiny detail lines */
+  --fs-sm: var(--text-caption-size);        /* small — chips, avatars, footers, solved-count */
+  --fs-md: var(--text-body-secondary-size); /* secondary text — .small, labels, seg buttons, list rows */
+  --fs-lg: var(--text-label-size);          /* prominent UI text — buttons, nav links, summaries */
+  --fs-xl: var(--text-h2-size);             /* subheadings + card titles */
+  --brand-logo: url('/logo-light.png');   /* header + mobile login brand (theme-aware) */
+  --inline-logo: url('/logo-light.png');
+  /* Review-round 2: theme-aware select chevron (base.css consumes it — see the
+     select affordance rule there). Light: --muted tone. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A5248' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ==== S185 — the owner's batch-1 color table (the Project Detail palette) ======
+   Role-named values: ONE block to swap or revert the whole palette by editing
+   this block alone. --text/--muted stay the app's existing rungs (#141414 /
+   #5C5C5C) — re-declaring them under new names here would fork the ladder, so
+   the block names only what the table adds. This batch's consumers live on the
+   Project Detail page alone (body.pd-page + project-header.css) — no other
+   page's pixels move until later batches adopt the names. Dark twins live in
+   claude-dark-theme.css (the roles resolve onto the clay/near-black identity).
+   The column family is ONE OKLCH family — same lightness (0.962 tint / 0.75
+   dot) + same softness (0.018 tint / 0.13 dot chroma) across all five stages;
+   hues preserve the semantic assignments (idea azure · planned amber ·
+   progress gold · done green · bug red). Derived + AA-checked by
+   qa/s185-palette.mjs (every ink ≥4.5:1 on its own tint — idea/planned were
+   darkened; they were sub-AA on the S88 tints too). */
+:root {
+  /* surfaces & ink */
+  --page-bg: #F5F4F1;     /* the warm near-white canvas (the owner's value) */
+  --surface: #FFFFFF;     /* cards ride white on the warm canvas */
+  --border-soft: #D5D2CA; /* light warm gray — separates white cards from the near-white page (1.51:1 vs card, 1.37:1 vs page — the old --line's weight, warm cast) */
+  --text-muted: #5C5C5C;  /* the secondary rung, named for the table (reserved — consumed by later batches) */
+  --primary: #4A9FA3;     /* the teal interactive accent (light-mode identity) */
+
+  /* the five kanban columns — one family */
+  --col-idea-bg: #EBF3FF;      --col-idea-dot: #7BAFFF;     --col-idea-ink: #546F8E;     --col-idea-edge: 172 199 233;
+  --col-planned-bg: #FCF0E6;   --col-planned-dot: #E79A4E;  --col-planned-ink: #676E77;  --col-planned-edge: 209 212 216;
+  --col-progress-bg: #F7F2E5;  --col-progress-dot: #CCAB3E; --col-progress-ink: #7d5a34; --col-progress-edge: 240 197 155;
+  --col-done-bg: #EAF6ED;      --col-done-dot: #68C584;     --col-done-ink: #43704f;     --col-done-edge: 182 224 200;
+  --col-bug-bg: #FFEEED;       --col-bug-dot: #F58B88;      --col-bug-ink: #87555f;      --col-bug-edge: 238 185 194;
+
+  /* priorities — the select options' soft pairs (values unchanged; named) */
+  --prio-urgent-bg: #F9DFE6; --prio-urgent-text: #A81F42;
+  --prio-high-bg: #FBE5DA;   --prio-high-text: #A34A26;
+  --prio-medium-bg: #FAF0D3; --prio-medium-text: #7A611C;
+  --prio-low-bg: #EAF1E4;    --prio-low-text: #55703F;
+}
+
+/* S87 (owner request 2026-09-20): the prefers-color-scheme auto-dark block that lived
+   here was RETIRED — the app ships exactly two looks now: light (the :root baseline
+   above + themes.css's explicit light block) and claude-dark (claude-dark-theme.css).
+   boot.js resolves the stored preference / OS scheme to an explicit html[data-theme]
+   before first paint, so an OS dark preference renders claude-dark, never this
+   retired palette. */

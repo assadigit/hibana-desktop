@@ -1,0 +1,85 @@
+/* rtl.css — RTL directional overrides (extracted from modular files)
+   Session 25 Phase 1.5 (Option B): RTL rules extracted by-concern.
+   [dir='rtl'] prefix adds (0,1,0) specificity. Most base rules use CSS logical
+   properties (border-inline-start, margin-inline-end) which auto-mirror — these RTL
+   rules handle cases where logical properties aren't enough (SVG flips, transforms,
+   tooltip positioning). Loaded LAST (after themes.css) so RTL overrides always win.
+   (Task 4-F-impl: removed [dir='rtl'] .pc-corner rule — .pc-corner HTML element
+   deleted in Session 24h, audit confirmed zero references.) */
+
+/* S155: negative tracking is a Latin-optical device — on Arabic-script text it
+   fights the cursive joining. H1/H2's -0.01em/-0.005em resets to 0 in RTL; the
+   small POSITIVE eyebrow tracking (+0.03em) stays (the app precedent —
+   .qa-group's reduced 0.02em for Persian labels — kept in its own rules). */
+[dir='rtl'] h1, [dir='rtl'] h2 { letter-spacing: 0; }
+
+/* RTL: the track starts at the right edge, so «next» points LEFT — flip both glyphs. */
+[dir='rtl'] .stat-arrow svg { transform: scaleX(-1); }
+
+  [dir='rtl'] .dash-swipe-hint { animation-name: dashHintNudgeRtl; }
+
+/* S90 (owner request): the + creation circle FLIPS to the PHYSICAL bottom-left
+   corner in RTL. History: the 2026-08-30 rule pinned it to physical bottom-right
+   "in both directions" — that was correct while nav was a horizontal topbar, but
+   S88's vertical navigation rail mirrors to the RIGHT edge in RTL, and the +
+   collided with it. Opposite direction from the rail = physical left in RTL;
+   LTR keeps the physical right corner it has always had. The menu alignment
+   comes free: the stack's default align-items:flex-end is cross-end, which in a
+   dir=rtl column flex is the LEFT edge — so the pills anchor to the same physical
+   corner as the circle and grow rightward (the old flex-start override below
+   existed only to pin the menu to the right corner and is now REMOVED). */
+[dir='rtl'] .fab-stack { right: auto; left: 1.5rem; }
+
+[dir="rtl"] .icon.arrow { transform: scaleX(-1); }
+
+[dir='rtl'] .icon.arrow.opposite { transform: none; }
+
+/* UI/UX R2 (2026-09-12) — S85: the server "Resume work" card is gone (merged into
+   the client "Continue where you left off" component). Its RTL intent survives on
+   the merge's HERO entry: the Open CTA arrow (.resume-hero-cta .icon.arrow) is
+   flipped by the global [dir="rtl"] .icon.arrow rule above; polish-ui.css carries
+   the explicit [dir='rtl'] hover-nudge mirrors for the hero. Nothing else here. */
+
+[dir='rtl'] .sadhana-ribbon { transform: rotate(-45deg); }
+
+  [dir="rtl"] .feed-item:hover { transform: translateX(-2px); }
+
+  [dir="rtl"] .notif-item:hover { transform: translateX(-2px); }
+
+/* RTL: keep the tooltip centered (translateX(-50%) is symmetric) */
+[dir="rtl"] [data-tooltip]::before,
+[dir="rtl"] [data-tooltip]::after { transform: translateX(50%); }
+
+[dir="rtl"] .cal-cell.today {
+  border: 3px solid var(--brand) !important; /* thick brand border, overrides the 2px default */
+  background: color-mix(in srgb, var(--brand) 8%, var(--card));
+}
+
+[dir="rtl"] .cal-cell.today .cal-day-num {
+  color: var(--link); /* Session 20 (AA): was --brand — 2.9:1 as 13px text; --link matches the LTR .today rule */
+  font-weight: 700;
+}
+
+[dir="rtl"] #cal-title {
+  /* Prominent brand underline on the month heading in Jalali mode (Task 24: the h1 IS the month now) */
+  border-block-end: 3px solid var(--brand);
+  padding-block-end: 0.2rem;
+}
+
+[dir='rtl'] .t-code[data-lang]::before { float: left; }
+
+[dir="rtl"] .sp-month { border-inline-end: none; border-inline-start: 1px solid var(--line); }
+
+[dir="rtl"] .sp-month:last-child { border-inline-start: none; }
+
+[dir="rtl"] .sp-cell { }
+
+[dir="rtl"] .sp-bound::after { }
+
+[dir="rtl"] .sp-bar { }
+
+/* P4.7 (F-M19): mirror the sprint time-paging arrows in RTL so 'Older' points backward. */
+[dir='rtl'] .sp-arrow { transform: scaleX(-1); }
+
+[dir='rtl'] .dash-skeleton .sk::after,
+[dir='rtl'] .sk-topbar .sk::after { animation-name: sk-sweep-rtl; }

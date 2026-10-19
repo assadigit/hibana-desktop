@@ -1,0 +1,35 @@
+/* General Sans — the app's primary UI family (S155 typography system, Fontshare,
+   free OFL license). Three static latin woff2 files, self-hosted — zero runtime CDN
+   dependency, no font flash on load in Iran networks (the same contract the Manrope
+   files under /vendor/manrope/ have served since the roast plan's Phase 3).
+   Only 400 / 500 / 600 ship: the S155 scale uses exactly these three weights —
+   700 stays in reserve, unused, so a genuine fourth level remains available.
+   Farsi glyphs are NOT covered by General Sans — 'VazirFA'/'Vazir' sit later in
+   the --font-sans / --font-fa stacks (variables.css) and catch the Arabic blocks,
+   so EN-only users never download Vazir and fa users keep the Persian-shaped face.
+   Loaded app-wide via the @import at the top of variables.css (next to the Vazir
+   import it mirrors). Manrope stays declared for legacy Canvas text objects whose
+   saved fontFamily is still 'Manrope' — unused families never download. */
+@font-face {
+  font-family: 'General Sans';
+  src: url('GeneralSans-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'General Sans';
+  src: url('GeneralSans-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'General Sans';
+  src: url('GeneralSans-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}

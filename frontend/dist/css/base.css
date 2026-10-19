@@ -1,0 +1,589 @@
+* { box-sizing: border-box; }
+
+/* S164 (the ghost card): a component's own display (grid/flex) beats the UA's
+   [hidden]{display:none} — a hidden element with display:grid renders anyway
+   (the #spark-notfound ghost rendered above every loaded idea since S161's
+   birth; the notes vault's new-folder row + settings' empty-trash button were
+   the same class). THIS reset is systemic: hidden WINS over every component's
+   display, everywhere, one rule. hidden="until-found" is unused in this app
+   (verified) so the blanket !important is safe. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  /* Fix 2026-09-09 (user report): app-wide color fringing on small teal numerals + badge
+     text. The body already had -webkit-font-smoothing:antialiased but was missing the
+     -moz-osx companion. Adding grayscale fixes Firefox/macOS subpixel fringing on every
+     small colored text (the "۲ روز پیش" numerals, badge labels, count pills) at the root
+     instead of patching each component. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 2026-09-09 (user request): minimal + modern animated page-transition loader.
+   A thin 2px teal bar at the very top of the viewport, z above the topbar but below
+   toasts/dialogs (60–90). Two states:
+   - .is-loading: bar grows from 0 → 80% width over 400ms (ease-out), opacity 1.
+   - .is-done: bar completes to 100% width over 150ms, then fades to opacity 0 over 300ms.
+   The element is fixed + pointer-events:none so it never blocks a click. Pure CSS
+   animation; no JS layout work per frame. Respects prefers-reduced-motion (no animation,
+   the bar just appears + disappears). */
+#hibana-nav-loader {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 0;
+  block-size: 2px;
+  background: var(--brand, #4A9FA3);
+  z-index: 50; /* above topbar (30), below toasts/dialogs (60+) */
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgb(74 159 163 / 0.4);
+}
+#hibana-nav-loader.is-loading {
+  opacity: 1;
+  animation: hibana-nav-loader-grow 8s cubic-bezier(0.1, 0.6, 0.3, 1) forwards;
+}
+#hibana-nav-loader.is-done {
+  opacity: 1;
+  inline-size: 100%;
+  transition: opacity 0.3s ease 0.15s;
+  opacity: 0;
+}
+@keyframes hibana-nav-loader-grow {
+  0% { inline-size: 0; }
+  100% { inline-size: 80%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #hibana-nav-loader.is-loading { animation: none; inline-size: 80%; }
+  #hibana-nav-loader.is-done { transition: none; }
+}
+
+/* S48i (owner: "a loading animation between pages and navigations — sometimes it
+   takes some time for a page to open up"): a full-page loading overlay for HARD
+   navigation (full page loads) + initial load. The top bar (#hibana-nav-loader)
+   handles SOFT navigation (AJAX swaps via nav.js); this overlay handles the cases
+   where the browser is loading a new page from scratch (hard refresh, first visit,
+   hard pages like /sadhana, /canvas). Painted early in the HTML (before JS loads) so
+   it's visible immediately; hidden by app.js on DOMContentLoaded. Also shows during
+   htmx content swaps (app.js listens to htmx:beforeRequest/afterSwap) so the project
+   page's content-load delay has feedback too. */
+#hibana-page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #fff);
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  pointer-events: all;
+  /* S84 (owner: "notes.html still appears pre-emptively and unloaded"): the
+     last-resort escape — if EVERY script that could lift the veil failed to
+     arrive (the flaky-link worst case), the loader itself must eventually get
+     out of the way: a pure-CSS fade at 20s, past every JS safety (the gated
+     page's 12s reveal, the inline watchdog's 12s reload, the plain 8s safety).
+     Visibility — not just opacity — so the invisible overlay can never sit on
+     top of the page swallowing every click. Animation fill beats the is-hidden
+     class in the cascade, and on a normally-revealed page it lands on an
+     already-transparent overlay (a no-op). */
+  animation: hibana-page-loader-escape 0.6s ease 20s forwards;
+}
+#hibana-page-loader.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes hibana-page-loader-escape {
+  to { opacity: 0; visibility: hidden; }
+}
+/* S109 (v0.3.42.0, owner item: "Mobile currently shows a generic spinning-circle loader;
+   desktop shows a ⏳emoji. Build a proper branded loading indicator for both platforms."):
+   ONE branded system for both. The mark is the logo tile itself (icon.svg: dark rounded
+   square + white H + the yellow spark dot) — the spark ORBITS the tile while the wordmark
+   pulses and a slim track sweeps underneath. Reduced motion parks the spark at its brand
+   position (top-right, where icon.svg pins it) and freezes the track at a partial fill —
+   still unambiguously "loading", no emoji, nothing generic. */
+#hibana-page-loader .hibana-page-loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+#hibana-page-loader .hibana-loader-mark {
+  position: relative;
+  inline-size: 3.4rem;
+  block-size: 3.4rem;
+  border-radius: 0.95rem;
+  background: #1f1f1f;
+  display: grid;
+  place-items: center;
+  /* the hairline ring keeps the dark tile readable on the dark theme's near-black bg */
+  box-shadow: 0 10px 30px -12px color-mix(in srgb, #1f1f1f 55%, transparent), 0 0 0 1px rgb(255 255 255 / 0.09);
+}
+#hibana-page-loader .hibana-loader-glyph {
+  font-family: system-ui, sans-serif;
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  transform: translateY(1px); /* optical centering of the H inside the tile */
+}
+#hibana-page-loader .hibana-loader-orbit {
+  position: absolute;
+  inset: -0.45rem;
+  border-radius: 1.4rem;
+  animation: hibana-loader-orbit 1.5s linear infinite;
+}
+#hibana-page-loader .hibana-loader-spark {
+  position: absolute;
+  inset-block-start: -0.26rem;
+  inset-inline-start: calc(50% - 0.28rem);
+  inline-size: 0.56rem;
+  block-size: 0.56rem;
+  border-radius: 50%;
+  background: #fde047;
+  box-shadow: 0 0 10px 2px color-mix(in srgb, #fde047 65%, transparent);
+}
+@keyframes hibana-loader-orbit {
+  to { transform: rotate(360deg); }
+}
+#hibana-page-loader .hibana-loader-track {
+  inline-size: 6.75rem;
+  block-size: 0.2rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--brand, #4A9FA3) 16%, transparent);
+}
+#hibana-page-loader .hibana-loader-fill {
+  display: block;
+  inline-size: 42%;
+  block-size: 100%;
+  border-radius: inherit;
+  background: var(--brand, #4A9FA3);
+  animation: hibana-loader-sweep 1.15s ease-in-out infinite;
+}
+@keyframes hibana-loader-sweep {
+  from { transform: translateX(-105%); }
+  to { transform: translateX(340%); }
+}
+[dir="rtl"] #hibana-page-loader .hibana-loader-fill {
+  animation-name: hibana-loader-sweep-rtl;
+}
+@keyframes hibana-loader-sweep-rtl {
+  from { transform: translateX(105%); }
+  to { transform: translateX(-340%); }
+}
+#hibana-page-loader .hibana-page-loader-brand {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--brand, #4A9FA3);
+  animation: hibana-page-loader-pulse 1.6s ease-in-out infinite;
+}
+@keyframes hibana-page-loader-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #hibana-page-loader .hibana-loader-orbit { animation: none; transform: rotate(38deg); }
+  #hibana-page-loader .hibana-loader-fill { animation: none; transform: none; inline-size: 62%; }
+  #hibana-page-loader .hibana-page-loader-brand { animation: none; }
+  #hibana-page-loader .hibana-page-loader-brand { animation: none; opacity: 0.8; }
+}
+
+/* Subtle film grain over the whole app (trendy texture, 2026-08-26): an feTurbulence SVG
+   noise tile at ~5% soft-light — barely visible, grains every surface in both themes.
+   z-index 1 puts it above static content but below toasts/dialogs/menus (60–90). */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+}
+
+/* Vazir for Farsi (Phase 3 i18n): swap the ENTIRE tree when the UI is in fa — body plus
+   every element — so no control, heading, list or chip can fall back to system/Arial. */
+html[lang="fa"] body,
+html[lang="fa"] body * {
+  font-family: var(--font-fa);
+}
+
+/* Inline SVG icon plumbing — one stroke-weight system. */
+.icon {
+  width: 1.1em;
+  height: 1.1em;
+  display: inline-block;
+  vertical-align: -0.2em;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Visually hidden, still read by screen readers — page H1s on full-canvas tool pages
+   (canvas / notebook) where a visible heading would fight the toolbar. */
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* One visible focus ring for every interactive control — neutral, never removed.
+   S179 (advisor block 15): the ring ink is --focus-ring (variables.css) — the accent
+   mixed toward the theme's text so it clears the 3:1 non-text floor against BOTH
+   the card and the row-fill surfaces in both themes (the bare accent sat ~2.9:1 on
+   the row fill). Same 2px/2px geometry — only the ink is calibrated. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+/* Text fields get the shadcn treatment instead of an outline: accent border + a soft
+   halo, so the ring hugs the field shape (2026-08-26 UI polish pass). */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid transparent;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* S155 TYPE SCALE — the element ladder resolves onto the owner's spec tokens
+   (variables.css): H1 24px/600/1.2/-0.01em · H2 18px/600/1.3/-0.005em · H3
+   14px/500/1.4 (the "minor heading / nav item" rung — demoted from the old
+   600/1.12rem card-title register, which is H2's job now). H4 keeps the shared
+   fallback (the spec defines no h4). Mobile (<768px): ONLY H1/H2 shrink —
+   working text never does. RTL: negative tracking is a Latin-optical device and
+   damages Arabic-script shaping — the [dir='rtl'] guard lives in rtl.css. */
+h1, h2, h3, h4 { margin-block: 0 0.5em; }
+h1 { font-size: var(--text-h1-size); font-weight: var(--text-h1-weight); line-height: var(--text-h1-line-height); letter-spacing: var(--text-h1-tracking); }
+h2 { font-size: var(--text-h2-size); font-weight: var(--text-h2-weight); line-height: var(--text-h2-line-height); letter-spacing: var(--text-h2-tracking); }
+h3 { font-size: var(--text-h3-size); font-weight: var(--text-h3-weight); line-height: var(--text-h3-line-height); }
+h4 { line-height: 1.25; font-weight: 500; } /* S157: was 600 — a fourth-level heading must not outweigh H3 (500), and the owner's lighter-heading ladder applies to the whole h1–h4 family */
+@media (max-width: 767.98px) {
+  h1 { font-size: var(--text-h1-size-mobile); }
+  h2 { font-size: var(--text-h2-size-mobile); }
+}
+
+a { color: var(--link); text-decoration: none; }  /* --link = the text-safe teal; --accent stays for fills/borders */
+a:hover { text-decoration: underline; }
+
+.muted { color: var(--muted); }
+.error { color: var(--err); }
+.small { font-size: var(--fs-md); }
+
+code {
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.92em;
+}
+
+/* --- auth page ----------------------------------------------------------- */
+.auth-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--bg);
+}
+
+.auth-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(2.25rem, 6vw, 3rem);
+  width: min(24rem, 100%);
+}
+.auth-card h1 { margin-block-end: 0.25rem; }
+
+.auth-card label {
+  display: grid;
+  gap: 0.4rem;
+  margin-block-end: 1rem;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+/* Session 19 (cron round 9): segmented 4-digit OTP input for the email-confirm page.
+   The underlying single <input> is visually hidden (kept as the form field for
+   server-side validation); 4 visible .otp-box <span>s render the digits. Auto-advance
+   + paste + backspace handled in confirm.html. */
+.otp-field { position: relative; display: flex; gap: 0.5rem; }
+.otp-box {
+  flex: 1;
+  inline-size: 0;
+  min-inline-size: 2.5rem;
+  block-size: 3.25rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--bg);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  user-select: none;
+}
+.otp-box.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--card);
+}
+.otp-box.is-filled { border-color: var(--accent); background: var(--card); }
+/* the real input — visually hidden but focusable (AT + mobile keyboard still work) */
+.otp-field input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  opacity: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 1rem;
+  cursor: text;
+}
+.otp-field input:focus { outline: none; } /* the .otp-box.is-active ring is the focus cue */
+
+/* --- forms & buttons ------------------------------------------------------ */
+input, textarea, select {
+  font: inherit;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+}
+/* Session 19: password fields read as disabled at the default hairline border weight —
+   bump to --line-strong + a faint surface tint so they're visibly editable. */
+input[type="password"], input[type="text"][name*="password" i] {
+  border-color: var(--line-strong);
+  background: var(--card);
+}
+input[type="password"]:hover { border-color: var(--text-dim, var(--muted)); }
+/* Session 19 (cron round 8): password visibility toggle. The auth forms wrap their
+   password <input> in a .pw-field div; a button.pw-toggle sits at the end edge. The
+   toggle swaps type=password ↔ type=text + the eye/eye-off icon. */
+.pw-field { position: relative; display: block; }
+.pw-field input { padding-inline-end: 2.4rem; }
+.pw-toggle {
+  position: absolute;
+  inset-inline-end: 0.3rem;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.pw-toggle:hover { color: var(--text); background: var(--bg-soft); }
+.pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pw-toggle .icon { inline-size: 1.05rem; block-size: 1.05rem; }
+input:hover, textarea:hover, select:hover { border-color: var(--line-strong); }
+/* Review-round 2 (2026-09-12): select affordance — the browser-default arrow reads as
+   faint/nothing on custom dark backgrounds (VLM audit: dropdowns "look identical to
+   disabled inputs"). Replace the native arrow with an explicit muted chevron that
+   follows the theme; padding-inline-end reserves its space on BOTH directions (RTL
+   position flip below). Multi/size selects keep their native list rendering. */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 2.1rem;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 12px 12px;
+}
+[dir='rtl'] select:not([multiple]):not([size]) { background-position: left 0.65rem center; }
+select:not([multiple]):not([size]):disabled { background-image: none; } /* no chevron on disabled: it can't open */
+textarea { width: 100%; resize: vertical; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 1rem;
+  background: var(--cta, var(--accent));
+  color: var(--btn-text);
+  /* S155 Label register: control labels weigh 500 (was 600) — hierarchy moves
+     onto the ink/size rungs; 600 is reserved for H1/H2 titles. */
+  font-weight: var(--text-label-weight);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+button:hover { background: var(--cta-hover, var(--accent-hover)); color: var(--btn-text, #fff); /* Session 19 (user report): primary buttons turn teal on hover; text must be white, not the resting --text (dark). Ghost/btn overrides below reset for their light-bg hovers. */ }
+button:active { background: var(--cta-hover, var(--accent-hover)); color: var(--btn-text, #fff); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* S186 — THE CTA RULE (the owner's development rule, applied app-wide):
+   ONE primary call-to-action per view (modal, page, form, empty state): a SOLID
+   teal fill (var(--cta)) with the on-teal label (var(--btn-text)) — the bare
+   <button> rules above ARE that shared primary (the "Capture an idea" style;
+   the same tokens drive hover/active/disabled). Every other button in the view
+   is a SECONDARY: outlined (.ghost) or the neutral white .btn — NEVER the teal
+   fill. Secondaries read NEUTRAL (dark ink, neutral hairline) so teal is
+   reserved for the one primary + text links. The primary sits at the TRAILING
+   end of its button row (DOM order [secondary…, primary] — flex row mirrors
+   under RTL, so trailing stays trailing). The global floating action button is
+   an app-shell element: exempt from the one-per-view count, but it keeps the
+   shared primary style (solid teal circle + white glyph — components.css .fab).
+   Regression guard: src/tests/cta-grammar.test.ts + e2e/s186-cta-grammar.spec.ts. */
+button.ghost,
+a.ghost {
+  background: transparent;
+  /* S186: NEUTRAL secondary ink (was --link teal, F14) — a teal-texted secondary
+     read as a sibling of the solid primary ("looks the same as Cancel", the crop
+     modal incident). Teal text now belongs to real links only; secondaries carry
+     the app's text rung. */
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+button.ghost:hover,
+a.ghost:hover { background: var(--bg-soft); border-color: var(--line-strong); color: var(--text); /* Session 19 (user report): was var(--link) (teal) — user said "text is green, not good readability." Now dark text on the light hover bg. */ }
+/* Session 19: an <a class="ghost"> (e.g. the calendar Export .ics link) has no <button>
+   base styles to inherit, so it needs an explicit box model to align with sibling
+   ghost buttons in a .row. button.ghost keeps inheriting from the global button {} rule. */
+a.ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+button.ghost.danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+button.ghost.danger:hover { color: var(--danger); background: var(--danger-soft-hover); }
+/* Text-wide delete buttons (project detail): .ghost.danger is the 1.75rem icon square, so a
+   delete with a visible label needs the padded .btn shape with the same danger palette. */
+.btn.danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--line);
+  white-space: nowrap;
+}
+.btn.danger:hover { background: var(--danger-soft-hover); border-color: var(--danger); }
+button.active { background: var(--accent-soft); }
+
+.row { display: flex; align-items: center; gap: 0.75rem; }
+.row.spread { justify-content: space-between; }
+.row.wrap { flex-wrap: wrap; }
+.grow { flex: 1; }
+.stack { display: grid; gap: 1.1rem; }
+
+/* Small icon-only controls get a ≥40px hit area via a padded pseudo-element.
+   NB: .btn.ghost.danger AND .ghost.small.danger (text buttons like the modal's
+   Delete and the note Clear button) are EXCLUDED — they need the auto-width
+   shape, not the 1.75rem square (which clips text like "حذف" or "پاک‌کردن" to a circle). */
+.hurdle .toggle,
+.ghost.danger:not(.btn):not(.small),
+.theme-floater,
+[data-theme-toggle] {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  padding: 0;
+  line-height: 1;
+}
+.hurdle .toggle::after,
+.ghost.danger:not(.btn):not(.small)::after,
+.theme-floater::after,
+[data-theme-toggle]::after {
+  content: "";
+  position: absolute;
+  inset: -0.55rem;
+}
+
+
+/* S29 responsive audit (2026-09-12): the login password eye (~30px visual — the FIRST
+   button a new user touches) gets the ::after hit ring (same trick as .ghost.danger
+   and .theme-floater above) → ≥44px tap target. .pw-toggle is already position:absolute,
+   so the ::after inset resolves against the button itself. */
+.pw-toggle::after { content: ""; position: absolute; inset: -0.45rem; }
+
+/* ---- S51-A: a11y skip-to-content + landmark ghost --------------------------------
+   Reintroduced per axe "bypass" (pages must offer a way past the repeated topbar).
+   The Session-21 removal was a VISUAL complaint: the old top-anchored pill covered
+   the header avatar in RTL when focused. This one parks BOTTOM-CENTER — never near
+   the avatar/brand — and is fully invisible (clipped + zero opacity) until
+   keyboard-focused; it hides again on blur. Mouse users never see it; screen
+   readers announce it as the page's first link; the first Tab press reveals it.
+   Lives in base.css (not polish-ui.css) because EVERY page that loads app.js must
+   style it — login.html loads app.js but not polish-ui.css (verified: the unstyled
+   link broke the login visual e2e baseline). */
+.skip-link {
+  position: fixed;
+  bottom: 1rem;
+  inset-inline: 0;               /* LTR+RTL safe horizontal centering */
+  margin-inline: auto;
+  width: max-content;
+  z-index: 1200;                 /* above the FAB stack + toasts */
+  display: block;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--accent-ink); /* S204: accent-as-text → ink (the skip link is text) */
+  border: 1px solid var(--accent);
+  box-shadow: var(--shadow);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  /* Resting state: fully CLIPPED (not transformed — a translateY-parked fixed element
+     contributes ~25px of scrollable overflow to the document, which broke the login
+     visual baseline: 745px vs 720px). clip-path hides the paint but keeps the box
+     INSIDE the viewport (zero overflow) and keeps the element focusable/tab-reachable
+     (unlike visibility:hidden). */
+  clip-path: inset(0 0 100% 0);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+.skip-link:focus {
+  clip-path: none;
+  opacity: 1;
+}
+/* Phones: keep the pill clear of the mobile bottom tab bar (740px = mobile-nav bp) */
+@media (max-width: 740px) {
+  .skip-link { bottom: 4.75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skip-link { transition: none; }
+}
+

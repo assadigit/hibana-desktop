@@ -2,8 +2,12 @@
 # Conventions inherited from the verified web CI (hibana-source ci.yml):
 # pinned toolchains, frozen deps, timeouts, failure-only artifacts, tag-driven Releases.
 #
-# The island drift check is the highest-value gate (WPP §7.4): it clones the
-# web repo AT THE PINNED REF and fails if frontend/dist differs by one byte.
+# TWO island gates (WPP §7.4 — the highest-value check of the separate-repo design):
+#   1. CHECKSUM gate (always): the committed frontend/dist must be byte-identical
+#      to the committed island.checksums.json — catches any hand-edit.
+#   2. PINNED-REF gate (needs HIBANA_SOURCE_TOKEN — hibana-source is PRIVATE):
+#      a fresh sync from hibana-source AT THE PIN must reproduce the same
+#      checksums — catches a drifted/dishonestly re-checksummed island.
 
 name: desktop
 
@@ -32,12 +36,26 @@ jobs:
         with:
           node-version: 22          # the island-sync + checksum scripts only
 
-      # 1. The island drift gate: clone hibana-source at the pinned ref and
-      #    verify the committed island is byte-identical to a fresh sync.
-      - name: Island drift check
+      # 1a. The checksum gate — no external access needed.
+      - name: Island checksum gate
+        run: node scripts/sync-island.mjs --ref $env:WEB_REF --check
+
+      # 1b. The pinned-ref gate — hibana-source is a PRIVATE repo: the clone
+      #     needs the PAT secret. Skipped (with a visible note) until the
+      #     owner sets HIBANA_SOURCE_TOKEN in this repo's secrets.
+      - name: Island pinned-ref gate
+        if: env.HAS_SOURCE_TOKEN == 'true'
+        env:
+          HAS_SOURCE_TOKEN: ${{ secrets.HIBANA_SOURCE_TOKEN != '' }}
         run: |
-          git clone --no-checkout https://github.com/assadigit/hibana-source.git $env:RUNNER_TEMP\hibana-source
-          node scripts/sync-island.mjs --ref $env:WEB_REF --src $env:RUNNER_TEMP\hibana-source --check
+          git clone --no-checkout https://x-access-token:${{ secrets.HIBANA_SOURCE_TOKEN }}@github.com/assadigit/hibana-source.git $env:RUNNER_TEMP\hibana-source
+          $tmp = Join-Path $env:RUNNER_TEMP "island-fresh"
+          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+          node scripts/sync-island.mjs --ref $env:WEB_REF --src $env:RUNNER_TEMP\hibana-source --out (Join-Path $tmp "dist")
+          if (Compare-Object (Get-Content frontend\island.checksums.json) (Get-Content (Join-Path $tmp "island.checksums.json"))) {
+            Write-Error "ISLAND DRIFT: a fresh sync at pin $env:WEB_REF does not reproduce the committed checksums"
+          }
+          Write-Host "pinned-ref gate OK: fresh sync at $env:WEB_REF reproduces the committed island byte-for-byte"
 
       # 2. Frozen deps + the pure-Go gates.
       - name: Verify + vet + test

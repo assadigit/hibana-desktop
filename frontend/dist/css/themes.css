@@ -1,0 +1,56 @@
+/* themes.css — the LIGHT theme's explicit token block.
+   Session 25 Phase 1.5 (Option B): dark-theme rules were once extracted here by-concern.
+   S87 (owner request 2026-09-20): the app ships EXACTLY TWO looks — light (this block)
+   and claude-dark (claude-dark-theme.css, now THE dark mode). The old `dark` theme and
+   every prefers-color-scheme auto-dark fallback were retired: boot.js resolves the
+   stored preference (migrating legacy 'dark' → 'claude-dark', resolving 'system' via
+   the OS scheme) to an explicit html[data-theme] BEFORE first paint, so data-theme is
+   always 'light' or 'claude-dark' and both looks are deterministic regardless of OS.
+   The dark component skins that used to live here moved to claude-dark-theme.css
+   (they reached claude-dark through the old un-gated :not([data-theme='light']) twins;
+   converting them in scope preserved that rendering exactly). */
+
+html[data-theme='light'] {
+  color-scheme: light;
+  /* S95 r2: the light block mirrors variables.css's neutral-gray canvas + hairlines
+     (this explicit block must never drift from the :root baseline — it exists so an
+     OS-dark scheme can never bleed through, not to carry different values). */
+  --bg: #E7E7E7; --bg-soft: #DEDEDE; --card: #FFFFFF;
+  /* S155: the inks join the rung system — the explicit light block mirrors
+     variables.css (the rungs + their OPAQUE flattened forms that --text/--muted
+     consume; see the mixing note there). Same contract as above: this block
+     exists so an OS-dark scheme can never bleed through, not to carry new values. */
+  --ink-primary: rgba(0, 0, 0, 0.92); --ink-secondary: rgba(0, 0, 0, 0.64); --ink-tertiary: rgba(0, 0, 0, 0.56);
+  --text: #141414; --muted: #5C5C5C;
+  --statcard-bg: #F5F6F7;
+  --line: #D4D4D4; --line-strong: #BFBFBF; --accent: #4A9FA3; --accent-hover: #3D8D91;
+  --accent-ink: #297073; /* S200 (UX-3): mirrors :root — accent-as-text ink (see variables.css) */
+  --accent-soft: rgba(74,159,163,.13); --cta: #2E7B7F; --cta-hover: #276A6D; --link: #297073; --ok: #1f7a34; --err: #c02626; --btn-text: #ffffff;
+  --pastel-tool: #fef3c7; --pastel-tool-strong: #fde68a;
+  --danger: #b42318; --danger-soft: #fdeaea; --danger-soft-hover: #fbdddd;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A5248' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); /* review-round 2 select affordance — explicit light must win over any OS-dark media twin */
+  /* S137: mirrors the variables.css :root baseline — one canonical --st-* hue per
+     status; badges are the pastel/AA-ink pairs of the same hue; the per-status kanban
+     card tints are retired (cards wear var(--card)). */
+  --st-idea: #5B8DEF;
+  --st-planning: #E9B93B;
+  --st-queued: #17799E;   /* S141: clear cyan-blue (was #3D7A8A — too little chroma) */
+  --st-developing: #E08A54;
+  --st-awaiting_dev: #75689E; /* S141: violet-slate (was #859098 gray — read too close to Up Next) */
+  --st-operational: #279E49;  /* S141: chroma raise (was #3D9A55) */
+  --st-bug: #E54D4D;
+  --badge-spark-bg: #E8EFFB;         --badge-spark-fg: #2E5FA3;
+  --badge-unreviewed-bg: #E8EEF6;    --badge-unreviewed-fg: #46618C;
+  --badge-planning-bg: #FAF1CF; --badge-planning-fg: #77590A;
+  --badge-queued-bg: #D6ECF3;      --badge-queued-fg: #14536C;   /* S141: cyan family, AA 6.9 */
+  --badge-developing-bg: #FBE9DA;         --badge-developing-fg: #96511A;
+  --badge-awaiting_dev-bg: #E9E5F2;        --badge-awaiting_dev-fg: #4C4370;  /* S141: violet family, AA 7.2 */
+  --badge-operational-bg: #DFF2E4;  --badge-operational-fg: #277334; /* S141: AA 5.0 */
+  --nb-paper: #fdfdfb;
+  --nb-grid: rgb(28 28 26 / 0.05);
+  --nb-ink: none;
+  --brand: #4A9FA3;
+  --brand-hover: #3D8D91;
+  --brand-logo: url('/logo-light.png');
+  --inline-logo: url('/logo-light.png');
+}

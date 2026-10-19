@@ -1,0 +1,1988 @@
+/* --- dashboard quick notebook ---------------------------------------------- */
+/* Card-within-card: the notebook widget sits on the dashboard as its own .card; each
+   note is a quieter surface (bg-soft + line + radius-sm). Flat, zero shadows (token
+   --shadow: none), logical properties for RTL.
+   User request 2026-09-02 (compact): the notebook container had the default .card
+   padding (clamp 1.25-2rem) — too much wasted space. Tightened to 0.75-1rem.
+   S179 (advisor block 6 — surface tokens): the S93–S95 TEAL IDENTITY TINT RETIRES —
+   the panel rides the plain CARD surface token now (three surfaces total: page /
+   card / row; the sticky-note yellows are the ONLY tinted surfaces left). The
+   heading's teal ink left with the fill (the section title speaks the one
+   dash-sec-title register). */
+.notebook.card { padding: clamp(0.75rem, 1.5vw, 1rem) clamp(0.75rem, 1.5vw, 1rem) clamp(1rem, 2vw, 1.5rem) clamp(0.75rem, 1.5vw, 1rem); overflow: visible; /* Session 19 (user report): the view/size controls panel floats absolutely + its box-shadow was clipped by the card's implicit overflow. The bottom padding is larger (1–1.5rem) to give the sticky-note shadows (4px 12px 20px) room below — container-type:inline-size on #notebook clips block-axis overflow, so the card itself must reserve the space. */ }
+
+/* ═══ S180 (owner blocks 1–6): the DASHBOARD compact panel's rules MOVED to the END of
+   this sheet (see "S180 — the sticky restore") — the S179 placement at the TOP lost the
+   cascade to the shared .note-card/.note-list base rules below (equal specificity,
+   later position wins): the stickies rendered as white chips in a stacked grid. ═══ */
+
+.notebook .note-heading { margin-block-end: 0; font-size: 1rem; }
+.note-head .note-title { flex: 1; min-inline-size: 0; }
+/* S70 (390px FA/RTL overflow fix): the per-note head row — <span class="row note-head-main">
+   holding the title input + the date chip — is a flex item WITHOUT min-inline-size:0, so
+   its automatic minimum content size (the input's intrinsic size=20 default ≈230px + the
+   ~80px date chip + gap ≈ 324–328px) exceeded the ~316px card interior at 390px, and the
+   overflow propagated up through .note-head (a grid row of .note-card) → document
+   scrollWidth 416 @390. Fixed at EVERY level that carries an automatic minimum: */
+.note-head-main { flex: 1 1 0; min-inline-size: 0; gap: 0.4rem; }
+/* The decisive level: .note-card is display:grid and its ROWS (.note-head, the hurdles
+   list, the composer, the attach row) are grid items with min-width:auto — the .note-head
+   row's min-content (title input intrinsic + date chip ≈ 362px) forced the whole track
+   wider than the 316px card @390px. Letting every direct card child shrink below its
+   content min-content is the same guard the card itself already carries (line ~401,
+   session 19 — long URLs). Text still wraps naturally; only the automatic minimum
+   is lifted. */
+.note-card > * { min-inline-size: 0; }
+/* S70: the day-binding chip gets real styling (it had NONE — a bare span) + it is now a
+   link to the calendar day (quicknotes-helpers.ts renders <a href="/calendar.html?date=…">).
+   Soft chip look: small caps-ish size, muted ink, hover lifts it to the interactive teal.
+   flex:none — it must never be squeezed by the shrinking title input. */
+.note-date-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-inline-end: 0.25rem; /* inline contexts (the note footer's meta line) — flex parents override via their own gap */
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--note-color, #FFF59D) 30%, transparent);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.note-date-chip:hover, .note-date-chip:focus-visible {
+  border-color: var(--link);
+  color: var(--link);
+  background: color-mix(in srgb, var(--note-color, #FFF59D) 18%, transparent);
+}
+.note-date-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* User request 2026-09-02: controls FIRST, heading SECOND (near each other, not spread). */
+.note-head { gap: 0.4rem; margin-block-end: 0.4rem; align-items: center; }
+.note-head .note-heading { margin: 0; }
+
+/* Session-11 (user decision 2026-09-14): the view/size controls collapse behind a single
+   ⚙ <details> again — the session-10 revert made them always visible, but the owner
+   settled on the toggle now that the picked view/size (and the toggle's own open state)
+   persist in localStorage (app.js): the widget boots in the remembered view, so the
+   controls row only surfaces when that choice actually changes. Collapsed → just the
+   gear sits next to the heading; open → the segmented controls float as a small panel
+   under the gear so they don't push the composer + notes down. Scoped to
+   .note-controls-toggle (any notebook surface), not just the dashboard variant. */
+.note-controls-toggle { position: relative; }
+.note-controls-toggle > summary {
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 1.6rem; block-size: 1.6rem;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none; /* hide the default disclosure triangle */
+}
+.note-controls-toggle > summary::-webkit-details-marker { display: none; }
+.note-controls-toggle > summary:hover { color: var(--text); background: var(--bg-soft); }
+.note-controls-toggle[open] > summary { color: var(--brand); background: var(--accent-soft); }
+/* Open panel: the controls float as a small card under the gear so they don't push the
+   composer + notes down when revealed. */
+.note-controls-toggle[open] .note-head-controls {
+  position: absolute;
+  inset-block-start: calc(100% + 0.25rem);
+  inset-inline-end: 0;
+  z-index: 5;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-dropdown);
+  /* S46.18: collision-aware positioning is JS-driven (positionNoteControlsPanel in
+     app.js). The CSS provides the DEFAULT (inset-inline-end:0 → extends toward
+     inline-start, the preferred side). The JS measures + flips/shifts if overflow.
+     inline-size caps the width; the JS may override with a smaller size if both sides
+     overflow. */
+  inline-size: min(20rem, calc(100vw - 2rem));
+  max-inline-size: min(20rem, calc(100vw - 2rem));
+  flex-wrap: wrap;
+}
+/* When collapsed, the controls are hidden (the <details> hides non-summary content by
+   default, but the absolute panel above also needs the open state — belt and suspenders). */
+.note-controls-toggle:not([open]) .note-head-controls { display: none; }
+
+.note-compose { gap: 0.3rem; margin-block-start: 0.4rem; flex-wrap: wrap; }
+/* Persistent label above the composer (audit 6): the input keeps its placeholder too. */
+.note-compose-label {
+  flex: 1 1 100%;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+.note-compose-text { flex: 1 1 14rem; resize: vertical; min-height: 2.5rem; max-height: 40vh; } /* compact (was 4.25rem) — one-row minimum, bounded resize */
+/* Dashboard widget: composer is one row by default and grows on focus (user request
+   2026-09-09). rows="1" + a slightly smaller min-height keeps the widget dense; the
+   existing resize:vertical + max-height:40vh still let it grow when Ali types more. */
+.notebook-dashboard .note-compose-text { min-height: 2.1rem; }
+
+/* Segmented Note/List toggle (edge-to-edge on the focus ring, not a pill — quiet
+   underline state for the active mode). */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.seg-btn {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.45rem 0.8rem;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.seg-btn:hover { background: var(--bg-soft); color: var(--text); }
+.seg-btn.active { background: var(--accent-soft); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+
+
+.note-list { display: grid; gap: 0.3rem; margin-block-start: 0.4rem; }
+/* Sticky-note view (2026-08-25): pure-CSS toggle — the #nv-sticky radio (a sibling of
+   .note-list) switches the same cards into a horizontal carousel of paper notes, up to 4
+   across with scroll-snap + arrows when there are more. No JS required, so a stale cached
+   app.js can never leave the view stuck on the vertical list. */
+.note-view-radio { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; overflow: hidden; }
+.note-size-radio { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; overflow: hidden; }
+/* S47 (owner design critique): shared rounded track + captions + icons + filled active chip */
+.note-head-controls { display: flex; flex-direction: column; gap: 0.4rem; }
+.note-ctrl-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.note-ctrl-cap { font-size: var(--fs-xs); color: var(--muted); font-weight: 500; }
+.note-view-seg, .note-size-seg {
+  display: inline-flex; border-radius: var(--radius-sm); overflow: hidden;
+  background: var(--bg-soft); border: 1px solid var(--line); padding: 2px; gap: 2px;
+}
+.note-size-seg label, .note-view-seg label {
+  padding: 0.3rem 0.6rem; font-size: var(--fs-sm); color: var(--muted); cursor: pointer;
+  user-select: none; border-radius: calc(var(--radius-sm) - 1px); display: inline-flex;
+  align-items: center; gap: 0.3rem; transition: background 0.12s ease, color 0.12s ease;
+}
+.note-view-seg label:hover, .note-size-seg label:hover { background: var(--card); color: var(--text); }
+.note-view-seg label svg, .note-size-seg label svg { inline-size: 0.85rem; block-size: 0.85rem; opacity: 0.7; }
+/* S47/Q2: filled pastel-teal chip for active (was: thin outline + accent-soft) */
+#notebook #nv-list:checked ~ .note-head .note-view-seg label[for='nv-list'],
+#notebook #nv-sticky:checked ~ .note-head .note-view-seg label[for='nv-sticky'],
+#notebook #nv-grid:checked ~ .note-head .note-view-seg label[for='nv-grid'] {
+  background: var(--accent); color: var(--btn-text, #fff); font-weight: 600;
+}
+#notebook #nv-list:checked ~ .note-head .note-view-seg label[for='nv-list'] svg,
+#notebook #nv-sticky:checked ~ .note-head .note-view-seg label[for='nv-sticky'] svg,
+#notebook #nv-grid:checked ~ .note-head .note-view-seg label[for='nv-grid'] svg { opacity: 1; }
+#notebook .note-view-radio:focus-visible ~ .note-head .note-view-seg label { outline: 2px solid var(--accent); outline-offset: -2px; }
+#notebook .note-size-radio:focus-visible ~ .note-head .note-size-seg label { outline: 2px solid var(--accent); outline-offset: -2px; }
+#notebook #ns-s:checked ~ .note-head .note-size-seg label[for='ns-s'],
+#notebook #ns-m:checked ~ .note-head .note-size-seg label[for='ns-m'],
+#notebook #ns-l:checked ~ .note-head .note-size-seg label[for='ns-l'] {
+  background: var(--accent); color: var(--btn-text, #fff); font-weight: 600;
+}
+/* S47/Q1: dim + disable the size row when NOT in sticky mode (list or grid active) */
+#notebook #nv-list:checked ~ .note-head .note-size-seg,
+#notebook #nv-grid:checked ~ .note-head .note-size-seg {
+  opacity: 0.35; pointer-events: none;
+}
+/* S47: size is sticky-only (2026-08-26) — but now dimmed instead of fully hidden so
+   the user knows it exists but isn't applicable in the current view mode */
+#notebook #nv-list:checked ~ .note-list { display: grid; gap: 0.3rem; }
+#notebook #nv-sticky:checked ~ .note-list {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-block-end: 0.5rem;
+  /* Session 19 (user report): the sticky carousel clipped the right + bottom shadows of
+     the last note. The inline padding gives the shadow (4px 12px 20px) room to render on
+     the end edge; the block padding gives the bottom shadow room. The scroll-padding
+     keeps the snap target inside the padding so the last note isn't flush against the
+     container edge after a scroll. */
+  padding-inline: 0.5rem;
+  padding-block: 0.25rem 0.75rem;
+  scroll-padding-inline: 0.5rem;
+  scrollbar-width: none;
+  align-items: flex-start;
+}
+#notebook #nv-sticky:checked ~ .note-list::-webkit-scrollbar { display: none; }
+#notebook #nv-sticky:checked ~ .note-list > .note-card { flex: 0 0 calc(25% - 0.6rem); min-width: 10rem; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card {
+  /* Session 17 (2026-09-18, owner reference mockup): the sticky paper is a TRUE SQUARE
+     with near-sharp corners and a Miro-style layered, directional shadow — light from
+     the top-left, so the shadow sits down-and-right and the top/left edges stay clean.
+     Two stacked layers: a tight low-opacity contact shadow hugging the paper + a larger
+     softer diffuse one beneath for depth. The shadow is neutral black on every paper
+     fill (yellow/green/pink/blue) — color-matched shadows read muddy, not realistic.
+     NOTE: this intentionally REVERSES Phase 7 item 11's auto-height (the "Box is too
+     big" complaint) per the owner's latest direction — the fixed square returns; long
+     content clips sooner, which the «بیشتر…» note-more chip + the internal scroll
+     (app.js markClampedNotes) keep handling. The height caps are GONE: min/max block
+     size would clip the 16rem square (old cap 15rem) and re-introduce non-square
+     papers on narrow grid tracks — aspect-ratio alone governs the paper now. */
+  aspect-ratio: 1 / 1;
+  grid-template-rows: auto minmax(0, 1fr) auto; /* header + content + footer — definite tracks (2026-08-26) */
+  scroll-snap-align: start;
+  position: relative; /* the hover palette overlays the paper */
+  align-self: flex-start; /* a long sibling never stretches this card (2026-08-25) */
+  /* UI/UX R1 (2026-09-12): removed the colored fill — sticky notes now use a neutral
+     border so the task board reads as the primary zone. The fill is kept only if a
+     user explicitly picks a color via the note palette (the --note-color custom property
+     is still applied when a color is chosen; the default is now transparent + border). */
+  background: var(--note-color, transparent);
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  border-radius: 2px; /* near-sharp paper corners (was --radius-sm 14px) */
+  box-shadow: 1px 2px 3px rgb(0 0 0 / 0.08), 2px 6px 10px rgb(0 0 0 / 0.10); /* Session 19 (user report): was 1px 3px 4px / 4px 12px 20px — too much spread, clipped hard by container-type containment. Reduced spread + opacity so the shadow stays soft + fits in the card's padding. */
+  color: #3f3f46;
+  overflow: hidden; /* hard boundary — content can never bleed off the paper (2026-08-25) */
+}
+#notebook #nv-sticky:checked ~ .note-list > .note-card.dragging { opacity: 0.45; }
+/* Sticky-note size toggle (2026-08-26): pure-CSS radios chained after #nv-sticky. Capped
+   pixel widths (not %) so cards stop ballooning on wide monitors — square, so height = width. */
+#notebook #nv-sticky:checked ~ #ns-s:checked ~ .note-list > .note-card { flex: 0 0 10.5rem; min-width: 10.5rem; }
+#notebook #nv-sticky:checked ~ #ns-m:checked ~ .note-list > .note-card { flex: 0 0 13rem; min-width: 13rem; }
+#notebook #nv-sticky:checked ~ #ns-l:checked ~ .note-list > .note-card { flex: 0 0 16rem; min-width: 16rem; }
+/* Body font per size. Was 1.8/2.1/2.5rem after the ≥100% bump (2026-08-26), then trimmed
+   back down — the user found it too large. Now 1.05/1.2/1.4rem (~17-22px). */
+#notebook #nv-sticky:checked ~ #ns-s:checked ~ .note-list .note-text,
+#notebook #nv-sticky:checked ~ #ns-s:checked ~ .note-list .markdown-body { font-size: 1.05rem; }
+#notebook #nv-sticky:checked ~ #ns-m:checked ~ .note-list .note-text,
+#notebook #nv-sticky:checked ~ #ns-m:checked ~ .note-list .markdown-body { font-size: 1.2rem; }
+#notebook #nv-sticky:checked ~ #ns-l:checked ~ .note-list .note-text,
+#notebook #nv-sticky:checked ~ #ns-l:checked ~ .note-list .markdown-body { font-size: 1.4rem; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-text,
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-render {
+  color: #3f3f46;
+  /* Session 17: the paper is a fixed square (aspect-ratio 1/1), so the content row is
+     the square minus the headbar/footer tracks — long notes scroll INSIDE the paper and
+     app.js's markClampedNotes still fires the «بیشتر…» chip at the truncation point. */
+  max-block-size: 100%;
+  overflow: hidden auto; /* horizontal clipped, long notes scroll vertically (2026-08-25) */
+  overflow-wrap: anywhere;
+  min-width: 0;
+  min-height: 0;
+}
+/* Sticky-note header (2026-08-26): a slim row holding the close × (the "Sticky note"
+   label was removed as redundant 2026-08-26). S105 (owner: "close buttons appear at
+   the top-left; they should be top-right — [x] is always top-right"): the row now
+   packs at the INLINE-END — top-right in LTR, top-left in RTL (the corner the eye
+   goes to for dismiss, matching the fabric sticky + every modal in the app).
+   Hidden in list view, which keeps its own delete in the footer/head. */
+#notebook .note-headbar { display: none; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-headbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-block-size: 1.9rem; /* Session 28 (user: "make the button whitespace less"): was 2.75rem — a 44px strip holding a 14px icon; now a slim 30px strip, hit area preserved by the ::after ring below. */
+  padding-inline: 0.15rem;
+  flex: none;
+}
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-headbar [data-note-delete] {
+  /* Session 28: compact visual box (1.75rem ≈ 28px, was 2.75rem/44px) — the icon is
+     0.85rem so the old box was ~70% padding. The tap target stays ≥44px via the
+     base.css .ghost.danger::after ring (inset -0.55rem ⇒ 2.85rem hit zone). */
+  min-inline-size: 1.75rem; min-block-size: 1.75rem;
+  display: grid; place-items: center;
+  border-radius: 50%;
+}
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-headbar [data-note-delete]:hover { background: rgb(0 0 0 / 0.14); }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-headbar [data-note-delete] .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+/* S115 (owner, the collision fix): the headbar's two controls shared the inline-END
+   corner — [✕][⋯] side by side, one mis-tap from deleting what the owner meant to
+   configure. The sketch separates them to opposite corners: ⋯ at the inline-START
+   (top-left LTR / top-right RTL), ✕ alone at the inline-END dismiss seat. DOM order
+   is doneBtn → ✕ → menu, so `order: -1` moves the menu first and its auto margin
+   absorbs the run between the corners — flex-end keeps ✕ pinned to the far seat.
+   Logical properties mirror both corners in RTL for free. */
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-headbar .spark-menu {
+  order: -1;
+  margin-inline-start: 0;
+  margin-inline-end: auto;
+}
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-footer-right [data-note-delete],
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-head-right [data-note-delete] { display: none; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-text { background: transparent; border-color: transparent; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-text:focus { background: transparent; border-color: transparent; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-footer { color: #3f3f46; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-footer .muted { color: rgb(63 63 70 / 0.72); }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-card button.ghost { color: #3f3f46; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-card button.ghost.danger { color: #b42318; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .note-attach { display: none; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .markdown-body { color: #3f3f46; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .markdown-body a { color: #3f3f46; text-decoration: underline; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .markdown-body code { background: rgb(63 63 70 / 0.1); }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .markdown-body pre { background: rgb(63 63 70 / 0.08); border-color: rgb(63 63 70 / 0.2); }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .markdown-body blockquote { border-inline-start-color: rgb(63 63 70 / 0.35); color: rgb(63 63 70 / 0.8); }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list .markdown-body hr { border-block-start-color: rgb(63 63 70 / 0.3); }
+/* Sticky hover palette (2026-08-25): four compact dots IN the footer/head row, revealed on
+   hover (always on touch). No absolute positioning — they live inline with the meta/delete. */
+#notebook .note-color-picker { display: none; gap: 0.25rem; align-items: center; }
+#notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card:hover .note-color-picker { display: inline-flex; }
+@media (hover: none) {
+  #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-color-picker { display: inline-flex; }
+}
+.note-color-picker .color-dot { inline-size: 1rem; block-size: 1rem; border-radius: 50%; padding: 0; cursor: pointer; flex: none; }
+.note-color-picker .color-dot.active { outline: 2px solid rgb(0 0 0 / 0.55); outline-offset: 1px; }
+.note-footer-right, .note-head-right { gap: 0.5rem; }
+.note-color-picker .dot-yellow { background: #fff59d; }
+.note-color-picker .dot-green { background: #bbf7d0; }
+.note-color-picker .dot-pink { background: #fbcfe8; }
+.note-color-picker .dot-blue { background: #bfdbfe; }
+/* Session 19 (user request): softer sticky notes in dark mode. The bright pastels glare;
+   the first attempt was too dark (#4A4438 — invisible). These are the original hues
+   desaturated + grey-mixed: still clearly yellow/green/pink/blue but muted, with light
+   text (#EDE8DE) for readability on the darker surface. */
+/* Session 20 (AA): the meta timestamp / Attach chip / footer small text sat on the muted
+   --dark text color (#B0A79C → 2.5:1 on the dark sticky fills). Same light ink as the
+   note body (#EDE8DE — 4.83:1 worst-case on #6B6450), so metadata stays quieter than
+   the body via size, not via an unreadable color. !important to beat the blanket
+   `button.ghost` rule above (which is also !important). */
+@media (prefers-color-scheme: dark) {
+  /* Session 20 (AA): mirror of the [data-theme='dark'] rules above — meta text gets the
+     readable light ink on the dark sticky fills (system-dark users get the same fix). */
+}
+#notebook #nv-list:checked ~ .note-list .note-color-picker { display: none; }
+#notebook #nv-grid:checked ~ .note-list .note-color-picker { display: none; }
+/* Grid view (2026-08-26 user request): a compact 3×3-maximum grid of square sticky
+   notes — no carousel arrows, no page-length list. Cards are HALF the original size
+   (2026-08-26: ≥50% smaller per user request): 6 columns instead of 3, gap halved to
+   0.4rem. Each row is still as tall as the column width, so 3 square rows now span
+   half the notebook's width — max-height: calc(50cqw − 0.2rem) caps it there (the
+   notebook is a size container, below) and any 4th+ row scrolls inside the grid so no
+   note is ever lost. The size toggle is hidden here (fixed size). */
+#notebook #nv-grid:checked ~ .note-list {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.4rem;
+  overflow-y: auto;
+  max-height: calc(50cqw - 0.2rem); /* 3 rows of half-width cards = half the notebook's width */
+  scrollbar-width: thin;
+  /* Session 19 (user report): give the sticky shadows room on all edges so they're never
+     clipped by the scroll container. */
+  padding: 0.5rem;
+  margin: -0.25rem; /* negates the extra padding so the grid doesn't shift the layout */
+}
+/* Narrow screens (session 14, user request): 6 columns would be unreadable — and the
+   old 3-up fallback left each paper too cramped to read (a 390px phone gave ~101px
+   columns with truncated text). Now 2 sticky notes per row, and each note is a little
+   SMALLER than the full half-width: tracks cap at 9.5rem and the pair centers in the
+   notebook, shrinking gracefully on narrower phones (minmax(0, …) floors the track at
+   0). Session 17: the 10.5rem card height cap is GONE — aspect-ratio 1/1 governs the
+   square paper (9.5rem track = 9.5rem square). */
+@media (max-width: 40rem) {
+  #notebook #nv-grid:checked ~ .note-list {
+    grid-template-columns: repeat(2, minmax(0, 9.5rem));
+    justify-content: center;
+    max-height: 100cqw;
+  }
+}
+#notebook #nv-grid:checked ~ .note-list > .note-card {
+  min-width: 0;
+  min-height: 0;
+}
+#notebook #nv-grid:checked ~ .note-list .note-text,
+#notebook #nv-grid:checked ~ .note-list .note-render { font-size: 1rem; }
+#notebook #nv-grid:checked ~ .note-sticky-nav { display: none; }
+#notebook #nv-grid:checked ~ .note-head .note-size-seg { display: none; }
+#notebook { position: relative; container-type: inline-size; } /* anchors the floating carousel handles; size container for the grid's 3-row cap (2026-08-26) */
+#notebook #nv-list:checked ~ .note-sticky-nav { display: none; }
+#notebook #nv-sticky:checked ~ .note-sticky-nav {
+  position: absolute;
+  inset-inline: 0;
+  top: 55%;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  padding: 0;
+  z-index: 5;
+}
+/* Compact floating handles flanking the notes (2026-08-25) */
+.note-sticky-nav button {
+  min-inline-size: 2rem; min-block-size: 2rem; inline-size: 2rem; block-size: 2rem; padding: 0;
+  background: var(--card); border: 1px solid var(--line); color: var(--muted);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+}
+.note-sticky-nav button:hover { color: var(--text); border-color: var(--line-strong); /* Session 19: was var(--accent) (teal) — now dark for readability */ }
+/* Prev is the mirror of next: flipped in LTR, un-flipped in RTL (next auto-flips via the
+   global [dir=rtl] .icon.arrow rule). */
+.icon.arrow.opposite { transform: scaleX(-1); }
+.note-card {
+  /* UI/UX R1 (2026-09-12): fill removed → background transparent so the task board reads
+     as the primary zone. A thin neutral border (rgba(0,0,0,0.10) light / rgba(255,255,255,0.10)
+     dark — see themes.css) replaces the soft surface fill. Was:
+       background: color-mix(in srgb, var(--bg-soft) 45%, var(--card));
+     Sticky/grid view overrides below still swap in the user-picked note color. */
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  border-radius: var(--radius-sm);
+  /* Fix 2026-09-09 (user report, further compaction): tightened padding 0.22/0.4 -> 0.18/0.38
+     + gap 0.06 -> 0.04. Content dictates height; the card is now as dense as a sticky note. */
+  padding: 0.18rem 0.38rem;
+  display: grid;
+  gap: 0.04rem;
+  --note-body-fs: var(--fs-sm);
+  /* Session 19 (cron round 5): a note whose content is a long URL overflowed its grid
+     track on mobile (VLM-flagged). min-inline-size:0 lets the grid track shrink; the
+     textarea inside already has overflow-wrap:anywhere, but the card itself needs the
+     same guard so the whole card clips, not just the textarea. */
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  /* Hover hint (user request 2026-09): make it obvious notes are clickable/editable */
+  cursor: text;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.note-card:hover {
+  border-color: var(--brand);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.06);
+}
+
+/* Standardize quadrant icon visual weight (audit 2026-09): emoji + SVG glyphs
+   should match in size + opacity so the 4 quadrants look uniform. */
+.dash-todo-style .icon,
+.quadrant-emoji { inline-size: 1.1rem; block-size: 1.1rem; font-size: 1.1rem; line-height: 1; opacity: 0.7; }
+.dash-todo-style:hover .icon,
+.dash-todo-style:hover .quadrant-emoji { opacity: 1; }
+.note-card[data-kind='note'] .note-render,
+.note-card[data-kind='note'] .note-text { font-size: var(--note-body-fs, var(--fs-sm)); line-height: 1.62; }
+/* Phase 7 item 6: hovering a quick-note card lights it up — a pastel blue that reads
+   "active" (user: "the box must change color to a more active color, grabs the eye").
+   List view only: sticky/grid papers carry the user's own note color. */
+#notebook #nv-list:checked ~ .note-list > .note-card:hover,
+#notebook #nv-list:checked ~ .note-list > .note-card:focus-within {
+  background: color-mix(in srgb, #BFDBFE 55%, var(--card));
+  border-color: rgb(96 165 250 / 0.6);
+}
+.note-text {
+  background: transparent;
+  border-color: transparent;
+  resize: none;
+  overflow-y: auto;        /* a one-word note is one short line; long notes scroll at the cap */
+}
+.note-text:hover { border-color: var(--line); }
+.note-text:focus { border-color: var(--line-strong); background: var(--card); }
+/* Markdown reading (2026-08-25): notes show rendered markdown by default (Obsidian-style);
+   clicking the rendered body switches to the raw-textarea editor. */
+.note-card .note-text { display: none; }
+.note-card .note-render { display: block; }
+.note-card.note-edit .note-text { display: block; }
+.note-card.note-edit .note-render { display: none; }
+.markdown-body { overflow-wrap: anywhere; font-size: var(--fs-sm); line-height: 1.55; }
+/* S157: note headings ride the heading tokens (were a hardcoded 600 — the
+   markdown headings are the h1–h3 family inside the reader, so they follow the
+   owner's lighter-heading ladder; sizes/line-height unchanged). */
+.markdown-body h1, .markdown-body h2, .markdown-body h3 { margin: 0.4em 0 0.2em; line-height: 1.3; }
+.markdown-body h1 { font-weight: var(--text-h1-weight); }
+.markdown-body h2 { font-weight: var(--text-h2-weight); }
+.markdown-body h3 { font-weight: var(--text-h3-weight); }
+.markdown-body h1 { font-size: 1.15rem; }
+.markdown-body h2 { font-size: 1.05rem; }
+.markdown-body h3 { font-size: 0.95rem; }
+.markdown-body p { margin: 0.25em 0; }
+.markdown-body p:last-child { margin-block-end: 0; } /* tight content→meta gap in note cards */
+.markdown-body ul, .markdown-body ol { margin: 0.25em 0; padding-inline-start: 1.25rem; }
+.markdown-body li { margin-block-end: 0.1em; }
+.markdown-body code { background: var(--accent-soft); border-radius: 4px; padding: 0.05em 0.3em; font-size: 0.92em; }
+.markdown-body pre { background: var(--bg-soft); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.5rem 0.6rem; overflow-x: auto; margin: 0.3em 0; }
+.markdown-body pre code { background: transparent; padding: 0; }
+
+/* ══ S88 — THE CODE-BLOCK PANEL (renderMarkdown's fenced output) ════════════════
+   The owner's ask: mono typeface, a size step down, per-token syntax coloring, and
+   a Copy button top-right. One structure serves every markdown surface (quicknote
+   reader, vault preview, the live editor overlay); app.js owns the single delegated
+   clipboard handler ([data-md-copy] → copies the panel's <pre><code> textContent,
+   swaps the icon to a checkmark + "Copied", reverts after 1.4s). Tokens ride the
+   --md-tok-* inks (light + claude-dark both defined). */
+.markdown-body .md-ic,
+.markdown-body code.md-ic {
+  font-family: var(--font-mono);
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  color: var(--code-fg);
+  border-radius: 5px;
+  padding: 0.06em 0.34em;
+  font-size: 0.85em;
+}
+.markdown-body .md-code { margin: 0.45em 0; border: 1px solid var(--code-border); border-radius: 10px; background: var(--code-panel-bg); overflow: hidden; }
+.markdown-body .md-code-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
+  padding: 0.32rem 0.4rem 0.32rem 0.65rem;
+  border-block-end: 1px solid rgb(255 255 255 / 0.07);
+}
+.markdown-body .md-code-lang {
+  font: 600 0.62rem/1.2 var(--font-mono);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--code-panel-fg); opacity: 0.66;
+}
+.markdown-body .md-code-copy {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  border: 0; background: transparent; color: var(--code-panel-fg); opacity: 0.66;
+  cursor: pointer; padding: 0.3rem 0.45rem; border-radius: 6px;
+  font: 500 0.68rem/1 var(--font-sans);
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.markdown-body .md-code-copy:hover { opacity: 1; background: rgb(255 255 255 / 0.09); }
+.markdown-body .md-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
+.markdown-body .md-code-copy .md-copy-done { color: #9DC7A9; font-weight: 600; }
+.markdown-body .md-code pre { margin: 0; background: transparent; border: 0; border-radius: 0; padding: 0.55rem 0.75rem 0.65rem; }
+.markdown-body .md-code pre code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.85em;               /* the size step down vs body text */
+  line-height: 1.55;
+  color: var(--code-panel-fg);
+  background: transparent; border: 0; padding: 0;
+  white-space: pre; overflow-x: auto;
+  tab-size: 2;
+}
+/* the tokenizer's five token classes */
+.md-tok-kw  { color: var(--md-kw); }
+.md-tok-str { color: var(--md-str); }
+.md-tok-com { color: var(--md-com); font-style: italic; }
+.md-tok-num { color: var(--md-num); }
+.md-tok-fn  { color: var(--md-fn); }
+.md-tok-op  { color: var(--md-op); }
+.markdown-body blockquote { margin: 0.3em 0; padding-inline-start: 0.6rem; border-inline-start: 3px solid var(--line-strong); color: var(--muted); }
+.markdown-body hr { border: 0; border-block-start: 1px solid var(--line-strong); margin: 0.5em 0; }
+.markdown-body a { color: var(--link); text-decoration: underline; }
+.note-title {
+  background: transparent;
+  border-color: transparent;
+  font-weight: 600;
+  padding-block: 0.35rem;
+}
+.note-title:hover { border-color: var(--line); }
+.note-title:focus { border-color: var(--line-strong); background: var(--card); }
+.note-items { margin-block-end: 0; }
+.note-items .hurdle { background: var(--card); }
+.note-add { gap: 0.4rem; }
+.note-add input { flex: 1; min-inline-size: 0; padding-block: 0.35rem; }
+/* Session 19: the add-row's + button was a 2.25rem circle vs the ~1.5rem input → the
+   button extended below the input's baseline (VLM-flagged). Size it to match the input
+   height: same padding-block, a compact width, square corners. */
+.note-add .qa-btn { inline-size: auto; block-size: auto; padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); }
+/* S197: the compact add-row's + is a CROSSING glyph at 0.95rem — the 1.8 system
+   stroke renders 1.14px effective (the S195 hairline class). The optical 2.1
+   fork → 1.33px effective; scoped to this instance (the composer FAB's 16.8px
+   + keeps the shared system — its 1.26px rides above the crossing floor). */
+.note-add .qa-btn .icon { inline-size: 0.95rem; block-size: 0.95rem; stroke-width: 2.1; }
+/* Draft preview (list mode): Enter drafts lines; only the + commits them. Dashed rows
+   signal “not saved yet” against the solid saved note-items. */
+.note-draft { flex: 1 1 100%; list-style: none; padding: 0; margin: 0; display: grid; gap: 0.3rem; }
+.note-draft .draft-hint { padding-inline-start: 0.15rem; }
+.note-draft .hurdle { padding: 0.4rem 0.6rem; border-style: dashed; background: var(--card); font-size: var(--fs-lg); }
+.note-draft .draft-check .icon { color: var(--muted); }
+.note-draft .hurdle .ghost.danger { padding: 0.2rem; }
+/* Phase 5 item 14 (2026-09-08): the meta line (یادداشت · ۲۱:۰۵) is 40% smaller than
+   the old footer size (0.8rem → 0.48rem) — it whispers, the content talks. */
+.note-footer { font-size: 0.48rem; }
+.note-footer .small, .note-footer .note-meta { font-size: 0.6rem; } /* .small's own rule would beat the inherited size. Session 20: was 0.48rem (~7.7px) — genuinely unreadable; 0.6rem keeps it quiet but legible */
+/* S179 (advisor block 10): the sticky paper's TIMESTAMP steps up to the paper's own
+   ink (#3f3f46 — the value the sticky text already speaks). The old .muted gray
+   (#5C5C5C) rode ~4.4:1 on the default yellow paper — just under the 4.5:1 AA
+   floor; the paper ink clears ~9:1 on yellow and stays AA on every other paper. */
+#notebook .note-card .note-meta { color: #3f3f46; }
+#notebook .note-card .note-meta .chip,
+#notebook .note-card .note-meta a { color: inherit; }
+/* UI/UX R6 (2026-09-12) → Session 28 revision (user: "make this button whitespace
+   less"): the list-view dismiss «×» (button.ghost.danger in the footer) was a 2.75rem
+   min square PLUS 0.5rem/0.6rem padding — a ~60px button around a ~14px glyph.
+   Compact visual box: 1.75rem square, zero padding, circular. WCAG 2.5.5 is kept —
+   the base.css .ghost.danger::after ring (inset -0.55rem) still expands the touch
+   target to ~2.85rem ≈ 45px, and the footer row itself is a taller hit lane. */
+.note-footer .ghost.danger { padding: 0; min-inline-size: 1.75rem; min-block-size: 1.75rem; display: inline-grid; place-items: center; border-radius: 50%; }
+.note-footer .note-meta { overflow-wrap: anywhere; }
+
+/* Session 28 (user request, whitespace batch): every icon-only control INSIDE a note
+   card shares the compact 1.75rem visual box (done ✓, list toggle, item remove ×).
+   Non-danger buttons don't get the base.css ::after ring, so this adds it — inset
+   -0.5rem on a 1.75rem box = 2.75rem ≈ 44px touch zone (WCAG 2.5.5 floor). */
+.note-card .icon-btn {
+  min-inline-size: 1.75rem;
+  min-block-size: 1.75rem;
+  padding: 0;
+  position: relative;
+}
+.note-card .icon-btn:not(.danger)::after {
+  content: "";
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: 50%;
+}
+.note-card .icon-btn .icon { inline-size: 0.9rem; block-size: 0.9rem; }
+/* Phase 7 item 11: the bottom action row in LOGICAL layout — margin-inline-start on the
+   controls group mirrors the row with the reading direction (RTL: meta at start/right,
+   controls at end/left; LTR: the mirror) with zero physical left/right rules. The page's
+   documentElement.dir (rtl for fa — i18n.js) governs; the card's dir=auto children never
+   bleed into this row. */
+.note-card .note-footer { display: flex; align-items: center; gap: 0.25rem; padding-inline-start: 0.1rem; padding-inline-end: 0.1rem; }
+.note-card .note-footer .note-footer-right { margin-inline-start: auto; display: flex; align-items: center; gap: 0.3rem; }
+
+/* --- quick-note ↔ project attach (user request 2026-08-25) ------------------ */
+.note-attach { margin-block-start: 0.05rem; }
+/* User request 2026-09-02: attach button too big — make it smaller + more compact. */
+.attach-btn { padding: 0.1rem 0.35rem; border-radius: 999px; font-size: 0.7rem; gap: 0.2rem; }
+.attach-btn .icon { width: 0.8em; height: 0.8em; }
+.attach-btn .small { font-size: inherit; }
+/* Phase 7 item 11: the اتصال button's teal (--accent #4A9FA3) measured ~2.9:1 against
+   the note card — under WCAG AA's 3:1 floor for text/UI. A dedicated darker teal
+   (#1F6B70) fixes the button without touching the app-wide accent. */
+.note-attach .attach-btn { color: #1F6B70; border-color: rgb(31 107 112 / 0.4); }
+.note-attach .attach-btn .icon { color: #1F6B70; }
+
+/* --- Phase 7 item 12: the FAB's «یادداشت سریع» modal (app.js builds it) ------------- */
+#quicknote-dialog .modal { display: grid; gap: 0.6rem; }
+#quicknote-text {
+  min-inline-size: 0; width: 100%;
+  min-block-size: 7rem;
+  resize: vertical;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+#quicknote-text:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.qn-attach { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.qn-attach-chip { cursor: pointer; max-inline-size: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qn-attach-chip[hidden] { display: none; }
+.qn-attach-options { display: grid; gap: 0.2rem; max-block-size: 12rem; overflow-y: auto; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--bg); padding: 0.4rem 0.45rem; }
+.qn-attach-options[hidden] { display: none; }
+.qn-attach-option { text-align: start; padding: 0.4rem 0.55rem; border-radius: var(--radius-sm); border: 1px solid transparent; background: transparent; color: var(--text); cursor: pointer; font-size: var(--fs-md); overflow-wrap: anywhere; }
+.qn-attach-option:hover { background: var(--accent-soft); border-color: var(--line); }
+#quicknote-error { color: var(--err); }
+.attach-row { gap: 0.4rem; }
+.attach-chip { display: inline-flex; align-items: center; gap: 0.3rem; max-inline-size: 100%; }
+.attach-chip .icon { inline-size: 0.85rem; block-size: 0.85rem; color: var(--muted); }
+.attach-picker {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  padding: 0.45rem 0.5rem;
+  margin-block-start: 0.35rem;
+}
+.attach-options { display: grid; gap: 0.2rem; margin-block-start: 0.4rem; max-block-size: 13rem; overflow: auto; }
+.attach-option {
+  text-align: start;
+  padding: 0.4rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: var(--fs-md);
+  overflow-wrap: anywhere;
+}
+.attach-option:hover { background: var(--accent-soft); border-color: var(--line); }
+.related-notes a { color: var(--text); overflow-wrap: anywhere; }
+.related-notes a:hover { color: var(--accent-ink); text-decoration: underline; } /* S204: accent-as-text → ink */
+.related-notes .icon { inline-size: 0.85rem; block-size: 0.85rem; margin-inline-end: 0.3rem; vertical-align: -0.12em; }
+
+/* --- sparks shelf: drag-reorder + 3-dot menu ------------------------------- */
+/* Hover-reveal: the ⋯ button is invisible until the card is hovered/focused, so the card
+   stays clean at rest. The popover (when open) stays visible regardless. Applies to
+   .spark-menu on project cards (sparks + projects pages) AND note cards (dashboard). */
+.spark-menu { position: relative; margin-inline-start: auto; }
+.spark-menu > button[data-menu-open] {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  padding: 0;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+/* ≥40px hit area (same pattern as the theme/undo mini-buttons). */
+.spark-menu > button[data-menu-open]::after {
+  content: "";
+  position: absolute;
+  inset: -0.55rem;
+}
+.spark-menu > button[data-menu-open]:hover,
+.spark-menu > button[data-menu-open][data-open] {
+  background: var(--bg-soft);
+  color: var(--text);
+  border-color: var(--line);
+}
+.spark-menu-pop {
+  position: absolute;
+  inset-block-start: calc(100% + 0.4rem);
+  inset-inline-end: 0;
+  min-inline-size: 10rem;
+  padding: 0.25rem;
+  display: grid;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  z-index: 30;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.08); /* the ONLY shadow: floating menus (same as .toast) */
+}
+.spark-menu-pop[hidden] { display: none; }
+/* S82: the LIFTED note ⋯ pop (dashboard quick notes) — while open it lives directly on
+   <body> as position:fixed, so the sticky paper's overflow:hidden boundary and the
+   carousel's scrollport can never clip it (the owner's "menu opens inside the note"
+   bug). inset: auto neutralizes the docked .note-card anchoring (inset-block-start /
+   inset-inline-end from the rules above) so the JS-set left/top are the only coords;
+   the rest of the look (bg/border/shadow/buttons) inherits from .spark-menu-pop. */
+body > .spark-menu-pop.is-floating {
+  position: fixed;
+  inset: auto;
+  z-index: 90;
+  animation: note-pop-in 0.14s ease-out;
+}
+/* S105 (owner: "changing the view option of quick note — the menu goes under other
+   elements"): the ⚙ view-options panel gets the SAME lift treatment while open —
+   #notebook's container-type stacking context trapped the old absolute z-index:5
+   under later dashboard sections. As a <body> child with fixed coords (set by
+   app.js liftNoteControlsPanel) it paints above everything, like the spark menu. */
+body > .note-head-controls.is-floating {
+  position: fixed;
+  inset: auto;
+  z-index: 90;
+  animation: note-pop-in 0.14s ease-out;
+}
+@keyframes note-pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body > .spark-menu-pop.is-floating { animation: none; }
+  body > .note-head-controls.is-floating { animation: none; }
+}
+.spark-menu-pop button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-weight: 500;
+  text-align: start;
+}
+.spark-menu-pop button:hover { background: var(--bg-soft); }
+.spark-menu-pop button.danger { color: var(--err); }
+.spark-menu-pop .icon { inline-size: 1rem; block-size: 1rem; }
+
+/* Hover-reveal the ⋯ button on cards — cleaner UI (button hidden at rest, appears on
+   hover/focus-within). The open popover stays visible regardless. Touch devices: the
+   button is always visible (no hover) — kept at opacity 1 via @media (hover: none). */
+.spark-menu > button[data-menu-open] { opacity: 0; transition: opacity 0.12s ease, background-color 0.12s ease, color 0.12s ease; }
+.project-card:hover .spark-menu > button[data-menu-open],
+.project-card:focus-within .spark-menu > button[data-menu-open],
+.note-card:hover .spark-menu > button[data-menu-open],
+.note-card:focus-within .spark-menu > button[data-menu-open],
+.pd-task:hover .spark-menu > button[data-menu-open],
+.pd-task:focus-within .spark-menu > button[data-menu-open],
+.kanban-card:hover .spark-menu > button[data-menu-open],
+.kanban-card:focus-within .spark-menu > button[data-menu-open],
+.sticky-note:hover .spark-menu > button[data-menu-open],
+.sticky-note:focus-within .spark-menu > button[data-menu-open],
+.projects-table tr:hover .spark-menu > button[data-menu-open],
+.projects-table tr:focus-within .spark-menu > button[data-menu-open],
+.spark-menu > button[data-menu-open][data-open] { opacity: 1; }
+@media (hover: none) {
+  .spark-menu > button[data-menu-open] { opacity: 1; }
+}
+/* S44 (owner: "there must be a way to delete/edit the folder ideas"): sparks' LIST,
+   KANBAN and STICKY views render the same ideas with NO edit/delete affordance — only
+   the cards view injected the ⋯. The hosts below dock the same spark-menu; kanban and
+   sticky cards are navigable ([data-nav-url]) so the injected host carries
+   data-nav-local (nav.js stands down for clicks inside it — the ⋯ opens the menu
+   instead of navigating). */
+.projects-table td .spark-menu { display: inline-flex; margin-inline-start: 0.4rem; vertical-align: middle; }
+.kanban-card, .sticky-note { position: relative; }
+.kanban-card .spark-menu, .sticky-note .spark-menu { position: absolute; inset-block-start: 0.25rem; inset-inline-end: 0.25rem; margin: 0; z-index: 5; }
+.kanban-card .spark-menu-pop, .sticky-note .spark-menu-pop { inset-block-start: calc(100% + 0.25rem); inset-inline-end: 0; }
+/* Note-card ⋯ menu positioning (the note headbar is flex — pin the menu to the end). */
+.note-card .note-headbar .spark-menu { margin-inline-start: 0; }
+.note-card .spark-menu-pop { inset-block-start: calc(100% + 0.25rem); }
+/* .pd-task-wrap: a wrapper around the .pd-task card (+ banner, since S144). The wrapper
+   stays position:relative for its own descendants; the ⋯ menu is NOT anchored here —
+   see S146 below. */
+.pd-task-wrap { position: relative; }
+/* S146 (owner: "the ... setting button is hidden behind the label of priority — it
+   needs to be placed a little lower", sketched at the title row's end): the ⋯ anchored
+   to the WRAP at top 0.25rem — since S144 the priority BANNER is the wrap's top strip,
+   so the button rendered ON the label. The menu lives INSIDE .pd-task on both surfaces
+   (S136 board recipe = project-page.js appendChild), so the CARD is the containing
+   block now: the button sits at the card's top-right — beside the title row, one
+   banner below the wrap's top, exactly the owner's sketched placement. Logical
+   properties keep it mirrored in RTL; the wand + its popover are position:fixed so
+   the containing-block change can't trap them. */
+.pd-task-wrap .pd-task { display: block; position: relative; }
+.pd-task-wrap .spark-menu { position: absolute; inset-block-start: 0.25rem; inset-inline-end: 0.25rem; margin: 0; z-index: 5; }
+.pd-task-wrap .spark-menu-pop { inset-block-start: calc(100% + 0.25rem); inset-inline-end: 0; }
+/* S136: the .db-card menu block is RETIRED — board.html renders .pd-task cards with
+   the menu INSIDE the card (the project-page.js recipe), styled by the base
+   .spark-menu rules + the .pd-task:hover reveal above. */
+
+/* --- user profile menu (topbar avatar hover) --------------------------------- */
+.user-menu { position: relative; display: inline-flex; }
+.user-menu > .user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.15rem 0.4rem 0.15rem 0.2rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text);
+  font-weight: 600;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.user-menu > .user-chip:hover { background: var(--bg-soft); border-color: var(--line); }
+.user-menu-pop {
+  position: absolute;
+  inset-block-start: calc(100% + 0.5rem);
+  inset-inline-end: 0;
+  min-inline-size: 11rem;
+  padding: 0.3rem;
+  display: grid;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  z-index: 40;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.08);
+  visibility: hidden;
+  opacity: 0;
+  translate: 0 -6px;
+  transition: opacity 0.15s ease, translate 0.15s ease, visibility 0s linear 0.15s;
+}
+/* Bridge the gap between chip and popup so the hover never drops. */
+.user-menu-pop::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -0.5rem;
+  inset-inline: 0;
+  block-size: 0.5rem;
+}
+.user-menu:hover .user-menu-pop,
+.user-menu:focus-within .user-menu-pop {
+  visibility: visible;
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity 0.15s ease, translate 0.15s ease;
+}
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;   /* ≥44px row with the 1.9rem icon-chip (audit 11) */
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-weight: 500;
+  font-size: var(--fs-lg);
+  text-align: start;
+}
+/* S94 (owner item 2 — the REAL admin-link leak): .user-menu-item's display:flex BEATS
+   the UA [hidden] sheet (author CSS always wins over UA rules — the Task-17 popover
+   lesson, applied here to the two flex-row surfaces that ship the hidden Admin row):
+   the desktop account menu AND the mobile More sheet showed "Admin" to EVERY user,
+   role-gating in hib-init.js/app.js was correct all along. This explicit guard makes
+   the hidden attribute authoritative again on both. */
+.user-menu-item[hidden],
+.mobile-more-row[hidden] { display: none !important; }
+.user-menu-item:hover { background: var(--bg-soft); color: var(--text); text-decoration: none; }
+/* S61 a11y: same keyboard-focus ring for the topbar user menu (language rows, links,
+   sign-out) — it was hover-tint only before. */
+.user-menu-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.user-menu-item .icon-chip { inline-size: 1.8rem; block-size: 1.8rem; }
+/* S200 (HLTH-6): the .lang-check pair deleted — the user menu carries no language
+   rows anymore (language lives in Settings); nothing renders or toggles the check. */
+/* Sign-out demoted to a quiet, low-emphasis row (audit 1) — danger only on hover. */
+.user-menu-item.user-menu-signout {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+.user-menu-item.user-menu-signout:hover { color: var(--danger); background: var(--danger-soft); }
+
+/* --- auth split-screen (login) ------------------------------------------------ */
+/* Replaces the centered auth-card for sign-in: 60% photo / 40% form, full-bleed. */
+.auth-split-page { display: block; padding: 0; }
+/* Force the split to fill the viewport — the shared `.auth-page` centering grid must
+   not trap it in a centered box (that caused white gutters on wide screens). */
+.auth-split {
+  display: grid;
+  grid-template-columns: 3fr 2fr; /* 60 / 40 */
+  min-height: 100dvh;
+  width: 100%;
+  max-inline-size: none;
+  background: var(--bg);
+}
+.auth-visual {
+  /* Full-bleed photo — nothing but the photo and a small corner brand (user request:
+     60% picture / 40% login, keep it minimal). */
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: url('/Login.webp') center / cover no-repeat; /* S200 (PERF-8): WebP re-encode, 110KB JPEG → 68KB WebP */
+}
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.35);
+}
+/* The brand text on the dark photo also softens in dark mode — pure white glares. */
+/* P4.5 (F-M16): guard with :not([data-theme='light']) so OS-dark + app-light doesn't dim the brand. */
+@media (prefers-color-scheme: dark) {
+}
+.auth-visual .auth-brand {
+  position: absolute;
+  inset-block-start: clamp(1.5rem, 3vw, 2.5rem);
+  inset-inline-start: clamp(1.5rem, 3vw, 2.5rem);
+  z-index: 1;
+}
+.auth-brand .mark { display: none; }
+/* The logo on the photo panel: always the light-glyph variant — the photo + scrim is dark. */
+.auth-logo {
+  display: block;
+  height: 2.4rem;
+  width: auto;
+  filter: drop-shadow(0 2px 10px rgb(0 0 0 / 0.3));
+}
+
+.auth-form {
+  display: grid;
+  place-content: center;
+  gap: 1.2rem;
+  justify-self: center;
+  width: min(24rem, 100%);
+  padding: clamp(2rem, 5vw, 4rem);
+}
+.auth-form h2 { margin: 0; font-size: 1.6rem; }
+.auth-form form { display: grid; gap: 1rem; }
+.auth-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+.auth-form > p { margin: 0; }
+/* The inline brand is only for the collapsed (mobile) layout where the visual panel hides. */
+.auth-brand-inline {
+  display: none;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text);
+  font-weight: 700;
+}
+.auth-brand-inline .mark { display: none; }
+/* Mobile login brand — theme-aware variant like the header. */
+.auth-logo-inline {
+  display: block;
+  height: 1.5rem;
+  width: auto;
+  content: var(--inline-logo);
+}
+@media (max-width: 860px) {
+  .auth-split { grid-template-columns: 1fr; }
+  .auth-visual { display: none; }
+  .auth-brand-inline { display: inline-flex; }
+}
+
+/* --- responsive topbar (roast plan Phase 4; header-less mobile pass 2026-08-29) --- */
+/* ≤1024px the app went header-less by the 2026-08-29 request (bottom tab bar carried
+   everything). Batch (s) 2026-09-08 — the user asked for the header BACK on mobile:
+   "in mobile view the header (logo) must always be visible". So the topbar survives
+   ≤1024px as a SLIM brand-only bar (logo + the offline sync badge), pinned sticky at
+   the top by the base rule; nav links / user chip / theme toggle stay hidden — the
+   fixed bottom bar + its More sheet still carry all navigation and account actions.
+   Desktop ≥1025px keeps the single-row topbar untouched. */
+@media (max-width: 1024px) {
+  .topbar { gap: 0; padding: 0.4rem 0.9rem; }
+  .topbar .nav-links,
+  .topbar .nav-actions { display: none; }
+  /* Shell fills the viewport minus BOTH bars (bottom 3.5rem + the slim top bar ~2.3rem)
+     so short pages never overflow into a scroll. */
+  .shell { min-block-size: calc(100dvh - 3.5rem - 2.3rem - env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Mobile "More" sheet — the user-menu destinations, bottom-sheet edition (2026-08-29). */
+.mobile-more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(0 0 0 / 0.42);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s ease, visibility 0s linear 0.18s;
+}
+.mobile-more-backdrop.open { opacity: 1; visibility: visible; transition: opacity 0.18s ease; }
+.mobile-more-sheet {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 61;
+  max-inline-size: 26rem;
+  margin-inline: auto;
+  padding: 0.5rem 0.5rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
+  box-shadow: 0 -8px 30px rgb(0 0 0 / 0.14);
+  display: grid;
+  gap: 2px;
+  max-block-size: min(72dvh, 30rem);
+  overflow-y: auto;
+  translate: 0 100%;
+  visibility: hidden;
+  transition: translate 0.22s ease, visibility 0s linear 0.22s;
+}
+.mobile-more-sheet.open { translate: 0 0; visibility: visible; transition: translate 0.22s ease; }
+.mobile-more-head {
+  padding: 0.55rem 0.75rem 0.35rem;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.mobile-more-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  min-block-size: 44px; /* touch target (WCAG 2.5.5) */
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-weight: 500;
+  font-size: var(--fs-lg);
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+.mobile-more-row:hover { background: var(--bg-soft); text-decoration: none; }
+.mobile-more-row .icon { width: 1.4em; height: 1.4em; color: var(--muted); flex-shrink: 0; }
+/* S59: the row for the page you're currently on — soft tint + teal ink, so opening
+   the More sheet answers "where am I?" for secondary pages instead of showing an
+   undifferentiated list. S190: the pair joins the S189 SHAPE family app-wide —
+   the SAME soft teal tint (--nav-active-bg 14% light / 20% dark) with the icon at
+   --nav-active-icon and the text at --nav-active-label (the old --accent-soft +
+   --link pair retires — the bar tabs, the sheet rows, and the desktop rail all
+   speak ONE active grammar now; the sheet's solid --card surface is the exact
+   blend the S189 rail proofs already cover, so the same floors hold). Hover on
+   the current row deepens one notch (--nav-active-bg-hover), the active-press
+   recipe everywhere. */
+.mobile-more-row[aria-current="page"] { background: var(--nav-active-bg); color: var(--nav-active-label); font-weight: 600; }
+.mobile-more-row[aria-current="page"] .icon { color: var(--nav-active-icon); }
+.mobile-more-row[aria-current="page"]:hover { background: var(--nav-active-bg-hover); }
+.mobile-more-danger { color: var(--color-error); }
+.mobile-more-danger .icon { color: var(--color-error); }
+/* S61 a11y: keyboard focus rings for the sheet's rows — the sheet is a focus-trapped
+   dialog (openSheet focuses the first row), so Tab-only users LIVE here; hover-tint
+   alone gave them no position feedback. */
+.mobile-more-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* S61: the palette's touch entry — the sheet's only ACTION row (everything else is
+   navigation), so it gets the accent-soft tint + teal ink to read as "this one does
+   something" rather than another destination. It sits above the first divider. */
+.mobile-more-cmdk { background: var(--accent-soft); color: var(--link); font-weight: 600; }
+.mobile-more-cmdk .icon { color: var(--link); }
+.mobile-more-cmdk:hover { background: var(--accent-soft); }
+.mobile-more-cmdk:active { scale: 0.985; }
+.mobile-more-div { block-size: 1px; background: var(--line); margin: 0.3rem 0.5rem; }
+@media (min-width: 1025px) {
+  .mobile-more-sheet, .mobile-more-backdrop { display: none !important; }
+}
+
+/* ═══ S65: the quick-note ARCHIVE ═════════════════════════════════════════════════
+   Every note ever captured, browsable at last. The dashboard widget caps at 20 cards;
+   the "Show all N notes" affordance under it opens this full-screen dialog (a centered
+   sheet on desktop). Rows are light — color dot, kind icon, first-line excerpt, weekday
+   stamp — each carrying a hidden full markdown render the note-reader opens on demand. */
+.note-show-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  inline-size: 100%;
+  margin-block-start: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--link);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.note-show-all .icon { inline-size: 1rem; block-size: 1rem; }
+.note-show-all:hover { background: var(--accent-soft); border-color: var(--brand); border-style: solid; }
+.note-show-all:active { scale: 0.99; }
+.note-show-all:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* The dialog — desktop: a tall centered sheet; mobile (≤640px): full-screen. */
+.qa-archive {
+  inline-size: min(56rem, calc(100vw - 2rem));
+  max-block-size: min(82vh, 46rem);
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+}
+.qa-archive::backdrop { background: rgb(0 0 0 / 0.45); }
+@media (max-width: 640px) {
+  .qa-archive {
+    inline-size: 100vw;
+    max-block-size: 100dvh;
+    block-size: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+}
+.qa-head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.9rem;
+  background: var(--card);
+  border-block-end: 1px solid var(--line);
+}
+/* S65 styling detail: on phones the head wraps — title+count keep the first row, the
+   filter takes the full second row (a 390px-wide single row squeezes all four into
+   crumbs). The body's height budget follows the taller head. S66: the jump button
+   joins row 1 (title+count+jump+close); the revealed date input shares row 2 with
+   the filter (which now grows instead of spanning 100%, so the head never gains a
+   third row). */
+@media (max-width: 640px) {
+  .qa-head { flex-wrap: wrap; padding: 0.55rem 0.75rem; }
+  .qa-jumpbtn { order: 3; }
+  .qa-head [data-qa-close] { order: 4; }
+  .qa-filter { flex: 1 1 9rem; order: 5; }
+  .qa-date { order: 6; }
+}
+.qa-title { margin: 0; font-size: 1rem; flex-shrink: 0; }
+.qa-count { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.qa-filter {
+  flex-grow: 1;
+  min-inline-size: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft, var(--card));
+  color: var(--text);
+  font-size: 0.88rem;
+}
+.qa-filter:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+/* Long list handling: capped height, custom scrollbar (the app's list convention). */
+.qa-body {
+  max-block-size: calc(min(82vh, 46rem) - 3.4rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.qa-body::-webkit-scrollbar { inline-size: 8px; }
+.qa-body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+@media (max-width: 640px) {
+  /* 6rem: the wrapped two-row head (title+count+jump+close, then filter+date). */
+  .qa-body { max-block-size: calc(100dvh - 6rem); }
+}
+/* Rows: dot · kind · excerpt+meta · done. Hairline separators, hover wash, focus ring.
+   S65 styling detail: the hover adds a leading accent edge (logical inset-inline-start)
+   — the scan surface reads like the palette's selected-row language, not a bare wash. */
+.qa-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.9rem;
+  border-block-end: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.12s ease;
+  position: relative;
+}
+.qa-row::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: 0.3rem;
+  inline-size: 2px;
+  border-radius: 2px;
+  background: var(--brand);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.qa-row:hover::before, .qa-row:focus-visible::before, .qa-row.qa-anchored::before { opacity: 1; }
+.qa-row:hover { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+.qa-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.qa-row.qa-hidden { display: none; }
+.qa-dot {
+  inline-size: 0.72rem;
+  block-size: 0.72rem;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.18);
+  flex-shrink: 0;
+}
+.qa-kind { display: inline-flex; color: var(--muted, inherit); flex-shrink: 0; }
+.qa-kind .icon { inline-size: 1rem; block-size: 1rem; }
+.qa-main { display: grid; gap: 0.12rem; min-inline-size: 0; }
+.qa-text {
+  font-size: 0.92rem;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qa-row.is-done .qa-text { text-decoration: line-through; opacity: 0.6; }
+.qa-meta { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; font-size: 0.78rem; }
+/* S65 fix: the pin glyph next to an attached project's title (was an invisible empty
+   span — the attribute existed, the style never did). Muted so the title reads first. */
+.qa-pin { display: inline-flex; color: var(--muted, inherit); }
+.qa-pin .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+.qa-done { color: var(--link); display: inline-flex; flex-shrink: 0; }
+.qa-done .icon { inline-size: 1rem; block-size: 1rem; }
+/* Empty state: a quiet archive glyph + the line — the "nothing here yet" moment reads
+   as a place, not an error. */
+.qa-empty { text-align: center; padding: 2.4rem 1rem; margin: 0; display: grid; justify-items: center; gap: 0.5rem; }
+.qa-empty .icon { inline-size: 1.8rem; block-size: 1.8rem; color: var(--muted, inherit); opacity: 0.65; }
+.qa-empty p { margin: 0; }
+/* Pagers — full-width ghost rows at the list's edges. */
+.qa-more, .qa-newer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  padding: 0.55rem;
+  border: none;
+  border-block-end: 1px solid var(--line);
+  background: transparent;
+  color: var(--link);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qa-more:hover, .qa-newer:hover { background: var(--accent-soft); }
+.qa-more:focus-visible, .qa-newer:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* S65 fix: the author `display: flex` above would defeat the `hidden` attribute's UA
+   `display: none` — the "last page" pager-hiding relied on it and stayed visible. */
+.qa-more[hidden], .qa-newer[hidden] { display: none; }
+
+/* ═══ S66: date-group headers + jump-to-date + filter dead-ends ════════════════
+   Sticky scannable separators (Today / Yesterday / This week / This month / Earlier)
+   recomputed client-side after every render. They ride the top of the scrolling body
+   with the dialog's own card paint so rows never bleed through; the trailing rule
+   line fills whatever width the label leaves. Hidden while the filter is active — a
+   header over zero visible rows would lie. */
+.qa-group {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  /* S155: the notebook's date-group labels join the EYEBROW rung — 12px/500,
+     +0.03em, sentence case (was 0.68rem/700/0.07em/uppercase — the S105-era
+     micro-label register is superseded by the spec's group-label row). */
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 0.8rem;
+  background: var(--card);
+  color: var(--muted, inherit);
+  font-size: var(--text-eyebrow-size);
+  font-weight: var(--text-eyebrow-weight);
+  letter-spacing: var(--text-eyebrow-tracking);
+  text-transform: none;
+  border-block-end: 1px solid var(--line);
+}
+/* Persian labels have no uppercase — the tracking still gives them structure. */
+[dir='rtl'] .qa-group { letter-spacing: 0.02em; }
+.qa-group::after { content: ''; flex: 1; block-size: 1px; background: var(--line); opacity: 0.55; }
+.qa-archive.filtering .qa-group { display: none; }
+
+/* The jump-to-date control: a calendar icon button; the native date input it reveals
+   shares the head's input anatomy (same border/radius/font as the filter). */
+.qa-jumpbtn { flex-shrink: 0; color: var(--muted, inherit); }
+.qa-jumpbtn .icon { inline-size: 1.05rem; block-size: 1.05rem; }
+.qa-jumpbtn:hover { color: var(--brand); background: var(--accent-soft); }
+.qa-jumpbtn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.qa-jumpbtn[aria-pressed='true'] { color: var(--brand); background: var(--accent-soft); }
+.qa-date {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft, var(--card));
+  color: var(--text);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.qa-date:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.qa-date[hidden] { display: none; }
+
+/* The filter's honest dead end (0 visible rows) — the archive glyph-free quiet twin
+   of .qa-empty, only ever visible while filtering. */
+.qa-nomatch {
+  text-align: center;
+  padding: 1.8rem 1rem;
+  font-size: 0.9rem;
+}
+.qa-nomatch[hidden] { display: none; }
+/* Read-only list renders inside the note-reader (archive rows for LIST notes): the
+   check glyph mutes so only the text reads as content; the title reads like a heading. */
+.qa-itemlist { margin: 0.2rem 0; }
+.qa-ro-check { color: var(--muted, inherit); display: inline-flex; }
+.qa-ro-check .icon { inline-size: 1rem; block-size: 1rem; }
+.qa-list-title { margin: 0 0 0.4rem; }
+/* The anchored-row flash reuses the S64 jump language (extended to archive rows). */
+.qa-row.note-jump {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 45%, transparent);
+  animation: note-jump-settle 0.65s ease 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .qa-row.note-jump { animation: none; }
+}
+
+/* ═══ S64: jump-to-note flash ═══════════════════════════════════════════════════
+   The palette's quick-note deep link (#note-<uuid>&q=<term>) scrolls the dashboard
+   card into view and pulses it once — the same accent language as the vault's S63
+   jump-to-match, tuned for the card's thin-border anatomy: a brand ring + an
+   accent wash that settles, plus a lift so the eye catches the target moving.
+   With a query, the first matching text node also wears <mark class="note-jump">. */
+.note-card.note-jump {
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 28%, transparent);
+  animation: note-jump-settle 0.65s ease 1;
+}
+@keyframes note-jump-settle {
+  0% {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--brand) 42%, transparent);
+    translate: 0 -2px;
+  }
+  100% {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 28%, transparent);
+    translate: 0 0;
+  }
+}
+mark.note-jump {
+  color: inherit;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 4px;
+  padding: 0 0.08em;
+  animation: note-jump-mark-pulse 0.7s ease 1;
+}
+@keyframes note-jump-mark-pulse {
+  0% { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+  100% { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-card.note-jump, mark.note-jump { animation: none; translate: 0 0; }
+}
+
+/* Respect reduced-motion (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ════════════════ S67: clear-jump affordance ════════════════════════════════
+   After a date jump the list is anchored somewhere OLD — a ↩ button appears in
+   the head (visible even when the input itself is Escape-hidden, because the
+   anchor is still live) and returns the list to the newest window. Styled as
+   the jump button's ACTIVE twin: brand-tinted (it undoes a live state, so it
+   reads as "on"), a one-shot slide-in so its appearance is noticed in a busy
+   head, and the picked date input carries data-jump so the input itself states
+   "this filter is shaping the list" (the palette's pressed language). */
+.qa-clearjump { flex-shrink: 0; color: var(--brand); background: var(--accent-soft); }
+.qa-clearjump .icon { inline-size: 1.05rem; block-size: 1.05rem; }
+.qa-clearjump:hover { color: var(--brand); background: color-mix(in srgb, var(--accent-soft) 70%, var(--accent) 12%); }
+.qa-clearjump:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.qa-clearjump[hidden] { display: none; }
+@keyframes qa-clearjump-in {
+  from { opacity: 0; translate: 0 -2px; }
+  to { opacity: 1; translate: 0 0; }
+}
+.qa-clearjump:not([hidden]) { animation: qa-clearjump-in 0.18s ease; }
+.qa-date[data-jump] {
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--line-strong));
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--bg-soft, var(--card)));
+}
+@media (max-width: 640px) {
+  .qa-clearjump { order: 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qa-clearjump:not([hidden]) { animation: none; }
+}
+
+/* ════════════════ S149 (owner): the task DETAIL slide-over ══════════════════
+   Click a task card → a panel slides in from the INLINE END — right on LTR,
+   LEFT on RTL (the owner: "a sliding sidebar to appear from right on LTR, and
+   LEFT on RTL") — showing the FULL title + full content, read-only (editing
+   stays behind the ⋯ → Edit). All placement is logical (inset-inline-end,
+   border-inline-start) so the mirror is free; the off-canvas TRANSFORM is the
+   one physical flip ([dir='rtl'] slides from -112%). The scrim locks the page
+   behind it; reduced-motion kills both transitions. The panel reuses the
+   card's own classes (.t-code, .pd-tag) so rendered markdown + label chips
+   inherit their styles with zero duplication. */
+.pd-detail-scrim {
+  position: fixed; inset: 0; z-index: 640;
+  background: rgb(15 15 15 / 0.38);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+#pd-detail-root.open .pd-detail-scrim { opacity: 1; pointer-events: auto; }
+.pd-detail {
+  position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 641;
+  inline-size: min(460px, 100vw);
+  background: var(--card); color: var(--text);
+  border-inline-start: 1px solid var(--line);
+  box-shadow: var(--shadow-dropdown);
+  display: flex; flex-direction: column;
+  transform: translateX(112%); /* off-canvas inline-end (right on LTR) */
+  visibility: hidden;          /* the delayed-visibility pattern keeps the slide, drops the tab stops */
+  transition: transform 0.26s ease, visibility 0s linear 0.26s;
+}
+[dir='rtl'] .pd-detail { transform: translateX(-112%); } /* RTL: slides from the LEFT */
+/* the open state rides the #pd-detail-root wrapper (the JS toggles one class on it) */
+#pd-detail-root.open .pd-detail { transform: translateX(0); visibility: visible; transition: transform 0.26s ease; }
+.pd-detail-head {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.85rem 1rem 0.75rem;
+  border-block-end: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.pd-detail-prio {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  line-height: 1.25; color: var(--prio-banner-ink); /* S154: was a hardcoded #fff — the badge family's base-ink token (white in light) */
+  padding: 0.24rem 0.6rem; border-radius: 999px; white-space: nowrap;
+}
+/* S150 fill+ink pairs: the pale slate/gold fills carry their dark ink (owner AA table);
+   the pill is self-contained. S154: the chip reads the BANNER tokens (the ONE badge
+   family) instead of --color-* — light is unchanged (they alias --color-* there) and
+   the dark overrides in claude-dark-theme.css flow to the slide-over too. */
+.pd-detail-prio.prio-low { background: var(--prio-banner-low); color: var(--prio-banner-ink-low); }
+.pd-detail-prio.prio-medium { background: var(--prio-banner-medium); color: var(--prio-banner-ink-medium); }
+.pd-detail-prio.prio-high { background: var(--prio-banner-high); color: var(--prio-banner-ink-high); }
+.pd-detail-prio.prio-urgent { background: var(--prio-banner-urgent); color: var(--prio-banner-ink-urgent); }
+.pd-detail-status {
+  font-size: var(--fs-xs, 0.8rem); color: var(--muted);
+  padding: 0.2rem 0.55rem; border: 1px solid var(--line);
+  border-radius: 999px; white-space: nowrap;
+}
+.pd-detail-x { margin-inline-start: 0; } /* S151: the actions group takes the auto margin now */
+/* S151 (owner): the slide-over's header actions — an INSTANT copy button + the ⋯
+   menu (Edit / Delete), docked before the close ✕. The ⋯ reuses the global
+   .spark-menu recipe verbatim (relative menu → absolute pop, inline-end) — no
+   local overrides, the popover opens under the button exactly like on the cards. */
+.pd-detail-actions { display: flex; align-items: center; gap: 0.15rem; margin-inline-start: auto; }
+/* S151: touch-lift — the long-press drag state (touch devices have no HTML5 DnD;
+   the lifted card floats on a deeper shadow so the finger can see what it moves) */
+.pd-task.touch-lift { opacity: 0.85; box-shadow: 0 14px 34px rgb(0 0 0 / 0.24); }
+/* S151: a long-press must not pop the iOS callout or start a text selection —
+   touch surfaces only (hover:none), desktop selection stays untouched. */
+@media (hover: none) {
+  .pd-task { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+}
+.pd-detail-body { overflow-y: auto; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.85rem; }
+.pd-detail-title { margin: 0; font-size: 1.12rem; font-weight: 700; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pd-detail-title .t-code { font-size: 0.92em; }
+.pd-detail-content {
+  font-size: 0.93rem; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere;
+  padding-block-start: 0.85rem;
+  border-block-start: 1px dashed var(--line);
+}
+[dir='rtl'] .pd-detail-title, [dir='rtl'] .pd-detail-content { text-align: start; }
+.pd-detail-meta {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+  padding: 0.8rem 1.15rem 1rem;
+  border-block-start: 1px solid var(--line);
+  color: var(--muted); font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.pd-detail-meta .pd-tag { cursor: default; } /* chips are inert here — filtering stays a card-surface action */
+body.pd-detail-lock { overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .pd-detail, .pd-detail-scrim { transition: none; }
+}
+
+/* ===== S152: the global task-category system ==================================== */
+/* (block 6) The category chip — a small colored pill wearing the category's own
+   fill+ink pair (stored per row; the 16 CURATED tiles themselves live in
+   variables.css as --cat-sw-*). Board cards render it DIRECTLY ABOVE the title
+   row; list rows and the slide-over reuse the same element. */
+.cat-chip {
+  display: inline-flex; align-items: center;
+  max-inline-size: 100%;
+  padding: 0.14rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; line-height: 1.35;
+  letter-spacing: 0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* the pale pastels keep an edge on any surface — a hairline in the chip's own
+     ink via color-mix (token-driven, no hardcoded hue) */
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+.cat-chip-sm { font-size: 0.66rem; padding: 0.08rem 0.45rem; }
+.pd-task-body > .cat-chip { margin-block-end: 0.2rem; }
+.pd-detail-cat { align-self: flex-start; margin-block-end: 0.35rem; }
+.pd-cat-toggle .cat-chip, .pd-cat-row .cat-chip { cursor: pointer; }
+
+/* (blocks 3+4) The picker popover: suggestion rows + the Create-'name' option +
+   the 16-tile swatch grid for the quick-add. Anchored to the field (logical props). */
+.pd-cat-field { position: relative; display: flex; flex-direction: column; gap: 0.3rem; }
+.pd-cat-row { display: flex; align-items: center; gap: 0.3rem; }
+.pd-cat-row input { flex: 1; min-inline-size: 0; }
+.pd-cat-pop {
+  position: absolute; inset-block-start: calc(100% + 0.3rem); inset-inline-start: 0;
+  z-index: 60; min-inline-size: min(20rem, 100%);
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.08);
+  padding: 0.3rem; display: grid; gap: 2px;
+  max-block-size: 60vh; overflow-y: auto;
+}
+.pd-cat-pop-head { font-size: 0.78rem; font-weight: 700; padding: 0.3rem 0.4rem; color: var(--muted); }
+.pd-cat-pop-row {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.42rem 0.5rem; border-radius: var(--radius-sm);
+  background: none; border: 0; color: inherit; text-align: start;
+  font-size: 0.85rem; cursor: pointer; inline-size: 100%;
+}
+.pd-cat-pop-row:hover, .pd-cat-pop-row.is-hi, .pd-cat-pop-row.is-exact { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.pd-cat-create { font-weight: 700; color: var(--brand, var(--text)); }
+.pd-cat-pop-back { color: var(--muted); }
+
+/* (block 5, S174) The swatch row — 16 fixed CIRCLES, no free-form color anywhere.
+   The owner's round: the old 1.6-aspect grid tiles read as oversized slabs; the
+   tiles are now small fixed circles in a wrapping flex row — the classic picker
+   idiom — sized for a comfortable ~37px pitch (30px dot + gap) and bumped on
+   coarse pointers. The "Aa" ink preview stays (a circle still shows the pair). */
+.pd-cat-swatches {
+  display: flex; flex-wrap: wrap; gap: 0.45rem;
+  margin-block: 0.35rem;
+}
+.pd-cat-swatch-tile {
+  flex: 0 0 auto;
+  inline-size: 1.9rem; block-size: 1.9rem; aspect-ratio: 1;
+  padding: 0; /* the global button padding (0.55rem 1rem) inflates a fixed-size flex
+    item past its box (min-width:auto floors at content+padding) — the old 1fr grid
+    masked it; a 30px circle must carry nothing */
+  border: 0; border-radius: 50%; cursor: pointer;
+  font-size: 0.55rem; font-weight: 800; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  transition: transform 0.12s ease;
+}
+.pd-cat-swatch-tile:hover { transform: scale(1.12); }
+/* The selection ring follows the circle (box-shadow, not outline — guaranteed
+   round on every engine; the --card gap keeps the ring readable against the
+   row below). */
+.pd-cat-swatch-tile.is-sel {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08), 0 0 0 2px var(--card), 0 0 0 4px var(--text);
+}
+@media (max-width: 480px) { .pd-cat-swatch-tile { inline-size: 2.05rem; block-size: 2.05rem; } }
+/* S197 (the touch+optical audit): the comment above PROMISED "bumped on coarse
+   pointers" but the bump was width-keyed (≤480px) — a touch device ≥481px still
+   got the 30px tiles, under the app's own 40px floor. The bump finally keys to
+   the POINTER (the S43 doctrine: visual compactness stays on desktop, the tap
+   law wins on touch); the "Aa" ink preview grows one rung with the tile. */
+@media (pointer: coarse) {
+  .pd-cat-swatch-tile { inline-size: 2.5rem; block-size: 2.5rem; font-size: 0.65rem; }
+}
+
+/* (block 7) The zero-enabled setup prompt + the per-project toggle rows. */
+/* S172: the composer's block-7 setup prompt is RETIRED — its styles went with it.
+   The per-project dialog's toggle rows stay, now with real touch targets. */
+.pd-cat-toggle {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.32rem 0.45rem; border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-block-size: 2.75rem; /* S172: 44px touch rows (the modal label grid used to
+    stack these into 1.1kpx-wide slabs; the specificity restore below + this floor
+    make every row a comfortable one-line target) */
+}
+/* S172 specificity restore: components.css's `.modal label { display:grid }`
+   (0,1,1) out-ranked `.pd-cat-toggle` (0,1,0) inside every modal and broke each row
+   into a stacked grid with a full-width checkbox. Two classes (0,2,0) win — the row
+   renders as the flex line it is, in the Categories dialog AND anywhere else a
+   `.modal` wraps a toggle. */
+.modal .pd-cat-toggle { display: flex; align-items: center; gap: 0.5rem; }
+.pd-cat-toggle:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.pd-cat-toggle input { accent-color: var(--brand, currentColor); flex: 0 0 auto; }
+.pd-cat-toggle-state { margin-inline-start: auto; font-size: 0.72rem; color: var(--muted); }
+.pd-cat-empty { margin: 0; }
+
+/* The per-project dialog + the Settings library list. */
+.pd-cats-inner { display: flex; flex-direction: column; overflow: hidden; }
+.pd-cat-toggle-list { display: grid; gap: 0.25rem; max-block-size: 40vh; overflow-y: auto; }
+.pd-cat-qa { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-block-start: 0.6rem; }
+.pd-cat-qa input { flex: 1; min-inline-size: 8rem; }
+.pd-cat-qa .pd-cat-swatches { inline-size: 100%; }
+.pd-cat-settings-list { display: grid; gap: 0.3rem; margin-block-start: 0.5rem; }
+.pd-cat-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+  padding: 0.35rem 0.2rem;
+  border-block-end: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  /* S172: wrap, don't h-scroll — at 360px the chip + usage + actions used to
+     overflow into a horizontal scroll slab; the actions now fold to a second
+     line instead of sliding off-screen. */
+  row-gap: 0.35rem;
+}
+.pd-cat-row:last-child { border-block-end: 0; }
+.pd-cat-usage { margin-inline-start: auto; }
+.pd-cat-row-actions { display: flex; gap: 0.3rem; }
+.pd-cat-edit {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.2rem;
+  border-block-end: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+.pd-cat-edit [data-cat-name-in] { flex: 1; min-inline-size: 8rem; }
+.pd-cat-swatches-edit { inline-size: 100%; }
+/* The hidden attribute must always win over the component's display value
+   (the slide-over chip + the dialog's swatch drawer toggle). */
+.cat-chip[hidden], .pd-cat-qa [hidden], .pd-cat-pop[hidden] { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   S180 (owner blocks 1–6) — THE STICKY RESTORE: the dashboard's compact notebook
+   ═══════════════════════════════════════════════════════════════════════════════
+   The S179 compact panel's rules originally lived ABOVE the shared .note-card /
+   .note-list base rules in this sheet — at EQUAL specificity the LATER base rules
+   silently won every conflicting declaration (background: transparent, the 14px
+   --radius-sm corners, the chip padding, the .note-list single-column grid): the
+   yellow stickies regressed into small WHITE CHIPS stacked vertically inside a
+   tall, mostly empty panel. This section now lives at the END of the sheet AND
+   scopes every rule under .notebook-dashboard, so the compact card can never lose
+   the cascade again (the S178 lesson restated: don't rely on order — win the
+   compound).
+
+   The restored contract (owner's spec):
+   - block 1: the sticky look — the note's own paper surface (var(--note-color),
+     the owner's fallback #FFF59D = NOTE_COLOR_HEX.yellow), dark-brown ink
+     #4D440A (8.76:1 on the yellow), a soft two-layer drop shadow, a small 4px
+     corner radius, and the creation DATE + TIME back on every note (server-side).
+   - block 2: readable text — the note body at --fs-md (14px, inside the suggested
+     13–14px band; the old 12px chip text read like a tag); the timestamp at 12px
+     in the paper's own brown family #6B5B10 (6.01:1 on the yellow — the ≥4.5:1
+     WCAG AA floor with margin, passing on every paper of the palette).
+   - block 3: compact layout — a WRAPPING row of equal-width (~180px) stickies
+     under the composer, starting at the inline-start edge, with a moderate gap;
+     the panel height follows its content; the vertical padding trimmed.
+   - blocks 4–6: the 5-most-recent cap + "View all (N)" (server-side, unchanged),
+     the Move-to… menu (keyboard wiring in app.js), the hover-revealed delete
+     (always visible on touch, ≥24×24 hit at the same visual size, 6s Undo). */
+
+/* The panel: plain card surface (S179 block 6 kept — three surfaces; the sticky
+   papers are the only tinted ones), padding trimmed moderately (S180 block 3:
+   one composer row + one wrap row — the panel shrinks to fit its content). */
+.notebook-dash-wrap { display: grid; gap: 0.55rem; }
+.notebook-dash-wrap .card.notebook-dashboard { display: grid; gap: 0.55rem; }
+/* S183 (the depth audit — L2 realized): the card's padding retires to 0 — the
+   section head (.dash-notebook-head.dash-sec-head) rides INSIDE as the header
+   strip (dashboard.css's .card > .dash-sec-head grammar: full-bleed + hairline);
+   the body blocks (composer + the sticky row) pad their own sides. The bottom
+   padding stays (the S180 paper-shadow doctrine — overflow:visible + room below
+   for the 4px 12px 20px sticky shadows). */
+.card.notebook-dashboard {
+  background: var(--surface-card, var(--card, #fff));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 0 1rem; /* S184: the foot rung = the 1rem side inset — one frame around the content */
+  margin-block-end: 0; /* S184: the main flex gap owns the card's outside beat */
+  overflow: visible; /* the Move-to popover (z-30, absolute) must escape the card */
+}
+.card.notebook-dashboard > .dash-sec-head { padding-inline: 1rem; }
+.card.notebook-dashboard > *:not(.dash-sec-head) { padding-inline: 1rem; }
+.notebook-dashboard .note-compose { margin-block-start: 0; } /* the card grid's 0.55rem gap owns the head→body spacing now */
+/* S184 (the layout audit, item 6 — the affordance): the S183 gray-well return made
+   the field the SAME tone as the page canvas, so it read disabled (the owner:
+   "the quick-note input is the same grey as the page background. It looks
+   disabled."). The field now speaks the card's own surface + a VISIBLE 1px
+   --line-strong border (the Session-19 password-field register: a hairline on a
+   same-tone fill reads dead), and the app's input focus grammar is re-armed by a
+   scoped :focus-visible — the (0,2,0) resting rule would otherwise out-rank the
+   global (0,1,1) focus border. Placeholder: --muted on the white card measures
+   6.7:1 at full opacity, ~5:1 at the note placeholder's 0.75 opacity — above the
+   4.5:1 floor (and better than the old gray well's ~4.35). Dark keeps the
+   RECESSED well (the claude-dark twin below): on a dark canvas a LOWER well
+   reads as an input; only light's gray-on-gray read as disabled. */
+.notebook-dashboard .note-compose-text {
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+}
+.notebook-dashboard .note-compose-text:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.dash-notebook-head { min-inline-size: 0; }
+.note-view-all {
+  border: 0;
+  background: transparent;
+  padding: 0.25rem 0.35rem;
+  border-radius: var(--radius-sm);
+  color: var(--link, var(--brand));
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.note-view-all:hover { text-decoration: underline; text-underline-offset: 3px; color: var(--text); }
+.note-view-all:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 1px; }
+
+/* S184: the archive "View all (N)" affordance moved from the head actions to the
+   card's FOOT — the head carries the CARD-level "Go to notebook" link (one
+   grammar with every section head); "View all" is column-level vocabulary and
+   lives inside the card, at the end of the row it extends. The card's own grid
+   gap (0.55rem) owns the row→foot separation. */
+.dash-note-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* The wrapping row of stickies (S180 block 3): display:flex + flex-wrap + a
+   moderate gap; every paper rides at the same ~180px inline size; the row starts
+   at the INLINE-START edge (block 4: newest first from the start). Scoped under
+   .notebook-dashboard so the shared .note-list single-column grid later in this
+   sheet can never override it again (the S179 defect). */
+.notebook-dashboard .dash-note-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-start; /* ragged rows are the sticky idiom; the panel height follows the tallest paper in each row */
+  margin-block-start: 0.35rem;
+}
+
+/* The sticky paper (S180 block 1 — restored from the pre-S179 look):
+   paper surface = the note's own color (inline --note-color from the server);
+   ink = the owner's dark brown; soft layered shadow; small 4px radius;
+   fixed 11.25rem (180px) — every paper the same width (block 3). */
+.notebook-dashboard .note-card-dash {
+  flex: 0 0 11.25rem;
+  max-inline-size: 11.25rem;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0.2rem;
+  padding: 0.55rem 0.6rem 0.5rem;
+  background: var(--note-color, #FFF59D); /* the PAPER — the sticky yellows stay the only tinted surfaces */
+  color: #4D440A; /* S180 block 1: the paper's own dark-brown ink (8.76:1 on #FFF59D) */
+  border: 1px solid rgb(0 0 0 / 0.10);
+  border-radius: 4px; /* the sticky paper's near-sharp corner */
+  box-shadow: 1px 2px 3px rgb(0 0 0 / 0.08), 2px 6px 10px rgb(0 0 0 / 0.10); /* the soft paper shadow (the sticky-view recipe) */
+  /* NO overflow:hidden — the Move-to popover must escape; the text clamps own theirs */
+  position: relative;
+}
+
+/* Readable text (S180 block 2): the note body at --fs-md (14px — the ≥13px floor;
+   the old --fs-sm 12px chip text read like a tag), and the timestamp at 12px in
+   the brown family — #6B5B10 measures 6.01:1 on the yellow, ≥4.5:1 on every
+   paper of the palette (green 5.54 / pink 4.86 / blue 4.72). */
+.notebook-dashboard .note-card-dash[data-kind='note'] .note-render { font-size: var(--fs-md); line-height: 1.5; }
+/* the compact sticky's clamp: 3 lines of text, then the fold */
+.notebook-dashboard .note-card-dash .note-render.markdown-body {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.notebook-dashboard .note-card-dash .note-render p { margin: 0; }
+/* re-pin the brown over misc.css's generic .note-render:hover → var(--text) flip */
+.notebook-dashboard .note-card-dash[data-kind='note'] .note-render:hover { color: #4D440A; }
+/* the paper's focusables speak the paper's own ring ink (the shared --focus-ring
+   was tuned against the card/row fills, not the yellow paper) */
+.notebook-dashboard .note-card-dash .note-render:focus-visible,
+.notebook-dashboard .dash-note-listlink:focus-visible { outline: 2px solid #4D440A; outline-offset: 2px; }
+.notebook-dashboard .note-card-dash .note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin: 0;
+}
+/* the creation stamp: date + time, 12px, #6B5B10 (6.01:1 on the yellow). The
+   #notebook.notebook-dash-wrap compound (1,3,0) beats the shared sticky-view
+   meta rule's bare #notebook .note-card scope (1,2,0) without touching it. */
+#notebook.notebook-dash-wrap .note-card-dash .note-meta { font-size: 0.75rem; color: #6B5B10; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notebook-dashboard .dash-note-link { color: inherit; opacity: 0.75; display: inline-flex; flex: none; }
+.notebook-dashboard .dash-note-link:hover { opacity: 1; }
+.notebook-dashboard .dash-note-link .icon { inline-size: 0.8rem; block-size: 0.8rem; }
+.notebook-dashboard .dash-note-listlink { text-decoration: none; color: inherit; display: grid; gap: 0.12rem; min-inline-size: 0; }
+.notebook-dashboard .dash-note-listlink:hover .dash-note-title { text-decoration: underline; text-underline-offset: 2px; }
+.notebook-dashboard .dash-note-title { font-size: var(--fs-md); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notebook-dashboard .dash-note-listlink .note-render {
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The hover-revealed control cluster (Move to… + delete) — S180 block 6: hidden on
+   pointer devices until the paper is hovered or keyboard-focused (:focus-within),
+   ALWAYS visible on touch (no hover to reveal with). Both controls keep their
+   1.6rem (25.6px ≥ 24px) hit box at the same visual size; coarse pointers ride
+   2.5rem (40px). */
+.notebook-dashboard .dash-note-acts {
+  position: absolute;
+  inset-block-start: 0.3rem;
+  inset-inline-end: 0.3rem;
+  display: inline-flex;
+  gap: 0.2rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 2;
+}
+.notebook-dashboard .note-card-dash:hover .dash-note-acts,
+.notebook-dashboard .note-card-dash:focus-within .dash-note-acts,
+.notebook-dashboard .dash-note-acts:focus-within { opacity: 1; }
+@media (hover: none) { .notebook-dashboard .dash-note-acts { opacity: 1; } }
+.notebook-dashboard .dash-note-acts button,
+.notebook-dashboard .dash-note-acts summary {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.6rem;
+  block-size: 1.6rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--card, #fff) 82%, transparent);
+  color: #4D440A;
+  cursor: pointer;
+  list-style: none;
+}
+.notebook-dashboard .dash-note-acts summary::-webkit-details-marker { display: none; }
+.notebook-dashboard .dash-note-acts button:hover,
+.notebook-dashboard .dash-note-acts summary:hover { background: var(--card, #fff); color: #4D440A; }
+.notebook-dashboard .dash-note-acts button:focus-visible,
+.notebook-dashboard .dash-note-acts summary:focus-visible { outline: 2px solid #4D440A; outline-offset: 1px; }
+.notebook-dashboard .dash-note-acts .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+.notebook-dashboard .dash-note-x:hover { color: var(--err); }
+@media (pointer: coarse) {
+  .notebook-dashboard .dash-note-acts button, .notebook-dashboard .dash-note-acts summary { inline-size: 2.5rem; block-size: 2.5rem; }
+}
+
+/* The Move-to… popover (a native <details> menu; keyboard wiring in app.js —
+   S180 block 5: Enter opens, ArrowDown/ArrowUp cycle, Escape closes). */
+.notebook-dashboard .dash-note-move { position: relative; }
+.notebook-dashboard .dash-note-move-pop {
+  position: absolute;
+  inset-block-start: calc(100% + 0.25rem);
+  inset-inline-end: 0;
+  z-index: 30;
+  min-inline-size: 11rem;
+  padding: 0.3rem;
+  display: grid;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgb(30 20 10 / 0.12), 0 2px 6px rgb(30 20 10 / 0.06);
+}
+.notebook-dashboard .dash-note-move-pop button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  inline-size: 100%;
+  inline-size: -webkit-fill-available;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: start;
+  cursor: pointer;
+}
+.notebook-dashboard .dash-note-move-pop button:hover { background: var(--bg-soft); }
+.notebook-dashboard .dash-note-move-pop button:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -1px; }
+.notebook-dashboard .dash-note-move-pop .icon { inline-size: 0.95rem; block-size: 0.95rem; color: var(--muted); flex: none; }
+/* the compact card's attach slot (the picker lands here; attached chips show) */
+.notebook-dashboard .note-card-dash .note-attach { grid-column: 1 / -1; }
+.notebook-dashboard .note-card-dash .note-attach:empty { display: none; }
+
+/* --- S191: THE ATTENTION SURFACE — the notifications count in the chrome -------- */
+/* Passive by design (§7 rejects nagging reminders/push/toasts): a quiet
+   severity-tinted pill, no animation, no pulsing, no sound. One visual grammar
+   with the notifications page's own chips — urgent = the danger family, "soon"
+   = the amber pending family (the token pair defined this round — it was
+   referenced since R2.1 but never defined, so every "Soon" chip/icon/accent
+   silently rendered unstyled), info = the spark family. All soft fills with
+   their AA inks; the same tokens theme both themes. */
+.rail-user-chip { position: relative; }
+
+.chip-notif-badge {
+  position: absolute;
+  inset-block-start: -0.2rem;
+  inset-inline-end: -0.3rem;
+  min-inline-size: 1.05rem;
+  block-size: 1.05rem;
+  padding-inline: 0.22rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;               /* the pill decorates the chip; the chip is the hit target */
+  box-shadow: 0 0 0 2px var(--card);  /* optical separation off the avatar (the rail IS --card) */
+  border: 1px solid transparent;
+}
+.chip-notif-urgent { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+.chip-notif-warning { background: var(--badge-pending-bg); color: var(--badge-pending-fg); border-color: color-mix(in srgb, var(--badge-pending-fg) 30%, transparent); }
+.chip-notif-info { background: var(--badge-spark-bg); color: var(--badge-spark-fg); border-color: color-mix(in srgb, var(--badge-spark-fg) 30%, transparent); }
+
+/* The count pill on the account-menu / More-sheet rows — the S188 badge-column
+   pattern: numbers at the row's inline-end edge, one column the eye compares.
+   margin-inline-start:auto pushes it out of the flex row; same severity map. */
+.menu-count-pill {
+  margin-inline-start: auto;
+  min-inline-size: 1.25rem;
+  padding-inline: 0.35rem;
+  padding-block: 0.08rem;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  border: 1px solid transparent;
+}
+.menu-count-urgent { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+.menu-count-warning { background: var(--badge-pending-bg); color: var(--badge-pending-fg); border-color: color-mix(in srgb, var(--badge-pending-fg) 30%, transparent); }
+.menu-count-info { background: var(--badge-spark-bg); color: var(--badge-spark-fg); border-color: color-mix(in srgb, var(--badge-spark-fg) 30%, transparent); }
+
+/* S192: the badge ring tracks the chip's hover/focus state — the ring paints
+   var(--card) for optical separation off the avatar, but the chip's own hover
+   tint is var(--bg-soft): under the pointer the white ring read as a mismatched
+   halo square on the gray tint (probe: rgb(255,255,255) on rgb(222,222,222)).
+   The ring now swaps to the SAME surface the chip paints, hover AND the keyboard
+   focus ring state, so the pill always reads as cut from the surface beneath it. */
+.rail-user-chip:hover .chip-notif-badge,
+.rail-user-chip:focus-visible .chip-notif-badge {
+  box-shadow: 0 0 0 2px var(--bg-soft);
+}

@@ -1,6 +1,6 @@
-# build outputs
+# build outputs (wails writes to build/bin; NEVER ignore frontend/dist — the island is committed + checksum-gated)
 build/bin/
-dist/
+/dist/
 *.exe
 *.syso
 hibana-portable-*.zip

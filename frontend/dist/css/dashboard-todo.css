@@ -1,0 +1,939 @@
+/* Session-12: grid-template-columns: minmax(0,1fr) pins the single implicit track to the
+   section's width — with a bare `auto` track, the phone carousel's flex-row min-content
+   (the SUM of all four slides' min-content) stretched the track to ~532px on a 390px
+   phone, dragging the header/dots/wrap out of the viewport (measured). */
+.dash-todo-section { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
+
+/* S182 (owner: "add a background for to-do list section, like the one quick note
+   has"): the section body joins the Quick Notebook's card grammar — ONE .card panel
+   wrapping the quadrant board. The recipe mirrors .card.notebook-dashboard
+   (quicknotes.css) token-for-token: the surface bg, the neutral hairline, --radius.
+   S183 (the depth audit): the panel's padding retires to 0 — the section head
+   rides INSIDE as the header strip (dashboard.css's .card > .dash-sec-head —
+   full-bleed + hairline), and .dash-quad-wrap pads the body (0.7rem, the S182
+   register). margin-block-end: 0 — the 2.9rem section rhythm owns the spacing
+   (the vault-banner doctrine; .card's own clamp margin would double it).
+   overflow: visible — the quadrant style popover + the task ⋯ menu
+   (fixed-positioned but anchored near the card's edges) must escape. */
+.card.dash-todo-panel {
+  background: var(--surface-card, var(--card, #fff));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0;
+  margin-block-end: 0;
+  overflow: visible;
+}
+/* S183: the head strip's inline padding aligns the title with the quadrant
+   board's body (0.7rem sides — the panel's own register). */
+.dash-todo-panel > .dash-sec-head { padding-inline: 1rem; }
+/* The body: the quadrant board + swipe hint pad themselves (the S182 panel
+   padding, moved onto the wrap). */
+.dash-todo-panel > .dash-quad-wrap { padding: 1rem; }
+
+/* Collapsible dashboard sections (Phase 3): a [data-dash-collapse] button on each
+   section header toggles a .is-collapsed class on the section. The body (everything
+   after the header) is hidden via CSS grid trick (display:none would break htmx
+   swaps). The collapse state persists in localStorage.
+   S183 (head-inside-panel): the collapsed section keeps its panel card with the
+   head strip visible — the panel's BODY (.dash-quad-wrap) and the phone dots hide,
+   not the whole panel. */
+.dash-todo-section.is-collapsed,
+.dash-projects-section.is-collapsed,
+section[id^="dashboard-"].is-collapsed { gap: 0; }
+.dash-todo-section.is-collapsed > .dash-quad-dots,
+.dash-todo-section.is-collapsed .dash-quad-wrap { display: none; }
+.dash-projects-section.is-collapsed .dash-projects-panel > *:not(.dash-sec-head),
+.dash-projects-section.is-collapsed .dash-ov { display: none; }
+section[id^="dashboard-"].is-collapsed .dash-quad-wrap { display: none; }
+.dash-collapse-btn {
+  background: none; border: none; padding: 0.2rem; cursor: pointer;
+  color: var(--muted); display: inline-flex; align-items: center; transition: transform 0.15s ease, color 0.12s ease;
+}
+.dash-collapse-btn:hover {
+  color: var(--brand);
+  /* Session 23: button:hover's green bg leaked behind this icon button — keep the
+     intended quiet icon-only hover (no fill). */
+  background: none;
+}
+.dash-collapse-btn .icon { inline-size: 1rem; block-size: 1rem; transition: transform 0.15s ease; }
+.is-collapsed .dash-collapse-btn .icon { transform: rotate(-90deg); }
+
+/* Smart empty states (Phase 3 → S94 owner item 10 → S179 advisor block 8 → S182
+   owner round → S187 owner round — the to-do empty states): a quadrant with 0 tasks
+   renders ONE quiet centered STATUS LINE inside the list window — pure information,
+   no action (the "Add a task" text link is retired; the header ＋ is the ONE add
+   path). The card keeps the SAME FIXED HEIGHT as its siblings ("whether filled or
+   empty", the owner's words). The line is per-quadrant copy (TODO_EMPTY_LINE —
+   "Nothing urgent right now." and siblings), centered in the free space — a
+   centered muted line is the standard "intentionally empty" signal; align-content
+   flips start → center so the single grid row sits mid-window, and the li's flex
+   centering + text-align:center land the words on it. app.js's updateDashTaskEmpty
+   re-creates THIS markup after htmx sweeps — server + client share one shape. */
+.dash-todo-list:has(> .dash-todo-empty) { align-content: center; }
+.dash-todo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 2.5rem;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+  /* logical properties only — the interface is RTL (owner note) */
+  padding-block: 0.3rem;
+  padding-inline: 0.5rem;
+}
+.dash-todo-empty-text { overflow-wrap: anywhere; }
+/* S184: the todo head joins the ONE head-strip geometry (align-items: center,
+   the shared 0.75rem gap — the S179-era baseline + 1rem duplicate retires; the
+   link's 4px block padding + section-hover underline rules below retire with
+   the .dash-sec-link grammar). */
+.dash-todo-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.dash-todo-head h2 { margin: 0; }
+/* S179 (advisor block 8) → S182 (owner: "the boxes need aligment and same size,
+   make them same height (not variable height)"): every quadrant card renders at
+   ONE fixed height — the grid stretches (align-items: start retired with the
+   variable-height era), the card's block-size is pinned to the 3-item window, and
+   the list inside owns the overflow (scroll, below). Empty cards sit at the same
+   height as full ones; a tall header (long custom name/subtitle) yields LIST
+   window, never card height — the four boxes stay row-aligned no matter what. */
+.dash-todo-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; align-items: stretch; }
+.dash-todo-quadrant {
+  inline-size: 100%; min-inline-size: 0; min-block-size: 0;
+  /* S182 (owner: "the minimum height must be equivalent of 3 items"): the FIXED
+     HEIGHT = paddings (0.85rem × 2) + the head's min (3.1rem — the two-line
+     title/subtitle stack) + the flex gap (0.65rem) + the 3-row list window
+     (3 × --dash-todo-row + the 2 inter-row gaps). --dash-todo-row is one task row
+     at rest: the 2.5rem check lane + the row's own chrome (0.18rem padding + 2px
+     borders). The phone carousel (≤720px below) keeps its own taller window —
+     this rule is the desktop/tablet contract. */
+  --dash-todo-row: 2.81rem;
+  block-size: calc(0.85rem * 2 + 3.1rem + 0.65rem + (3 * var(--dash-todo-row)) + (2 * 0.24rem));
+  /* S95 r2 (owner items 2+5+8): plain WHITE surface + the one uniform neutral
+     hairline + the big panel radius (--radius-lg 24px — the reference's radius
+     signature). Color left the panel fill entirely; it lives on the count badge
+     + title ink only. */
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 0.85rem; display: flex;
+  flex-direction: column; gap: 0.65rem; position: relative;
+  transition: border-color 0.12s ease, opacity 0.12s ease;
+}
+/* 2026-09 user request: quadrant boxes are MINIMAL/neutral — the per-quadrant accent
+   vars (.q-success/.q-info/.q-error/.q-warning → --dash-q-accent) are removed so all
+   four boxes share one look; only a user-PICKED accent (inline --dash-q-accent from the
+   swatch picker) can tint the pin markers again. Progress state lives on the task rows. */
+.dash-todo-quadrant.dragging { opacity: 0.45; }
+.dash-todo-quadrant.drag-over,
+.dash-todo-quadrant.task-drop-target { border-color: var(--accent); outline: 2px dashed var(--accent); outline-offset: 2px; }
+.dash-todo-task[draggable='true'] { cursor: grab; }
+.dash-todo-task[draggable='true']:active { cursor: grabbing; }
+.dash-todo-task.dragging { opacity: 0.45; }
+.dash-todo-task.move-pending { opacity: 0.65; }
+.dash-todo-task.move-error { border: 1px solid var(--err); border-radius: var(--radius-sm); padding-inline: 0.25rem; }
+.dash-todo-move-error { grid-column: 1 / -1; color: var(--err); font-size: var(--fs-xs); }
+.dash-todo-qhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; min-block-size: 3.1rem; }
+/* S179's empty-collapse head easing retired with .is-quadrant-empty (S182): every
+   head keeps the two-line min — the empty card is a full-height box, not a strip. */
+.dash-todo-qtitle { display: flex; align-items: center; gap: 0.25rem; min-inline-size: 0; position: relative; }
+.dash-todo-qtitle strong { overflow-wrap: anywhere; line-height: 1.3; }
+/* Quadrant subheading (2026-09 user request — editable via the pen popover): stacks
+   under the title; icon + pen stay locked to the first (title) line. */
+.dash-todo-qcol { display: grid; gap: 0.1rem; min-inline-size: 0; }
+.dash-todo-qsub { font-size: var(--fs-xs); color: var(--muted); line-height: 1.3; overflow-wrap: anywhere; }
+/* Pen button (2026-09-02): appears on hover over the quadrant NAME, opens the same
+   customize popover (rename + symbol + accent) as the icon button. */
+.dash-todo-pen { display: inline-grid; place-items: center; opacity: 0; min-inline-size: 1.5rem; min-block-size: 1.5rem; padding: 0; border: 0; background: transparent; color: var(--muted); transition: opacity 0.12s ease, background-color 0.12s ease, color 0.12s ease; }
+.dash-todo-qtitle:hover .dash-todo-pen, .dash-todo-pen:focus-visible { opacity: 1; }
+.dash-todo-pen:hover { color: var(--text); background: var(--bg-soft); border-radius: var(--radius-sm); }
+.dash-todo-pen .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+@media (pointer: coarse) { .dash-todo-pen { opacity: 0.75; } }
+/* Emoji quadrant symbols (icon_id can be an emoji picked on the board page) render as
+   text at the icon size, matching the SVG glyphs. */
+.quadrant-emoji { font-size: 1.05rem; line-height: 1; }
+/* F13 (session 9): the dashboard style-picker trigger was 32×32 — padded hit zone
+   reaches ~43px without touching the quadrant header layout. */
+.dash-todo-style { display: inline-grid; place-items: center; min-inline-size: 2rem; min-block-size: 2rem; padding: 0; border: 0; background: transparent; color: var(--dash-q-accent, var(--muted)); position: relative; }
+.dash-todo-style::after { content: ""; position: absolute; inset: -0.35rem; }
+.dash-todo-style:hover, .dash-todo-style:focus-visible { background: var(--bg-soft); }
+.dash-todo-style .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+/* S179 (advisor block 7): the EMPTY icon slot collapses to ZERO width — when a
+   quadrant renders no glyph (∅ picked), the title's inline-start edge reaches
+   the checkbox column's edge instead of starting two rem in (the ghost ∅ hover
+   affordance stays for discoverability; the pen + the title row remain the
+   customize paths). */
+.dash-todo-style:empty { min-inline-size: 0; }
+.dash-todo-style-pop { position: absolute; z-index: 25; inset-block-start: 2.5rem; inset-inline-start: 0; inline-size: min(18rem, calc(100vw - 2rem)); padding: 0.75rem; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: 0 6px 20px rgb(30 20 10 / 0.08), 0 2px 6px rgb(30 20 10 / 0.05); }
+.dash-todo-style-pop[hidden] { display: none; }
+/* 2026-09-02 user request: the picker offers EMOJIS (like the board page quadrants), not
+   the limited SVG glyph set — a dense, scrollable grid of emoji buttons.
+   2026-09-05: the 8 accent-swatch row was REMOVED (user — "color is for icons, now we
+   use emojis"); a previously saved accent still tints via --dash-q-accent. */
+.dash-style-icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-block-size: 9.6rem; overflow-y: auto; overscroll-behavior: contain; }
+/* F5 (session 9): color on the BASE rule — the global button{} paints every button's
+   text --btn-text (white); on the light card/soft bg the emoji glyphs were 1.1:1
+   (invisible). var(--text) covers .is-selected AND the hover/focus states that share
+   the same bg-soft fill; color-emoji fonts ignore it, text-glyph emoji become visible. */
+.dash-style-emoji { display: grid; place-items: center; aspect-ratio: 1 / 1; min-inline-size: 0; padding: 0.15rem; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font-size: 1.05rem; line-height: 1; font-family: inherit; }
+.dash-style-emoji:hover, .dash-style-emoji:focus-visible, .dash-style-emoji.is-selected { border-color: var(--dash-q-accent, var(--accent)); background: var(--bg-soft); }
+.dash-todo-rename-form { display: grid; gap: 0.5rem; align-items: center; flex: 1; min-inline-size: 0; }
+.dash-todo-rename-form label { display: grid; gap: 0.25rem; font-size: var(--fs-xs); color: var(--muted); }
+.dash-todo-rename-form input { min-inline-size: 0; width: 100%; padding-block: 0.3rem; }
+/* Phase 7 item 1 — the redesigned pop's bottom half: a نماد row (label + the single
+   emoji-preview button that opens the shared picker) with the ذخیره / لغو actions
+   pushed to the row's end (inline-end: left in RTL, right in LTR). */
+.dash-style-emoji-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.dash-style-lbl { font-size: var(--fs-xs); color: var(--muted); flex: none; }
+.dash-style-emoji-row .dash-style-icons { display: flex; grid-template-columns: none; max-block-size: none; overflow: visible; }
+/* S83 (owner request — the minimalist quadrant): the ∅ EMPTY button beside the emoji
+   picker. Dashed ring reads as "removal"; the armed state fills with the quadrant's
+   accent. Same 1.05rem cell as the emoji button so the row stays even. */
+.dash-style-emoji.dash-style-empty { border: 1px dashed var(--line-strong); color: var(--muted); font-size: 0.95rem; }
+.dash-style-emoji.dash-style-empty:hover, .dash-style-emoji.dash-style-empty:focus-visible { border-style: solid; border-color: var(--dash-q-accent, var(--accent)); background: var(--bg-soft); color: var(--text); }
+.dash-style-emoji.dash-style-empty.is-selected { border-style: solid; border-color: var(--dash-q-accent, var(--accent)); background: color-mix(in srgb, var(--dash-q-accent, var(--accent)) 12%, transparent); color: var(--dash-q-accent, var(--accent)); }
+
+/* --- S93 (owner round, item 6): the 16 PASTEL swatches (board + dashboard popovers) ---
+   Shared class names (.dash-style-swatches / .dash-style-swatch) — this sheet loads on
+   BOTH surfaces that render them (sadhana.html + dashboard.html). 'none' (∅) clears
+   back to the neutral quadrant. */
+.dash-style-swatches {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 5px;
+  padding-block-start: 2px;
+}
+.dash-style-swatch {
+  inline-size: 100%;
+  aspect-ratio: 1;
+  min-inline-size: 22px;
+  min-block-size: 22px;
+  padding: 0;
+  border-radius: 8px;
+  /* S102 (owner — "more pastel, more pale"): the chips PREVIEW the pale quadrant, not
+     the full ink — 50% over the card reads as a true pastel swatch in BOTH themes
+     (color-mix adapts to the dark card automatically); the border carries a touch more
+     hue than the old 35% so a pale chip stays delineated against the popover. */
+  border: 2px solid color-mix(in srgb, var(--sw, #999) 45%, transparent);
+  background: color-mix(in srgb, var(--sw, #999) 50%, var(--card));
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.dash-style-swatch:hover { transform: scale(1.12); }
+.dash-style-swatch.is-selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw, #999) 30%, transparent);
+  transform: scale(1.06);
+}
+.dash-style-swatch-none {
+  background: transparent;
+  border: 2px dashed var(--line-strong);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dash-style-swatch-none.is-selected { border-color: var(--text); color: var(--text); }
+
+/* S93 (item 6): the dashboard quadrant's picked pastel — ONCE a 12% wash on the
+   card + tinted border (S94 made it more visible).
+   S95 r2 (owner item 2 — the restraint rule): the wash was RETIRED — the panel fill
+   stayed plain white; the pastel lived ONLY on the small stuff (the header's title
+   ink and the count badge).
+   S102 (owner round — TWO fresh instructions): (1) "the colors are too saturated —
+   more pastel, more pale"; (2) "selecting a color doesn't change the quadrant color,
+   but it MUST." The wash came BACK at 7% + a 30% edge, every small-element mix
+   dropped (title 38%, count 50%, icon 74%).
+   S104 (owner round — the calibration): "too pale — like 95% pale, no visual
+   visibility, too low opacity." At 7% the box read as a plain white card. The wash
+   is RE-WEIGHTED to a VISIBLE pastel: 20% fill + 48% edge, title 48%, count 62%,
+   icon 85% — pastel, but unmistakably colored. claude-dark raises the mixes
+   (claude-dark-theme.css outranks the flat cap there — the S94 lesson). */
+.dash-todo-quadrant[style*='--dash-q-accent'] {
+  background: color-mix(in srgb, var(--dash-q-accent) 20%, var(--card));
+  border-color: color-mix(in srgb, var(--dash-q-accent) 48%, var(--line));
+}
+.dash-todo-quadrant[style*='--dash-q-accent'] .dash-todo-qtitle strong {
+  color: color-mix(in srgb, var(--dash-q-accent) 48%, var(--text));
+}
+.dash-todo-quadrant[style*='--dash-q-accent'] .dash-todo-counter {
+  --badge-fg: color-mix(in srgb, var(--dash-q-accent) 62%, var(--text));
+}
+/* S104: the style trigger (the quadrant's glyph button) rides at 85% toward the text
+   ink — the loudest cue on the card, a hair shy of the full token. */
+.dash-todo-quadrant[style*='--dash-q-accent'] .dash-todo-style {
+  color: color-mix(in srgb, var(--dash-q-accent) 85%, var(--text));
+}
+/* S83: the quadrant trigger with the EMPTY symbol — the glyph vanishes but the button
+   keeps its hit area (it's still the customize entry); a faint ∅ ghost appears on
+   hover so an empty quadrant stays discoverable/editable. ::after doesn't break
+   :empty (pseudo-elements aren't children). */
+.dash-todo-style:empty { color: transparent; }
+.dash-todo-style:empty::before { content: '∅'; position: static; inset: auto; opacity: 0; transition: opacity 0.15s ease; font-size: 0.9rem; }
+.dash-todo-style:empty:hover::before, .dash-todo-style:empty:focus-visible::before { opacity: 0.55; }
+/* the sadhana board's server-rendered trigger — same ghost treatment */
+.sadhana-qicon:empty { color: transparent; }
+.sadhana-qicon:empty::before { content: '∅'; opacity: 0; transition: opacity 0.15s ease; font-size: 1.1rem; }
+.sadhana-qicon:empty:hover::before, .sadhana-qicon:empty:focus-visible::before { opacity: 0.55; }
+/* the icon-grid variant of the EMPTY button (sadhana's 12-glyph grid) */
+.dash-style-icon.dash-style-empty { border: 1px dashed var(--line-strong); color: var(--muted); font-size: 0.9rem; }
+.dash-style-icon.dash-style-empty:hover { border-style: solid; border-color: var(--accent); }
+.dash-style-icon.dash-style-empty.is-selected { border-style: solid; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.dash-style-actions { margin-inline-start: auto; display: flex; gap: 0.35rem; flex: none; }
+.dash-style-cancel, .dash-style-save-btn {
+  min-inline-size: 0; padding: 0.32rem 0.9rem; border-radius: var(--radius-sm);
+  font: inherit; font-size: var(--fs-sm); cursor: pointer; border: 1px solid var(--line);
+  background: transparent; color: var(--text); transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.dash-style-cancel:hover { background: var(--bg-soft); border-color: var(--line-strong); }
+.dash-style-save-btn { background: var(--cta, var(--accent)); border-color: var(--cta, var(--accent)); color: var(--btn-text); }
+.dash-style-save-btn:hover { background: var(--cta-hover, var(--accent-hover)); border-color: var(--cta-hover, var(--accent-hover)); }
+.dash-style-save-btn:disabled { opacity: 0.55; cursor: wait; }
+.dash-todo-qactions { gap: 0.35rem; flex: none; }
+/* 2026-09-02 user request: «تعداد فعال» — shorter label, smaller type, optically aligned
+   with the first line of the quadrant title (e.g. امروز) instead of the box top edge.
+   S94 (owner item 9 — "larger digit font, weaker background"): the counter IS the
+   .board-count pill (both classes on one node); this rule used to force it back down
+   to 0.68rem muted type, defeating the shared pill typography AND its --badge-fg ink
+   (this sheet loads after dashboard.css). It now only aligns the pill inside the
+   actions row — size/weight/color come from .board-count above. */
+.dash-todo-counter { line-height: 1.35; padding-block-start: 0.3rem; overflow-wrap: anywhere; text-align: end; flex: none; }
+/* (k) 2026-09-06: the old hover-reveal header + button and its form CSS were removed
+   with the popover add button — replaced by .dash-todo-fab + .dash-quickadd below. */
+/* (l) 2026-09-06: grid-auto-rows: max-content — the row-squash fix. With auto rows in
+   a definite-height scroll container, Chromium resolved the implicit tracks to EQUAL
+   FRACTIONS of the list height: 8 tasks in a ~168px window rendered 17px-tall rows
+   with the 44px checkbox row clipped inside each (Ali: "tasks get compacted into each
+   other and unable to read" — invisible at ≤4 tasks, extreme at 7–8). max-content pins
+   every row to its natural height so overflow:auto actually scrolls.
+   S182: the DEFINITE height comes from the quadrant card's fixed block-size (the
+   S106 "4 visible + reveal" era's variable card height retired) — flex: 1 fills exactly
+   the 3-row window, min-block-size: 0 lets it shrink when the header grows or the
+   quick-add form reveals, and the scroll owns everything past the fold.
+   S183 (owner: "make each task item more compact so 3 items fit fully inside the
+   fixed card height without scrolling"): the listwrap anchors the FADE EDGES — the
+   wrapper takes the flex slot, the list fills it and keeps the scroll. The native
+   scrollbar HIDES (the fade edge + the scroll itself are the affordance now); wheel,
+   touch and keyboard scrolling all stay (hiding the scrollbar never disabled them).
+   app.js's syncDashTodoFades toggles .can-scroll/.fade-top/.fade-bottom from the
+   list's geometry — the fade is OFF when the list doesn't overflow. */
+.dash-todo-listwrap {
+  position: relative;   /* the fade mask + the progressive-blur strip anchor here */
+  flex: 1;
+  min-block-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-todo-list { list-style: none; margin: 0; padding: 0; min-block-size: 0; flex: 1; overflow-y: auto; overflow-x: hidden; display: grid; align-content: start; grid-auto-rows: max-content; gap: 0.375rem;
+  /* S183 (owner: "hide the native scrollbar once the fade is in place") — the thin
+     custom scrollbar retires; the fade edge speaks instead. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+.dash-todo-list::-webkit-scrollbar { display: none; }
+/* S187 (QA-found, live-confirmed): the generic .card ul indent (layout.css —
+   padding-inline-start 1.25rem for CONTENT lists) OUTRANKS the base rule's
+   `padding: 0` ((0,1,1) beats (0,1,0)), so ever since S182 put the quadrant
+   board inside the .dash-todo-panel.card, every list — task rows AND the empty
+   strip — sat 20px inset on its START edge only (one-sided; the header and the
+   quick-add form align flush). The old start-aligned strip masked it; the S187
+   centered status line exposed it (10px off the visual card center). The todo
+   lists are LAYOUT lists, not content lists — zero padding, both edges
+   symmetric. */
+.card .dash-todo-list { padding: 0; }
+/* S183 (owner: "a fade-out edge at the bottom of each task list…") — mask-image
+   gradients (~28px, inside the owner's 24–32px band), applied to the WRAPPER so
+   the scrolled content fades as it approaches the edge. Bottom fade only while
+   content waits below; the matching top fade appears once the list is scrolled
+   (JS toggles the classes; both may ride together mid-scroll). */
+.dash-todo-listwrap { --dash-fade: 1.5rem; } /* 24px — the owner's 24–32px band, sized to the compact rows */
+.dash-todo-listwrap.fade-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--dash-fade)), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--dash-fade)), transparent 100%);
+}
+.dash-todo-listwrap.fade-top {
+  -webkit-mask-image: linear-gradient(to top, #000 calc(100% - var(--dash-fade)), transparent 100%);
+  mask-image: linear-gradient(to top, #000 calc(100% - var(--dash-fade)), transparent 100%);
+}
+.dash-todo-listwrap.fade-top.fade-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--dash-fade), #000 calc(100% - var(--dash-fade)), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--dash-fade), #000 calc(100% - var(--dash-fade)), transparent 100%);
+}
+/* The optional progressive-blur edge (the owner's spec): a gradient-masked blur
+   strip pinned to the wrapper's foot — transparent at its top, strongest at the
+   very edge — visible ONLY while the list can scroll (opacity keyed to .can-scroll,
+   the same state as the bottom fade). pointer-events:none — the half-faded rows
+   stay clickable. @supports + prefers-reduced-transparency guard the effect. */
+.dash-todo-listwrap::after {
+  content: '';
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  block-size: var(--dash-fade);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  -webkit-backdrop-filter: blur(2.5px);
+  backdrop-filter: blur(2.5px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 100%);
+  mask-image: linear-gradient(to bottom, transparent, #000 100%);
+}
+.dash-todo-listwrap.can-scroll::after { opacity: 1; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dash-todo-listwrap::after { display: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .dash-todo-listwrap::after { display: none; }
+}
+/* (v) 2026-09-09: the to-do page's progress palette, ported verbatim from
+   sadhana.html's .sadhana-wrap tokens so both surfaces share ONE visual system
+   (grey = untouched, pastel orange = in progress, violet = on hold).
+   (x) 2026-09-09: on-hold yellow #E9C46A → violet #A78BFA — Ali: the yellow
+   and the in-progress orange "are not different enough"; a cool violet is a
+   different hue AND temperature, so در حال انجام / معلق never read as one. */
+:root {
+  --st-none: #9CA3AF; --st-none-bg: rgba(156, 163, 175, .10); --st-none-bd: rgba(156, 163, 175, .38);
+  --st-inprog: #F59A4E; --st-inprog-bg: rgba(245, 154, 78, .14); --st-inprog-bd: rgba(245, 154, 78, .55);
+  --st-hold: #A78BFA; --st-hold-bg: rgba(167, 139, 250, .14); --st-hold-bd: rgba(167, 139, 250, .5);
+}
+.dash-todo-task {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.15rem;
+  align-items: start; min-inline-size: 0; max-block-size: 100vh; overflow: hidden;
+  /* S95 r2 (owner items 2+3): every task row sits on ONE neutral off-white
+     (--statcard-bg) with the uniform neutral hairline — no shadow, no state wash
+     (the row never "floats"; state speaks through the 3px lead crescent below). */
+  background: var(--statcard-bg);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  /* S183 (owner: "reduce the vertical padding (~6–8px top/bottom), item gap
+     (~6px), checkbox (~16–18px), text size/line-height slightly if still
+     needed — 3 items must fit fully inside the fixed card height"): the row's
+     block padding trims to ~1.5px + the gap between the check lane and the
+     progress track to 0.15rem (the 6px item gap lives on the LIST). Text size
+     and contrast are UNTOUCHED (the owner's constraint) — the fit comes from
+     padding + the lane + the checkbox. */
+  padding: 0.05rem 0.4rem 0.04rem;
+  position: relative; /* Phase 7 item 3: the ⋯ menu anchors to the row's top-end corner */
+  transition: opacity 0.24s ease, max-block-size 0.3s ease, background-color 0.18s ease, border-color 0.18s ease, margin-block 0.3s ease;
+}
+/* S69's [hidden]-row guard RETIRED (S182): rows 5–8 no longer ship hidden — the
+   fixed 3-row window + the list's overflow scroll own the reveal, so nothing sets
+   the hidden attribute on a task row anymore (the UA sheet needs no help). */
+/* 2026-09-09 (v) user request — SUPERSEDES (m)'s "minimal, no borders" rows: Ali saw
+   the to-do page's state boards (the «معلق» state container — violet since (x) —, the grey
+   not-started container) and wants the SAME on the dashboard's four quadrant boxes:
+   every task row is a BOARD (border + state tint + a 3px start crescent for the
+   active/hold states — sadhana.html's .task-card recipe). The st-* class names are
+   live again; only momentary FEEDBACK states still override (.is-completing flash,
+   .move-error drag failure).
+   S95 r2 (owner item 2 — the restraint rule): the state WASHES left the row fills —
+   every row sits on the same neutral off-white; the state speaks ONLY through its
+   small 3px inline-start crescent (the reference keeps color for accents, never
+   whole surfaces). untouched keeps the neutral base row as-is. */
+.dash-todo-task.st-inprog { border-inline-start: 3px solid var(--st-inprog); }
+.dash-todo-task.st-hold { border-inline-start: 3px solid var(--st-hold); }
+/* the drag-failure red ring must win over the state tints (same specificity — later
+   in source order); the old .move-error rule near the drag rules lost the race once
+   rows grew real borders. */
+.dash-todo-task.move-error { border-color: var(--err); }
+.dash-todo-task.is-completing { background: var(--task-complete-bg); opacity: 1; }
+.dash-todo-task.is-completing .dash-todo-check span { text-decoration: line-through; }
+.dash-todo-task.is-removing { max-block-size: 0; opacity: 0; margin-block: 0; pointer-events: none; }
+/* (m) checkbox: flat and bare — no shadows (was box-shadow var(--shadow-soft) + a
+   second 0 1px 3px rule). The native checkbox + accent-color is all the row shows.
+   Phase 7 item 4: COMPACT rows (user: "make the content and font-size smaller so they
+   take less space — less space = more tasks visible") — smaller title type, a slimmer
+   row, a smaller checkbox, and a reserved end-corner gutter so long titles never run
+   under the absolutely-positioned ⋯ button (item 3).
+   UI/UX R6 (2026-09-12): the wrapper's min-block-size is lifted 2.3rem → 2.75rem (~44px)
+   per WCAG 2.5.5 (Target Size — minimum 24×24, recommended 44×44). The visible checkbox
+   stays at 1.05rem; the wrapper's padding grows the hit zone around the visual so the
+   tap target clears the floor without the icon visibly changing size.
+   S82 (owner: "one miss-click on the row completes the task"): the whole row is NO
+   LONGER the completion control — the <label> became a div, so only the checkbox (with
+   its ≥24px ::before hit island) toggles completion. The pointer cursor moves onto
+   the checkbox so the affordance tells the truth; the title stays selectable text.
+   S179 (advisor block 7 — the to-do rows): the row's text now centers on its
+   checkbox (align-items: center — the title sat high beside a top-pinned box), the
+   row height eases to ~40px (2.5rem — the advisor's "moderately reduced"; coarse
+   pointers keep the 44px touch floor), and the checkbox itself ENLARGES to 1.25rem
+   with a -0.6rem hit island (≥24×24 guaranteed at every pointer type, ~39px total
+   — inside the row, never stealing the neighbor's clicks). */
+.dash-todo-check { grid-column: 1; display: flex; align-items: center; gap: var(--task-row-gap); min-inline-size: 0; min-block-size: 1.5rem; padding-block: 0.1rem; padding-inline-end: 2.5rem; cursor: default; } /* S183 (owner: 3 rows must fit): lane 2.5rem → 1.5rem — the tap guarantee lives on the ::before island, not the lane */
+.dash-todo-check input {
+  flex: none;
+  inline-size: 1.05rem; block-size: 1.05rem; /* S183 (owner: "checkbox ~16–18px") — the -0.6rem island still wraps a ~36px tap zone */
+  margin-block: 0; margin-inline: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  position: relative; /* the ::before hit island anchors to the input */
+}
+/* S179: 24×24-minimum hit island (WCAG 2.5.5 / 2.2 floor) — ±9.6px around the
+   20px visual box, ~39px total: comfortably over the floor, still inside the row. */
+.dash-todo-check input::before { content: ''; position: absolute; inset: -0.6rem; }
+.dash-todo-check span { padding-block: 0.05rem; overflow-wrap: anywhere; line-height: 1.25; color: var(--text); font-size: var(--fs-sm); } /* S183: line-height 1.3 → 1.25 ("slightly, if still needed") — size + contrast untouched */
+/* S179: the touch floor stays a FIRST-CLASS contract on coarse pointers — the
+   rows and the checkbox hit island both step back up to the 44px register. */
+@media (pointer: coarse) {
+  .dash-todo-check { min-block-size: 2.75rem; }
+  .dash-todo-check input { inline-size: 1.25rem; block-size: 1.25rem; } /* S183: the visual box too — the touch register */
+  .dash-todo-check input::before { inset: -0.725rem; }
+}
+/* (v) 2026-09-09: the old .dash-todo-progress-dot hover control (the single status
+   dot from the pre-Phase-5 dashboard) is REMOVED — dead CSS since item 15 replaced
+   it with the 3-dot .prog-track further down; nothing in any HTML/JS emits that
+   markup anymore. */
+/* Phase 7 item 3 — the ⋯ settings button: TOP inline-end corner of the task box
+   (top-LEFT in RTL, top-RIGHT in LTR — inset-inline-end flips with the direction).
+   It used to be grid-column 3 in the flow, which auto-placed it on a row BELOW the
+   progress track — a whole invisible 2.25rem of dead white space after every
+   prog-track (user: "no wasted white space below the task progress switch").
+   Absolute + out-of-flow: the track is the row's last content, and the button hugs
+   the corner at a standard padding (0.25rem from the edges). */
+.dash-todo-menu { position: absolute; inset-block-start: 0.1rem; inset-inline-end: 0.25rem; grid-column: auto; opacity: 0; transition: opacity 0.12s ease; }
+.dash-todo-task:hover .dash-todo-menu, .dash-todo-task:focus-within .dash-todo-menu, .dash-todo-menu[open] { opacity: 1; }
+/* (n) 2026-09-06: the OPEN menu also lifts the <details> itself into the high z-index
+   layer — the fade transition (opacity < 1) transiently creates a stacking context at
+   z-index:auto, which would momentarily paint the pop under the FAB (z-index 20) and
+   any other raised layer; pinning z-index while open removes the whole edge case. */
+.dash-todo-menu[open] { z-index: 92; }
+.dash-todo-menu summary { list-style: none; display: inline-grid; place-items: center; min-inline-size: 2.25rem; min-block-size: 2.25rem; padding: 0; border-radius: 50%; color: var(--muted); cursor: pointer; }
+.dash-todo-menu summary::-webkit-details-marker { display: none; }
+.dash-todo-menu summary:hover { background: var(--bg-soft); color: var(--text); }
+.dash-todo-menu summary .icon { inline-size: 1rem; block-size: 1rem; }
+/* (n) 2026-09-06 fix — "the ⋯ menu opens UNDERNEATH other things, not visible".
+   The pop used to be position: absolute INSIDE the task row, but the row carries
+   overflow: hidden (the .is-removing collapse animation) and the quadrant list
+   scrolls (overflow: auto) — both CLIPPED the downward-opening pop into invisibility
+   (only a shadow sliver showed; every batch-(m) e2e click was a DOM .click() that
+   bypassed hit-testing, so the invisibility went undetected — the pinned lesson).
+   Now the pop is position: FIXED — same clipping-escape as the note panel
+   (.dash-note-pop) and the board's style popover — and app.js places it at the
+   ⋯ button's viewport coordinates on toggle-open (end-aligned like the old
+   inset-inline-end: 0, viewport-clamped, flips above the button when the space
+   below runs out). z-index 92: above the note bubble (90), below the note
+   history panel (95) that opens from the menu's «یادداشت‌ها» item. */
+.dash-todo-menu-pop { position: fixed; z-index: 92; min-inline-size: 10rem; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: 0 10px 28px rgb(0 0 0 / 0.2); display: grid; gap: 0.15rem; padding: 0.3rem; }
+/* S69 (found while auditing 390px RTL): the pop's author display:grid OVERRODE the UA's
+   closed-details hiding (author rules beat UA rules regardless of specificity — the same
+   class of bug as the [hidden] task rows). Every task's menu pop rendered permanently:
+   position:fixed at its auto/static offset, 160px wide at left:-80 in RTL — inflating the
+   390px document scrollWidth by 26px (a phantom h-scroll). Restoring the closed state
+   with (0,2,1) specificity; opening the details shows the pop as designed. */
+details.dash-todo-menu:not([open]) .dash-todo-menu-pop { display: none; }
+.dash-todo-menu-item { display: flex; align-items: center; gap: 0.45rem; width: 100%; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); padding: 0.45rem 0.55rem; text-align: start; font: inherit; text-decoration: none; }
+.dash-todo-menu-item:hover { background: var(--bg-soft); text-decoration: none; }
+/* (m) the destructive item reads red so a task delete never looks like an edit. */
+.dash-todo-menu-item.danger { color: var(--err); }
+.dash-todo-menu-item.danger:hover { background: var(--danger-soft); }
+.dash-todo-menu-item .icon { inline-size: 0.95rem; block-size: 0.95rem; flex: none; }
+.dash-todo-edit { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: end; min-inline-size: 0; }
+.dash-todo-edit input { min-inline-size: 0; flex: 1; padding-block: 0.35rem; }
+.dash-todo-edit button { min-inline-size: 2.25rem; min-block-size: 2.25rem; padding: 0.25rem; }
+.dash-todo-edit-error { flex: 1 1 100%; color: var(--err); font-size: var(--fs-xs); }
+.dash-todo-edit-error[hidden] { display: none; }
+/* F4 (session 9): the see-more link is a TEXT link, not a CTA — the global button{}
+   rule painted it solid --cta (muted-on-teal: 2.0 light / 1.2 dark). Transparent fill
+   in base, hover AND active (button:hover/:active would otherwise re-paint it teal). */
+.dash-todo-more { justify-self: start; color: var(--muted); font-size: var(--fs-sm); padding-inline: 0.35rem; background: transparent; }
+.dash-todo-more:hover { color: var(--text); background: transparent; }
+.dash-todo-more:active { background: transparent; }
+/* S106's FROST PILL (the "+N more" blurred reveal button) RETIRED (S182): the fixed
+   3-row window + the list's own scroll replaced the toggle — the rows it un-hid are
+   permanently in the DOM and reached by scrolling. The pill's CSS leaves with the
+   markup + the app.js handler (one affordance per job; scroll is the affordance).
+   S182: the over-cap board link rides INSIDE the scrollable list as its LAST row
+   (.dash-todo-more-row) — reached by the same scroll that walks rows 4–8, at the
+   exact spot where the render cap is met (it used to sit below the list, stealing
+   window height). */
+.dash-todo-more-row { display: flex; justify-content: flex-start; padding-block: 0.12rem; }
+/* S69: the over-cap affordance — a LINK to the board (rows beyond the widget's render
+   cap live there). Same quiet language as the see-more button, plus the arrow cue +
+   hover lift so it reads as navigation, not a toggle. */
+.dash-todo-more-link { text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; border: 1px dashed var(--line); border-radius: 999px; padding-inline: 0.55rem; transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
+/* S100 (the goto-chip language): the →/← text-arrow ::after PAIR retired — one
+   ↗ SVG cue instead, direction-neutral by construction (the old RTL pair also
+   leaned the wrong way under hover's physical translate). The icon rides at
+   0.85em and lifts ↗-diagonally on hover. */
+.dash-todo-more-link .icon { inline-size: 0.85em; block-size: 0.85em; transition: translate 0.15s ease; }
+.dash-todo-more-link:hover { color: var(--brand); border-color: var(--brand); transform: translateY(-1px); }
+.dash-todo-more-link:hover .icon { translate: 1px -1px; }
+.dash-todo-edit[hidden], .dash-todo-rename-form[hidden] { display: none; }
+
+/* ── (k) Per-quadrant quick-add FAB ─ 2026-09-06 user request ─────────────────────
+   The add-task affordance moved out of the customize popover into a circular + button
+   pinned to the quadrant's bottom corner. inset-inline-end is a LOGICAL property: it
+   resolves to the LEFT edge in RTL (fa) and the RIGHT edge in LTR (en) — exactly the
+   user's spec — with zero per-direction rules.
+   (m) 2026-09-06 restyle — "make the circles smaller, remove the drop shadow, remove
+   the green fill — border only and +, it's too much visual weight": 44px→36px,
+   transparent ground, a thin neutral ring, no shadow anywhere. Hover lights the ring
+   (accent) instead of lifting. Click ① reveals the input, click ② submits (app.js). */
+.dash-todo-fab {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.75rem;
+  min-block-size: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+}
+.dash-todo-fab:hover { border-color: var(--accent); color: var(--text); background: var(--bg-soft); }
+.dash-todo-fab:active { transform: scale(0.94); }
+.dash-todo-fab:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 1px; }
+.dash-todo-fab .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+/* S179 (advisor block 7): the trigger rides IN the header's actions row now — the
+   corner pin (absolute, bottom-inline-end) and its clearance paddings retire. */
+@media (pointer: coarse) { .dash-todo-fab { min-inline-size: 2.5rem; min-block-size: 2.5rem; } }
+/* (o) 2026-09-07 user request — "when the user writes in the input, the + button
+   must fill (green) and signal that it's ready to add a task". The moment the
+   quick-add input carries text, app.js toggles .is-ready and the FAB becomes the
+   app's filled capture circle (.qa-btn's exact CTA treatment — teal ground, white
+   glyph) with a gentle breathing pulse so the eye lands on it; an emptied input
+   returns the quiet outline. Pulse is disabled under reduced motion. */
+.dash-todo-fab.is-ready {
+  background: var(--cta, var(--accent));
+  border-color: var(--cta, var(--accent));
+  color: var(--btn-text);
+  animation: dash-fab-ready 1.6s ease-in-out infinite;
+}
+.dash-todo-fab.is-ready:hover {
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text);
+}
+@keyframes dash-fab-ready {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.09); }
+}
+/* The revealed quick-add row: just the input — Enter OR a second click on the + FAB
+   adds (app.js), Esc/empty-blur hides. [hidden] guard is REQUIRED (repo lesson, batch
+   j): author display beats the UA hidden sheet without it. padding-inline-end keeps
+   the input clear of the FAB pinned in the corner below it. */
+.dash-quickadd {
+  display: grid;
+  gap: 0.3rem;
+  animation: dash-qa-in 0.16s ease-out;
+}
+.dash-quickadd[hidden] { display: none; }
+@keyframes dash-qa-in {
+  from { opacity: 0; transform: translateY(-0.3rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dash-quickadd input[name='title'] {
+  inline-size: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.dash-quickadd input[name='title']:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ── (k) Task note chip + hover bubble ─ 2026-09-06 user request ──────────────────
+   A task carrying notes (sadhana_updates + the legacy single note) gets a clipboard
+   chip beside its title (grid column 2 of .dash-todo-task). The BUBBLE is a
+   fixed-position singleton built/positioned by app.js: the task list scrolls, so an
+   absolutely-positioned child would clip at the overflow edge — fixed escapes it and
+   clamps inside the viewport. */
+.dash-note-chip {
+  grid-column: 2;
+  grid-row: 1; /* Phase 7 item 3: keep the chip on the TITLE row (auto-placement parked it below the prog-track) */
+  align-self: center;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2.1rem;
+  block-size: 2.1rem;
+  margin-block-start: 0.1rem;
+  /* Phase 7 item 3: keep clear of the ⋯ button now pinned to the row's top-end corner */
+  margin-inline-end: 2.35rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.dash-note-chip:hover,
+.dash-note-chip:focus-visible,
+.dash-note-chip.is-open {
+  background: var(--bg-soft);
+  color: var(--text);
+  outline: none;
+}
+.dash-note-chip .icon { inline-size: 1.05rem; block-size: 1.05rem; }
+.dash-note-bubble {
+  position: fixed;
+  z-index: 90;
+  max-inline-size: min(18rem, calc(100vw - 1.5rem));
+  max-block-size: 11rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.55rem 0.7rem;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.dash-note-bubble .dash-note-bubble-head {
+  display: block;
+  margin-block-end: 0.25rem;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ── (m) Note history panel ─ 2026-09-06 user request ────────────────────────────
+   Clicking the note chip (or ⋯ → «یادداشت‌ها») opens the FULL note history as a
+   fixed-position panel — same clipping-escape reasoning as the hover bubble (the
+   task list scrolls), but INTERACTIVE: add / edit / delete notes without leaving
+   the dashboard. Fixed singleton built by app.js; content is fetched on demand
+   (GET /api/sadhana/tasks/:id/notes) so the dashboard HTML stays light. The note
+   rows reuse the board's .task-note-* classes (global) for a consistent look. */
+.dash-note-pop {
+  position: fixed;
+  z-index: 95;
+  inline-size: min(20rem, calc(100vw - 1.5rem));
+  max-block-size: min(26rem, 70vh);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
+  font-size: var(--fs-sm);
+}
+.dash-note-pop-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.dash-note-pop-head strong { font-size: var(--fs-sm); }
+.dash-note-pop-close { display: inline-grid; place-items: center; min-inline-size: 1.75rem; min-block-size: 1.75rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.dash-note-pop-close:hover { background: var(--bg-soft); color: var(--text); }
+.dash-note-pop-close .icon { inline-size: 0.9rem; block-size: 0.9rem; }
+/* The history list scrolls INSIDE the panel (the panel itself never scrolls — its
+   scroll listener would read as page scroll and close it, app.js filters anyway). */
+.dash-note-pop-list { flex: 1; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 0; list-style: none; display: grid; gap: 0.4rem; align-content: start; }
+.dash-note-pop .task-note-item { display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.3rem; border-radius: var(--radius-sm); }
+.dash-note-pop .task-note-item:hover { background: var(--bg-soft); }
+.dash-note-pop .task-note-copy { flex: 1; min-inline-size: 0; display: grid; gap: 0.1rem; }
+.dash-note-pop .task-note-copy time { color: var(--muted); font-size: var(--fs-xs); }
+.dash-note-pop .task-note-copy .task-note-text { overflow-wrap: anywhere; white-space: pre-wrap; text-align: start; }
+.dash-note-pop .task-note-acts { flex: none; display: flex; gap: 0.1rem; }
+.dash-note-pop .task-note-act { display: inline-grid; place-items: center; min-inline-size: 1.6rem; min-block-size: 1.6rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.dash-note-pop .task-note-act:hover { background: var(--bg); color: var(--text); }
+.dash-note-pop .task-note-act.danger:hover { color: var(--err); background: var(--danger-soft); }
+.dash-note-pop .task-note-act .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+/* Inline note edit (✎ swaps the text for a textarea + ✓/✕ row). */
+.dash-note-pop .task-note-editbox { flex: 1; min-inline-size: 0; display: grid; gap: 0.25rem; }
+.dash-note-pop .task-note-editbox textarea { min-inline-size: 0; width: 100%; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.3rem; font: inherit; font-size: var(--fs-xs); }
+.dash-note-pop .task-note-editbox textarea:focus { border-color: var(--accent); outline: none; }
+.dash-note-pop .task-note-editacts { display: flex; gap: 0.15rem; justify-content: flex-end; }
+.dash-note-pop .task-note-editacts button { display: inline-grid; place-items: center; min-inline-size: 1.6rem; min-block-size: 1.6rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.dash-note-pop .task-note-editacts button:hover { background: var(--bg-soft); color: var(--text); }
+.dash-note-pop .task-note-editacts .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+/* The add-note form pins to the panel bottom (the board's .task-note-add-form grid). */
+.dash-note-pop .task-note-add-form { margin: 0; flex: none; }
+/* Quadrant-name popovers: Save is the primary action — solid CTA fill so it can't
+   hide among the neutral inputs (user checklist 2026-08-30: "make save button more
+   visible in quadrant naming modal"). Applies to the dashboard rename popover and
+   the Sadhana board's qe-pop. */
+.dash-todo-rename-form button[type='submit'],
+.qe-save {
+  background: var(--cta, var(--accent));
+  color: var(--btn-text);
+  border: 1px solid transparent;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+}
+.dash-todo-rename-form button[type='submit']:hover,
+.qe-save:hover { background: var(--cta-hover, var(--accent-hover)); }
+@media (hover: none) {
+  .dash-todo-menu { opacity: 1; }
+}
+@media (max-width: 900px) { .dash-todo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* S88: the rail's secondary panel pushes the shell by --rail-panel-w — viewport media
+   queries over-measure there (1280px viewport, ~936px content). Step the quadrant
+   grid down to 2 columns while the panel is open so the todo cards keep readable
+   rows (the ≤900px rule's content-equivalent). */
+body.rail-panel-open .dash-todo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* ══ Session-12 (2026-09-15, user request): the phone TO-DO QUADRANTS are a SWIPE
+   CAROUSEL ══ — "make the to-do-list quadrant only show 1 in mobile, the rest by
+   swipe". The old ≤720px layout showed Q1|Q3 half-width side by side and HID Q2/Q4
+   entirely (2026-08-29 request, superseded). Now ≤720px turns .dash-todo-grid into a
+   scroll-snap rail — ONE full-width quadrant per slide, thumb-swipe or dot-tap to
+   move, scroll-snap-stop:always so a flick lands exactly one quadrant over (the same
+   pattern as the Sadhana board's carousel, session 9). Guidance chrome (dots + the
+   one-time swipe hint) is phone-only: this BASE rule hides it on every wider screen —
+   it MUST precede the media block below (same specificity, later source wins; the
+   session-9 lesson). Desktop/tablet keeps the 2×2 (and ≤900px 2-col) grids. */
+.dash-quad-dots, .dash-swipe-hint { display: none; }
+.dash-quad-wrap { display: block; }
+@media (max-width: 720px) {
+  .dash-quad-wrap { position: relative; min-inline-size: 0; }
+  .dash-todo-grid {
+    display: flex;
+    grid-template-columns: none;
+    min-inline-size: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    gap: 12px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dash-todo-grid::-webkit-scrollbar { display: none; }
+  .dash-todo-quadrant {
+    flex: 0 0 100%;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0; /* same lesson as the Sadhana carousel — content min-content must never inflate the slide */
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    aspect-ratio: auto;      /* a full-width slide is not a square — a comfortable, */
+    block-size: min(26rem, 96vw); /* list-scrolling window instead (list scrolls inside) — taller than the S182 desktop 3-row window: a phone slide is the whole board, so it earns the deeper window (same fixed-height + scroll contract) */
+  }
+  /* Dot indicators: one tappable dot per quadrant, the active dot tracks the visible
+     slide. The 26px button + -7px inset pseudo-element keeps the hit target ≥40px
+     (WCAG 2.5.8) while the dot itself stays 7px. */
+  .dash-quad-dots {
+    display: flex; justify-content: center; align-items: center;
+    gap: 14px; padding-block: 0.4rem 0.1rem;
+  }
+  .dash-quad-dot {
+    position: relative; inline-size: 26px; block-size: 26px; padding: 0;
+    background: transparent; border: 0; border-radius: 50%;
+    cursor: pointer; min-inline-size: 0; min-block-size: 0; font-size: 0; line-height: 0;
+  }
+  .dash-quad-dot::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; }
+  .dash-quad-dot::before {
+    content: ''; position: absolute; left: 50%; top: 50%;
+    inline-size: 7px; block-size: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
+    background: var(--muted); opacity: 0.55;
+    transition: transform 0.18s ease, background 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+  }
+  /* S82: the active dot gains the SAME soft glow the projects carousel's .stat-dot
+     .is-active now carries (blurred box-shadow in the dot's own color, low opacity) —
+     one dot language across every carousel. */
+  .dash-quad-dot.active::before {
+    background: var(--accent); opacity: 1; transform: scale(1.7);
+    box-shadow: 0 0 8px 2px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .dash-quad-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* One-time swipe hint: a pill at the inline-end edge pulsing toward the next
+     quadrant; dies on the first swipe or after 4s (app.js drives the lifecycle). */
+  .dash-swipe-hint {
+    display: flex; align-items: center; gap: 5px;
+    position: absolute; inset-block-start: 36%; inset-inline-end: 6px; z-index: 5;
+    background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px;
+    box-shadow: var(--shadow-dropdown); color: var(--muted);
+    font-size: 10.5px; font-weight: 600; padding: 5px 10px;
+    pointer-events: none;
+    animation: dashHintNudge 1.6s ease-in-out infinite;
+  }
+  .dash-swipe-hint.hide { display: none; }
+}
+@keyframes dashHintNudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-7px); } }
+@keyframes dashHintNudgeRtl { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(7px); } }
+@media (prefers-reduced-motion: reduce) {
+  .dash-todo-task { transition: none; }
+  .dash-todo-fab.is-ready { animation: none; } /* (o) the ready pulse is decoration, not information */
+}
+
+/* Quick-capture family (audit 3): every capture control shares one filled-circle style
+   with the FABs — per-box quick-add, the notebook composer + and list +. The padded
+   pseudo-element keeps the hit area ≥44px (audit 11) over a compact 2.25rem circle. */
+.qa-btn {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cta, var(--accent));
+  color: var(--btn-text);
+  position: relative;
+}
+.qa-btn:hover { background: var(--cta-hover, var(--accent-hover)); }
+.qa-btn .icon { inline-size: 1.05rem; block-size: 1.05rem; }
+.qa-btn::after { content: ""; position: absolute; inset: -0.4rem; }
+/* FAB tooltip (audit Phase 2): show a hint on hover so users know what the + does */
+.qa-btn[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  inset-inline-end: calc(100% + 0.5rem);
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  background: var(--card);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.qa-btn[data-tooltip]:hover::before { opacity: 1; }
+/* Icon-in-colored-circle (audit 17): stat-box status glyphs, dropdown menu icons and the
+   FABs all become a glyph inside a tinted circle — box/status tints here, accent-soft for
+   menus, cta for FABs + quick-add. */
+.icon-chip {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--text);
+  flex: none;
+}
+.icon-chip .icon { inline-size: 1rem; block-size: 1rem; }
+/* S105 (owner: "the projects boxes are too visually noisy"): the dashboard stage
+   boxes' icon-chips go NEUTRAL — one quiet monochrome glyph per lane header; the
+   colored COUNT pill (.board-count, keyed to the stage role) stays as the single
+   color key. The per-status tinted chips above made a 5-lane row read as a
+   patchwork. Scoped to .stat-box so other .icon-chip surfaces keep their look. */
+.stat-box .icon-chip {
+  background: var(--bg-soft);
+  color: var(--muted);
+}
+.stat-box[data-status='spark'] .icon-chip,
+.stat-box[data-status='planning'] .icon-chip,
+.stat-box[data-status='queued'] .icon-chip,
+.stat-box[data-status='developing'] .icon-chip,
+.stat-box[data-status='awaiting_dev'] .icon-chip,
+.stat-box[data-status='operational'] .icon-chip { background: var(--bg-soft); color: var(--muted); }
+/* Brand-colored interactive link states (audit 20). (S200/HLTH-6: .activity-more
+   dropped from the group with its dead class.) */
+.stat-box a.small:hover,
+.activity-main a:hover { color: var(--brand); }
+
+
+/* S29 responsive audit (2026-09-12): hit zones for the two sub-44px dashboard controls —
+   the same ::after ring trick as base.css (.ghost.danger / .theme-floater). The collapse
+   chevron (~23px visual) and the quadrant-name pen (~24px visual) now tap at ≥44px;
+   the visual sizes stay untouched (the audit's measurement noise finding). */
+.dash-collapse-btn { position: relative; }
+.dash-collapse-btn::after { content: ""; position: absolute; inset: -0.65rem; }
+.dash-todo-pen { position: relative; }
+.dash-todo-pen::after { content: ""; position: absolute; inset: -0.625rem; }

@@ -1,0 +1,1407 @@
+
+/* ═══ S179 (advisor blocks 5+6 — ONE section pattern + surface tokens) ═════════
+   Every dashboard section head is the SAME row: the title on the reading-start
+   edge (~18px / semibold 600 — one size, one weight, after years of h2-h3 mixes
+   and in-card headings), the secondary actions (View-all link, collapse chevron)
+   at the INLINE-END. S183 (the depth audit): the heading rides INSIDE its section
+   panel card as a header strip — see the S183 block below (the S179 above-card
+   placement and the unified-wrapper retirement both reverse). */
+.dash-sec-head {
+  display: flex;
+  align-items: center;   /* S184 (the layout audit, item 3): one head strip — the title + link center vertically in the shared 3rem min-height row */
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+/* (0,2,0) — must OUTRANK the legacy per-section h2/h3 rules that still ride
+   descendant selectors (.ov-head h2 in misc.css is (0,1,1)) or the old mixed
+   sizes leak back onto the new pattern. */
+.dash-sec-head .dash-sec-title {
+  margin: 0;
+  font-size: var(--text-h2-size);      /* 18px desktop / 16px mobile — the ladder's own section rung */
+  font-weight: var(--text-h2-weight);  /* S183: was the advisor's hardcoded 600 — the owner's S157 ladder (500, "use lesser weight for headings") wins; size + ink lead, not weight */
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  min-inline-size: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.dash-sec-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-inline-start: auto;          /* the inline-end shore, even when the title wraps */
+  white-space: nowrap;
+}
+/* S184 (the layout audit, item 4): ONE card-level header link grammar. Every
+   section head link wears .dash-sec-link — one color (the app's link ink), one
+   size (fs-sm), one weight (500), one trailing arrow, "Go to [page]" wording.
+   "View all" stays reserved for the COLUMN-level links inside cards (the stat
+   boxes' stat-viewall, the stale row's more link, the notebook foot's archive
+   button) — the same level of action looks and reads the same everywhere. */
+.dash-sec-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--link);
+  white-space: nowrap;
+}
+.dash-sec-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.dash-sec-link:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 1px; }
+.dash-sec-link .icon { inline-size: 0.9rem; block-size: 0.9rem; flex: none; }
+
+/* ═══ S183 (the depth audit — the owner's 4-layer model, L2 realized) ═══
+   The section head rides INSIDE its section panel card as a header strip —
+   full-bleed over the card, a hairline divider under it, the panel body below —
+   so the title lives on the surface it names (the audit measured the loudest ink
+   on the deepest layer and called it; the S179 above-card placement retires).
+   The weight fix above (600 → the S157 ladder's 500) is the same audit's item 4. */
+.card > .dash-sec-head {
+  /* S184 (the layout audit, item 3): ONE head-strip geometry on every panel —
+     0.75rem block padding + a 3rem (48px) min height + vertically centered
+     content. The audit measured header heights drifting 42–52px between cards;
+     one min-height + one padding closes it. */
+  padding-block: 0.75rem;
+  min-block-size: 3rem;
+  border-block-end: 1px solid var(--line);
+}
+/* The panels carry the ONE elevation token (--shadow-card — the dark twin is
+   already declared in claude-dark-theme.css) so the stack reads monotonic: page
+   canvas < section panel < the in-card boxes/sticky papers (which cast their own
+   shadows on the lifted panel). This restores the audit's missing elevation rung
+   — content no longer floats higher than its own container. */
+.dash-todo-panel, .card.notebook-dashboard, .dash-projects-panel, .dash-ov-panel,
+.dash-activity-panel, .resume-strip.card {
+  box-shadow: var(--shadow-card);
+}
+/* The panel bodies: the .card padding retires (the strip owns the top), each
+   body block pads its own sides + foot. The S182 margin doctrine holds — the
+   2.9rem section rhythm owns the spacing, so margin-block-end: 0. */
+.card.dash-projects-panel, .card.dash-ov-panel, .card.dash-activity-panel {
+  padding: 0;
+  margin-block-end: 0;
+}
+/* S183 (the 390px regression, caught in QA): the panels are GRID ITEMS of the
+   section grids — a panel's automatic minimum is its min-content, and the
+   fixed-column scrollers inside (.dash-proj-lower's minmax(15.5rem…) tracks,
+   the stat strip) propagate their intrinsic width THROUGH the block panel, so
+   at 390px the projects/ov panels rendered 961px wide (measured; the pre-S183
+   layout was immune because the scrollers were the section grids' DIRECT
+   items — the scroll-container automatic-minimum-zero rule). min-inline-size: 0
+   re-arms that guard at the panel level — every section panel (and the .dash-ov
+   section, itself an item of the projects grid) can shrink to its track, and
+   the scrollers scroll inside it. The same lesson as .dash-todo-section's
+   minmax(0,1fr) (Session-12) + .stat-stage (S93). */
+.dash-todo-panel, .dash-projects-panel, .dash-ov-panel, .dash-activity-panel,
+.dash-ov, .card.notebook-dashboard, .resume-strip {
+  min-inline-size: 0;
+}
+/* S184 (the layout audit, item 3): ONE panel inset — every head strip and body
+   block pads 1rem (16px) inline on every panel, so the title's start edge, the
+   stale row, the carousel, the overview row and the activity list all sit on
+   ONE inset line (the audit measured 12–18px drift between cards). */
+.dash-projects-panel > .dash-sec-head,
+.dash-ov-panel > .dash-sec-head,
+.dash-activity-panel > .dash-sec-head { padding-inline: 1rem; }
+.dash-projects-panel > *:not(.dash-sec-head),
+.dash-ov-panel > *:not(.dash-sec-head),
+.dash-activity-panel > *:not(.dash-sec-head) { padding-inline: 1rem; }
+.dash-projects-panel > .dash-stale-row { margin-block-start: 0.6rem; }
+.dash-projects-panel > .stat-carousel { padding-block: 0.75rem 1rem; }
+.dash-ov-panel > .dash-proj-lower { padding-block: 0.75rem 1rem; }
+/* S184: the ov-head's own 0.55rem margin (misc.css — still load-bearing on the
+   projects/sparks pages where the head is NOT inside a panel) retires INSIDE the
+   dashboard panel: the head strip's own padding owns the hairline→body beat. */
+.dash-ov-panel > .ov-head { margin-block-end: 0; }
+.dash-activity-panel > .activity { margin-block: 0; padding-block: 0.75rem 1rem; }
+/* The projects section's two sibling panels: the S184 1.5rem beat above owns
+   the panel→panel spacing (one gap value everywhere). */
+
+/* --- batch (s) 2026-09-08 — the dashboard projects strip is a CAROUSEL ----------------
+   (user request: "only three boxes by default, the rest behind carousel clicks").
+   The three MAIN working stages (در حال تحقیق · در انتظار اجرا · در حال انجام) render
+   first; بررسی نشده / توقف توسعه / عملیاتی page behind the arrows. The track keeps the
+   grid look — three boxes per page on desktop, two ≤980px, one ≤640px — but is a
+   horizontal scroll-snap rail the arrows page through. Without JS it still scrolls
+   natively (touch/wheel). The drag-a-card-between-boxes gesture is unaffected: the boxes
+   stay .stat-box children of the track. */
+/* S42 (owner: "this part is too compacted because of right left handles. expand
+   this section. make handles over them."): the carousel is now a 2-row GRID — the
+   stage row (.stat-stage, the position:relative anchor) carries the strip at FULL
+   section width, with the prev/next arrows floating OVER the strip's edges (absolute,
+   translucent + blur) instead of flanking it as flex columns that stole ~5rem of card
+   width on phones. The dots row sits below. At the ends the driver's .at-start/
+   .at-end flags (app.js syncStatCarousel) fade the handle that has nothing to page,
+   so a card edge is only covered while the handle is actually usable. */
+.stat-carousel { display: grid; gap: 0.5rem; margin-block-end: 1.25rem; }
+/* S93 (owner round, item 12 — "these carousel circles are too close to their section;
+   add some margin with the upper section"): the dots row gets real breathing room below
+   the stage strip (0.5rem grid gap + 0.7rem own margin ≈ 1.2rem total separation). */
+/* S184 (the layout audit, item 5): the prev/next handles JOIN the dots row —
+   static siblings flanking the dots, below the stage. The S42 overlay circles
+   sat ON the last visible column (covering its rows and badges — the "arrow
+   overlaps the red badge" + "Developing column cut off" reports were the same
+   handle); a control that pages a row of cards must never sit on one. The
+   at-start/at-end step-aside, the 40px tap law and the snap rail (x mandatory +
+   start — a column is never half-cut) are unchanged. */
+.stat-carousel-nav { display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-block-start: 0.7rem; }
+/* min-inline-size: 0 breaks the grid-item auto-minimum chain (the track's max-content
+   ~591px would otherwise size the stage and overflow the section); display stays block —
+   the .stat-strip stretches to the stage width as a block-level flex container. */
+.stat-stage { position: relative; min-inline-size: 0; }
+.stat-carousel .stat-strip.stat-boxes {
+  display: flex;
+  gap: 0.75rem;
+  margin-block-end: 0;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 0; /* full .stat-stage row (the stage is the only flex parent now) */
+  min-inline-size: 0;
+}
+.stat-carousel .stat-strip::-webkit-scrollbar { display: none; }
+.stat-carousel .stat-box {
+  flex: 0 0 calc((100% - 1.5rem) / 3);
+  min-inline-size: 0;
+  scroll-snap-align: start;
+  /* NOTE: no scroll-snap-stop:always — Chromium interrupts PROGRAMMATIC smooth scrolls
+     (scrollBy) at the FIRST snap point when it's set, so one arrow click advanced only a
+     single box (verified live). 'normal' lets the smooth page scroll complete and re-snap
+     at the nearest box boundary — which for a 3-wide track IS the next page. */
+}
+@media (max-width: 980px) { .stat-carousel .stat-box { flex-basis: calc((100% - 0.75rem) / 2); } }
+@media (max-width: 640px) { .stat-carousel .stat-box { flex-basis: 100%; } }
+/* Session 14 (user request): on phones each stage box is a full-width carousel slide —
+   an empty one ("Nothing here yet", .is-empty from dashboard.ts) is a wasted swipe.
+   Hidden ≤640px only; the dots/pages recompute because syncStatCarousel keys on
+   scrollWidth (display:none contributes nothing). When every stage is empty the server
+   marks none, so the section never renders hollow. */
+@media (max-width: 640px) {
+  .stat-carousel .stat-box.is-empty { display: none; }
+}
+/* S42 heritage → S184: the handles left the stage overlay for the nav row; they
+   keep the S105 quiet recipe — a plain card-surface circle with a hairline
+   (still 2.5rem / 40px for the tap law). */
+.stat-arrow {
+  /* S184: static now — the handle rides the nav row beside the dots (see
+     .stat-carousel-nav); no stage overlay, no row coverage. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  transition: opacity 0.25s ease, background 0.15s ease, border-color 0.15s ease;
+}
+/* Nothing left to page that way → the handle steps aside entirely (native touch/wheel
+   scroll still reaches everything). :focus-visible overrides it so keyboard users
+   tabbing onto the handle still SEE it appear. */
+.stat-carousel.at-start .stat-arrow[data-stat-prev],
+.stat-carousel.at-end .stat-arrow[data-stat-next] { opacity: 0; pointer-events: none; }
+.stat-carousel.at-start .stat-arrow[data-stat-prev]:focus-visible,
+.stat-carousel.at-end .stat-arrow[data-stat-next]:focus-visible { opacity: 1; pointer-events: auto; }
+.stat-arrow:hover {
+  /* Session 23: full green+light hover (button:hover used to leak green under dark text) */
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.stat-arrow:disabled { cursor: default; }
+.stat-dots { display: flex; gap: 0.4rem; align-items: center; }
+.stat-dot {
+  inline-size: 0.45rem;
+  block-size: 0.45rem;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.35;
+  /* S82: the active dot grows + glows — keep the transition buttery (the to-do
+     carousel's .quad-dot::before transitions on the same cadence). */
+  transition: transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+/* S82 (owner: "make the projects carousel's dots match the to-do list carousel's"):
+   the active dot keeps the accent + scale treatment. S105 (owner: "too visually
+   noisy"): the blurred GLOW box-shadow is retired — a clean scaled dot reads calmer. */
+.stat-dot.is-active {
+  background: var(--brand);
+  opacity: 1;
+  transform: scale(1.7);
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat-dot { transition: none; }
+}
+
+/* batch (s): today's CALENDAR DATE rides next to the «لیست کارها» heading — the to-do
+   page's date, but minimal: muted text, NO pill background (user request). */
+.dash-todo-date { font-size: 0.78rem; font-weight: 400; color: var(--muted); letter-spacing: 0.01em; white-space: nowrap; }
+.stat-box .row { gap: 0.5rem; flex-wrap: wrap; }
+/* The count is a bold standalone numeral next to the single icon chip (roast 2026-08-25:
+   the old count-pill + icon-circle pair read as one cluttered double-circle group). */
+.stat-count { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+/* Dashboard kanban columns (2026-08-25): every project per stage as a compact kanban card —
+   same visual language as the projects page, scaled for a 3-column strip. */
+.stat-kanban {
+  margin-block-start: 0.65rem;
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+}
+.card.stat-kanban-card {
+  /* Session 19 (user request): colorless surface — transparent bg, only a border.
+     Was var(--statcard-bg) (a grey fill). The .card prefix raises specificity above
+     the .card gradient rule (line 5858) so transparent actually wins. The ::before
+     indicator bar still carries the status color (the only status-colored element). */
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.5rem 0.3rem;
+  cursor: grab;
+  display: grid;
+  gap: 0.1rem;
+  border-radius: 10px;
+}
+/* Hover steps toward the text tone — a visible nudge on the now-borderless surface. */
+.card.stat-kanban-card:hover { background: var(--bg-soft); border-color: var(--line-strong); }
+/* Batch (q) 2026-09-07 — COMPACT dashboard cards. S105 (owner: "too visually
+   noisy"): the skc-open arrow button is GONE — the whole card navigates via
+   data-nav-url (nav.js) and drag still changes status, so a dedicated arrow circle
+   was pure decoration. S115 (owner, "still noisy — clean, professional"): the
+   meta line (timeAgo · backlog · idea/plan/hurdle counts) is RETIRED too — the
+   card face is ONE row: single-line ellipsized heading + bug bubble, nothing
+   else (freshness lives in the hover title). Vertical rhythm retuned for the
+   single-line anatomy: symmetric padding, no inter-row gap to pay for. */
+.card.stat-kanban-card { padding-block: 0.5rem; gap: 0; }
+.skc-row { display: flex; align-items: center; gap: 0.4rem; min-inline-size: 0; }
+.skc-title {
+  flex: 1 1 auto; min-inline-size: 0;
+  font-size: var(--fs-md); line-height: 1.35; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* S115: the demoted cards-view hop — a quiet muted affordance, no arrow icon
+   competing with the count pill (the eye reads icon → label → count again). */
+.stat-viewall { text-decoration: none; flex: none; }
+.stat-viewall:hover { color: var(--fg); text-decoration: underline; }
+/* Reports Working/Archived boxes keep a plain list of project links (2026-08-25). */
+.stat-recent {
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.34rem;
+}
+.stat-recent a { color: var(--text); font-size: var(--fs-md); overflow-wrap: anywhere; }
+.stat-recent a:hover { color: var(--accent-ink); text-decoration: underline; } /* S204: accent-as-text → ink */
+.stat-recent li .muted { display: block; font-size: var(--fs-xs); }
+/* ≥40px tap targets for the dashboard's compact link rows (roast P5) — same
+   padded pseudo-element pattern as the small icon buttons: the visible layout
+   stays tight while the hit zone grows. */
+.stat-box a.small::after {
+  content: "";
+  position: absolute;
+  inset: -0.6rem;
+}
+.stat-box a.small { position: relative; }
+/* Standalone small links need a ≥24px target (WCAG 2.5.8) — text links inside a sentence
+   keep the inline exception, these don't. (S200/HLTH-6: .activity-more dropped from
+   this selector group — no renderer emits it; the projects home's recently-active
+   rows are .activity-section now.) */
+.stat-box a.small { padding-block: 4px; }
+/* Kanban column labels read as plain text — only the count is bold. */
+.stat-label { font-weight: 400; }
+
+/* --- batch (q) 2026-09-07 — projects page «at a glance» rail -----------------
+   S45 REDESIGN (owner directive: density + hierarchy on the crown surfaces): the six
+   stage boxes are now a COMPACT INLINE RAIL everywhere — [icon · count · label] on one
+   line per box (~64px tall desktop), not the old stacked icon-over-number-over-label
+   cards (169px tall in the grid home, 537px of a 390px phone). The click-to-filter
+   semantics, is-active / is-empty states, and per-stage --pg-c tints are unchanged
+   (S44's in-place filter contract). The strip (above filtered lists) and the home
+   (asMain) now share ONE geometry — the home just earns the «Recently active»
+   section below (server-rendered). */
+.pglance {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-block-end: 1.1rem;
+}
+@media (max-width: 980px) { .pglance { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .pglance { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Session 14 (user request): on phones an empty stage box (count 0, .is-empty from
+   glanceStrip) is dead weight in the 2-up grid — hide it. Desktop keeps every box so
+   the full stage map stays visible. When EVERY stage is empty the server marks none
+   (fresh-account fallback), so the group never collapses to nothing. */
+@media (max-width: 560px) {
+  .pglance .pglance-box.is-empty,
+  .pglance-grid .pglance-box.is-empty { display: none; }
+}
+.pglance-box {
+  --pg-c: 74 159 163; /* fallback: the teal accent */
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--card);
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  min-inline-size: 0;
+  min-block-size: 2.75rem; /* 44px: the box is a control (tap law) */
+}
+.pglance-box:hover { border-color: rgb(var(--pg-c) / 0.45); background: rgb(var(--pg-c) / 0.05); }
+.pglance-box.is-active { border-color: rgb(var(--pg-c) / 0.55); background: rgb(var(--pg-c) / 0.08); }
+.pglance-count {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  flex: none;
+}
+.pglance-label {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  line-height: 1.25;
+  flex: 1;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+}
+/* S137: the stage keys renamed twice since these rules were written (unreviewed →
+   investigating → planning …) — the selectors had drifted off the emitted data-pglance
+   values entirely. Re-keyed to the REAL stage keys, and the tint rides the canonical
+   --st-* hue per status (rgb triplets mirror variables.css). */
+.pglance-box[data-pglance='planning']      { --pg-c: 233 185 59; }
+.pglance-box[data-pglance='queued']        { --pg-c: 61 122 138; }
+.pglance-box[data-pglance='developing']    { --pg-c: 224 138 84; }
+.pglance-box[data-pglance='awaiting_dev']  { --pg-c: 133 144 152; }
+.pglance-box[data-pglance='operational']   { --pg-c: 61 154 85; }
+
+/* S45: the home (pglance-grid) rides the SAME compact rail — its old big-card era
+   (3×2 stacked boxes with 3.8rem icons, the density complaint) is retired. One rule
+   keeps the strip and the home identical; the recent section below does the
+   "never lose your place" work the big boxes used to waste space pretending to do. */
+.pglance-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.45rem; }
+@media (max-width: 980px) { .pglance-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .pglance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; } }
+
+/* S200 (HLTH-6): the S45 «Recently active» .precent* family (the typo'd name)
+   deleted — the projects home's recently-active panel renders as .activity-section
+   (layout.css) since the S45+ redesign; zero references across HTML/JS/e2e, and the
+   one e2e probe on .precent-row was vacuously passing on an empty NodeList. */
+
+/* --- batch (s) 2026-09-08 — idea folders (پوشه‌ها) on the Ideas shelf -------------
+   A pill row above the spark cards: All · every folder (with a live count + a ⋯ for
+   rename/delete) · بدون پوشه · a dashed ＋ to create. Chips filter client-side; the
+   bar rides INSIDE the shelf fragment so the 30s poll keeps counts live. */
+.sf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-block-end: 0.9rem; }
+
+/* Folder grid (file-manager view on the Ideas page — user request 2026-09) */
+.spark-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.8rem;
+  margin-block-end: 1.2rem;
+}
+.spark-folder-card {
+  position: relative;
+  display: grid;
+  gap: 0.3rem;
+  place-items: center;
+  text-align: center;
+  padding: 1.2rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease;
+  text-decoration: none;
+  color: var(--text);
+}
+.spark-folder-card:hover {
+  border-color: var(--brand);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.06);
+  transform: translateY(-1px);
+  /* Session 23: button:hover's green bg used to leak under this card on hover —
+     reset the surface to the intended neutral card fill (content card, not a CTA). */
+  background: var(--card);
+  color: var(--text);
+}
+.spark-folder-card:active { transform: translateY(0); }
+.spark-folder-icon { color: var(--muted); }
+.spark-folder-icon .icon { inline-size: 2rem; block-size: 2rem; }
+.spark-folder-card:hover .spark-folder-icon { color: var(--brand); }
+/* S106 (owner: "Idea's Folders … must appear in Bold text"): 600 → 700, the shared
+   bold register for every name/head (project names, folders, group heads). */
+.spark-folder-name { /* S155: folder names ride the H3 register (500 — nav item; was the S106 700 bold register) */ font-weight: var(--text-h3-weight); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 100%; }
+.spark-folder-count { font-size: var(--fs-xs); color: var(--muted); }
+.spark-folder-menu { position: absolute; inset-block-start: 0.3rem; inset-inline-end: 0.3rem; opacity: 0; transition: opacity 0.12s ease; }
+.spark-folder-card:hover .spark-folder-menu { opacity: 1; }
+/* S44: keyboard parity — the ⋯ is hover-revealed for mice and (hover:none)-revealed
+   for touch; focus-within covers keyboard tabbing to the card/menu. */
+.spark-folder-card:focus-within .spark-folder-menu { opacity: 1; }
+.spark-folder-new { border-style: dashed; color: var(--muted); }
+.spark-folder-new:hover {
+  /* Session 23: green fill + light text (owner hover spec; was a green-bg/teal-text mix) */
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.spark-folder-all { background: var(--accent-soft); border-color: var(--brand); }
+.spark-folder-all .spark-folder-icon { color: var(--brand); }
+.sf-item { display: inline-flex; align-items: center; }
+.sf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  padding: 0.22rem 0.7rem;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  max-inline-size: 14rem;
+}
+.sf-chip:hover {
+  /* Session 23: green fill + light text — button:hover's leak made these green+dark */
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.sf-chip.is-active {
+  color: var(--text);
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  font-weight: 600;
+}
+.sf-chip .sf-n {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sf-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.15rem 0.25rem;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.sf-more:hover {
+  /* Session 23: green fill + light icon (was transparent-base leak → green bg, muted icon) */
+  background: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.sf-new { border-style: dashed; }
+.sf-new .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+/* S41: the bar's HOME chip («پوشه‌ها») — the always-visible exit to the folder grid.
+   Brand-tinted so it reads as navigation, not another filter. */
+.sf-home .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.sf-home {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--line));
+  background: color-mix(in srgb, var(--brand) 7%, var(--card));
+}
+.sf-home:hover {
+  background: color-mix(in srgb, var(--brand) 14%, var(--card));
+  border-color: var(--brand);
+  color: var(--text);
+}
+/* The ⋯ pop (rename / delete) — tiny absolute menu next to its folder item. */
+.sf-item { position: relative; }
+.sf-menu {
+  position: absolute;
+  inset-block-start: calc(100% + 0.3rem);
+  inset-inline-start: 0;
+  z-index: 40;
+  min-inline-size: 10rem;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.3rem;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.18);
+}
+.sf-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0.4rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  text-align: start;
+  cursor: pointer;
+}
+.sf-menu button:hover { background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.sf-menu button.danger { color: var(--accent-3, #B85A54); }
+/* The move-to-folder radio list (dialog body). */
+.sf-move-list { display: grid; gap: 0.25rem; margin-block: 0.4rem 0.6rem; max-block-size: 16rem; overflow-y: auto; }
+.sf-move-list label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.3rem 0.4rem; border-radius: var(--radius-sm); }
+.sf-move-list label:hover { background: color-mix(in srgb, var(--muted) 12%, transparent); }
+
+/* --- S41 (2026-09-13) — folder EMOJI icons + the mobile pass on the Ideas page -----
+   The owner's asks: (1) folders carry a user-picked emoji as their icon — grid cards,
+   bar chips, kanban headers, the create/rename dialog (shared emoji-picker.js, which
+   docks as a bottom sheet under 640px); (2) the page's mobile layout — the folder grid
+   rendered ONE full-width 363×125 card per row at 390px (minmax(11rem,1fr) misses the
+   second column by ~2px), the ⋯ menu button was hover-only (invisible on touch), and
+   the chips were 29px tall (tap-target law: ≥44px on coarse pointers). */
+.sf-emoji { font-size: 1rem; line-height: 1; }
+.spark-folder-emoji { font-size: 2rem; line-height: 1; }
+/* The scoped empty-state icon renders a <span> emoji (folder view with an icon set) —
+   the svg path fills the 3rem box; a text emoji needs an explicit size. */
+.empty-state-icon > span { font-size: 2.4rem; line-height: 1; }
+/* The empty state's CTA row (S41: capture + New folder side by side, wrapping). */
+.empty-state-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+
+/* The folder dialog's emoji row: big preview button (opens the picker) + clear. */
+.sf-icon-row { display: flex; align-items: center; gap: 0.6rem; margin-block: 0.2rem 0.5rem; }
+.sf-icon-btn {
+  inline-size: 3rem;
+  block-size: 3rem;
+  display: grid;
+  place-items: center;
+  font-size: 1.55rem;
+  line-height: 1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.sf-icon-btn:hover { border-color: var(--brand); box-shadow: 0 2px 10px rgb(0 0 0 / 0.06); }
+.sf-icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Touch: the folder card's ⋯ menu was opacity:0 until :hover — touch devices never
+   hover, so rename/delete were unreachable (the S40 audit's grid-menu fix only solved
+   the click-delegation half). Same pattern as quicknotes.css's hover:none rules. */
+@media (hover: none) {
+  .spark-folder-menu { opacity: 1; }
+}
+
+/* Mobile ≤480px: the folder grid goes two-up (real file-manager feel). At 390px the
+   auto-fill/minmax(11rem) math left ONE 363px column — 6 full-width cards of scroll
+   before the first idea. Two columns halve that and keep cards tap-sized. */
+@media (max-width: 480px) {
+  .spark-folder-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .spark-folder-card { padding: 0.9rem 0.5rem; gap: 0.25rem; }
+  .spark-folder-icon .icon { inline-size: 1.7rem; block-size: 1.7rem; }
+  .spark-folder-emoji { font-size: 1.7rem; }
+  .spark-folder-count { font-size: 0.7rem; }
+  .spark-folder-menu { opacity: 1; }
+  .empty-state.empty { padding: 2.2rem 1rem; }
+}
+
+/* Coarse pointers: chips get real tap targets (were 29px tall — under the 44px law;
+   S171: 2.5rem ≈ 40px was still a stretch — the full 2.75rem = 44px now). */
+@media (pointer: coarse) {
+  .sf-chip { padding-block: 0.45rem; min-block-size: 2.75rem; }
+  .sf-more { padding: 0.4rem 0.45rem; min-block-size: 2.75rem; }
+}
+
+/* Mobile ≤640px header: the h1/controls row stacks — h1 alone, then the capture
+   button (flex-1, the page's primary action) beside the compact view select; the
+   «نمایش:» label goes screen-reader-only to reclaim its 47px. */
+@media (max-width: 640px) {
+  .sparks-head { flex-direction: column; align-items: stretch; gap: 0.65rem; }
+  .sparks-head > .row.wrap { flex-wrap: nowrap; gap: 0.5rem; }
+  .sparks-head [data-quickadd-open] { flex: 1; min-block-size: 2.75rem; display: inline-flex; align-items: center; justify-content: center; }
+  .sparks-head .view-select { flex: 0 0 auto; }
+  .sparks-head .view-select label {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .sparks-head .view-select select { min-block-size: 2.75rem; }
+}
+
+/* Dashboard To-Do preview: compact mirror of the Sadhana board. */
+/* 2026-09-02 user request: generous whitespace BETWEEN dashboard sections — e.g. لیست کارها
+   and پیشخوان پروژه‌ها used to sit 1.25rem apart; every dashboard section now gets a wide
+   bottom margin for an airy, minimal rhythm.
+   Session-11 (2026-09-14): the rule was DEAD — the dashboard <main> carried a duplicate
+   id (id="main" … id="dash") and the parser drops the second attribute, so #dash never
+   matched anything (user report: "sections cramped together with no distance"). The hook
+   is now the .shell-dash class on that <main> (see dashboard.html). */
+/* S184 (the layout audit, item 1 — ONE rhythm, the owner's option 1): the
+   dashboard main IS the parent container — a flex column with ONE 1.5rem (24px)
+   gap. Every direct child (the h1, the resume strip, the vault banner, each
+   section wrapper, the empty state) sits the same 24px from its neighbors, and
+   NO child carries its own block margin — the audit measured ~80/~80/~50/~17px
+   drift from exactly that mix (the retired 2.9rem section rhythm + the .card
+   clamp margins + the 1.1rem h1 gap). Cards that are equally related now sit
+   equally far apart; the h1-to-first-card beat is the SAME gap value. */
+main.shell-dash { display: flex; flex-direction: column; gap: 1.5rem; }
+main.shell-dash > section,
+main.shell-dash > h1 { margin-block: 0; }
+
+/* S181 (opening block 1 — the page opens with its name): the dashboard's h1 is
+   VISIBLE (the same opening every page of the app speaks; it was sr-only since
+   S51-A while Projects/Settings/… all opened with their name). The house h1
+   tokens paint it; the dashboard only tunes the space under it so the first
+   section's head (the resume strip) breathes like a section, not a caption. */
+/* S184: the h1 carries no block margin — the parent flex gap owns the title-to-
+   first-card beat (24px, the same value as every card pair). */
+
+/* S181 (opening block 2 — the FIRST section speaks the one grammar): the resume
+   strip's head row sits ABOVE its card now (.dash-sec-head from the S179 block 5
+   pattern — 18px/600 title, secondary actions at the inline-end). The head keeps
+   the notebook-wrap's 0.55rem head→card gap, and the Clear button loses its old
+   far-edge auto margin (the .dash-sec-actions group owns that shore now — hint +
+   Clear ride together as one actions cluster). */
+.resume-dash-head { margin-block-end: 0; } /* S184: the head rides INSIDE the card — no extra gap under the hairline */
+.resume-dash-head .resume-clear { margin-inline-start: 0; }
+
+/* S181 (opening block 4 — the zero page joins the empty register): the cold
+   dashboard (every section hidden) speaks the SAME quiet strip the empty
+   quadrants speak (S179 block 8) — a muted line + a text action on one row,
+   natural height, no card chrome. The action keeps the old text-button register
+   (the retired .dash-todo-add-text's look): transparent ground, brand ink,
+   fs-sm/500. S187 scoped the quiet-line retirement to the to-do QUADRANTS only —
+   this page-level zero state keeps its one action (it is the page's only CTA). */
+.dash-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-block-size: 2.5rem;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  padding: 0.3rem 0.4rem;
+}
+.dash-empty-text { margin: 0; overflow-wrap: anywhere; }
+.dash-empty-action {
+  flex: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  color: var(--brand);
+  font-weight: 500;
+  text-decoration: none;
+}
+.dash-empty-action:hover, .dash-empty-action:focus-visible { text-decoration: underline; outline: none; }
+.dash-empty-action .icon { inline-size: 0.9rem; block-size: 0.9rem; }
+
+/* ==========================================================================
+   S85 (owner redesign instruction #2): ONE shared board-column header component.
+   Every board-style column on the dashboard — the To-Do quadrant columns AND the
+   projects stage columns — speaks the SAME header convention:
+     [glyph icon-chip] [label] [pill count badge]
+   (Nielsen: Consistency & Standards; the two boards previously used different
+   header conventions for the same underlying UI role.)
+   The pill count (.board-count) draws its tint from the fixed pastel status roles
+   (the --badge-*-bg/-fg token pairs — the same fixed palette the status badges,
+   stat-box icon-chips and sig-chips use; instruction #3). Light theme = pastel fill
+   + dark text (WCAG-safe); dark theme flips via themes.css token overrides.
+   ========================================================================== */
+.board-col-head { min-inline-size: 0; }
+.board-col-title { align-items: center; gap: 0.5rem; min-inline-size: 0; }
+/* S155: the stage-column head is the EYEBROW rung — 12px/500/0.03em, secondary
+   ink, sentence case (the spec's "Planning"/"Up Next" example row). S106's
+   700/--text register is superseded: hierarchy via the ink rungs, not weight. */
+.board-col-label { color: var(--muted); font-size: var(--text-eyebrow-size); font-weight: var(--text-eyebrow-weight); line-height: var(--text-eyebrow-line-height); letter-spacing: var(--text-eyebrow-tracking); }
+/* S94 (owner item 9 — "larger digit font, weaker background — currently too much
+   color"): the pill used to fill with the stage's SOLID pastel badge background
+   (--badge-*-bg), which read as the loudest chip on the row. The fill is now a
+   low-opacity WASH keyed on the pill's own ink (--badge-fg at 10% — one recipe for
+   stage pills AND accent-tinted quadrant pills), and the digits step up to fs-md
+   bold so the count reads first. Ink stays the AA-designed --badge-*-fg tokens. */
+.board-count {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.55rem;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  background: color-mix(in srgb, var(--badge-fg, var(--muted)) 10%, transparent);
+  color: var(--badge-fg, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--badge-fg, var(--muted)) 22%, transparent);
+}
+/* Stage columns: the pill wears the column's status role (data-status is already on
+   the .stat-box — the exact selector shape the icon-chips above use). S94: only the
+   INK token is wired now — the old --badge-bg fills are gone (the wash above keys on
+   the fg), so the rules collapse to --badge-fg assignments. */
+.stat-box[data-status='spark'] .board-count { --badge-fg: var(--badge-spark-fg); }
+.stat-box[data-status='planning'] .board-count { --badge-fg: var(--badge-planning-fg); }
+.stat-box[data-status='queued'] .board-count { --badge-fg: var(--badge-queued-fg); }
+.stat-box[data-status='developing'] .board-count { --badge-fg: var(--badge-developing-fg); }
+.stat-box[data-status='awaiting_dev'] .board-count { --badge-fg: var(--badge-awaiting_dev-fg); }
+.stat-box[data-status='operational'] .board-count { --badge-fg: var(--badge-operational-fg); }
+/* The stat header's label + pill sit in one flex row; keep the label from being
+   squeezed by long translated words (FA) while the pill stays whole. */
+.board-col-title .stat-label { overflow-wrap: anywhere; }
+
+/* Quadrant columns: NEUTRAL pill by default (the 2026-09 owner decision — quadrants
+   stay minimal, no per-quadrant accent) — the neutral --muted role; a user-PICKED
+   quadrant accent (the rename API's accent_color → --dash-q-accent) tints the pill
+   so saved personalization still reads. Same shape/weight as the stage pills.
+   S94 (item 9): the fg is an accent-into-text mix (65/35) — a bare 100% pastel ink
+   dropped under 3:1 at the small pill size; the mix keeps the hue AA on the wash. */
+.dash-todo-quadrant .board-count {
+  --badge-fg: color-mix(in srgb, var(--dash-q-accent, var(--muted)) 65%, var(--text));
+}
+/* The quadrant count pill rides the header's actions side — baseline-aligned with
+   the title block (subtitle shifts the visual center), nudged like the old counter. */
+.dash-todo-qactions .board-count { padding-block-start: 0.06rem; }
+
+/* ==========================================================================
+   S85 (owner redesign instruction #1): the merged "Continue where you left off"
+   component lives in polish-ui.css (.resume-*) — the server "Resume work" card
+   (.dash-resume*) was REMOVED from dashboard.ts; its affordances (glyph + label +
+   title + timestamp + Open CTA) survive as the strip's HERO entry, sourced from the
+   ONE shared last-opened timestamp.
+   ========================================================================== */
+
+/* ==========================================================================
+   S59: Notes Vault onboarding banner — the server renders it ONLY while the user
+   has zero active vault notes (adoption signal, dashboard.ts); the inline fragment
+   script honors a localStorage dismissal (hibana-vault-banner-dismissed).
+   S181 (opening block 3 — the nudges speak ONE quiet register): the banner joins
+   the stale-row grammar — {semantic 4px lead bar + light tint + small bold flag +
+   content row} — the accent register's answer to "Untouched for 2+ weeks"'s warn.
+   An introduction nudge is the same KIND of thing as a staleness nudge; the old
+   loud recipe (the solid CTA glyph tile, the 30% accent border, the uppercase
+   link-inked label, the fs-lg/700 title, the .btn CTA) retires. The glyph keeps
+   its PLACE but speaks the quiet tile language the resume chip icons speak (a
+   12% accent tint + accent ink); the CTA is the section-actions text link.
+   ========================================================================== */
+/* S97 (the flat-card system, B) lineage + S181: the compound .dash-vault-banner.card
+   selector (0,2,0) stays LOAD-BEARING: the banner markup carries class="card" and
+   notifications.css's flattened .card (0,1,0, later in source order) would
+   otherwise swallow the fill back to the plain card — the same cascade trap the
+   Quick Notebook hit in S95 r2. The compound also outranks main.shell-dash >
+   section (0,1,1), so the banner carries no own margin — the 2.9rem section
+   rhythm owns the spacing. Dark theme: the claude-dark .card rule (0,2,1) would
+   flatten the fill — the dark twin rides claude-dark-theme.css (the notebook
+   precedent). */
+.dash-vault-banner.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  /* inline-end padding clears the absolutely-positioned dismiss button */
+  padding: 0.7rem 2.6rem 0.7rem 1rem;
+  background: color-mix(in srgb, var(--accent) 7%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-inline-start: 4px solid var(--accent);
+  border-radius: var(--radius);
+  position: relative;
+}
+.dash-vault-glyph {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem; height: 2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.dash-vault-glyph .icon { width: 1.05rem; height: 1.05rem; }
+.dash-vault-body { display: flex; flex-direction: column; gap: 0.15rem; min-inline-size: 0; flex: 1; }
+/* the stale-flag register: fs-xs/700 in the SEMANTIC ink, no uppercase/letter
+   spacing (the "NEW" shout retires; the accent flag whispers like the warn one).
+   S200 (UX-3): --accent → --accent-ink — the label is TEXT at 12px, and the raw
+   accent is 2.5:1 on the card (AA needs 4.5:1; the ink is 5.74:1). */
+.dash-vault-label { font-size: var(--fs-xs); font-weight: 700; color: var(--accent-ink); }
+.dash-vault-title { font-size: var(--fs-md); font-weight: 600; color: var(--text); }
+.dash-vault-copy { font-size: var(--fs-sm); color: var(--muted); margin-block: 0.1rem 0.4rem; }
+/* the CTA speaks the section-actions link register (a.small + the arrow) — an
+   adoption nudge answers with a quiet go-to, not a filled button */
+.dash-vault-cta { align-self: flex-start; padding-block: 4px; text-underline-offset: 3px; }
+.dash-vault-banner:hover .dash-vault-cta { text-decoration: underline; }
+.dash-vault-dismiss {
+  position: absolute;
+  inset-inline-end: 0.55rem;
+  inset-block-start: 0.55rem;
+  display: grid;
+  place-items: center;
+  width: 2rem; height: 2rem;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dash-vault-dismiss:hover { background: var(--bg-soft); color: var(--text); }
+.dash-vault-dismiss .icon { width: 1rem; height: 1rem; }
+@media (max-width: 540px) {
+  .dash-vault-banner { flex-wrap: wrap; gap: 0.6rem; padding: 0.7rem 2.4rem 0.7rem 0.9rem; }
+  .dash-vault-cta { margin-inline-start: auto; }
+}
+@media (max-width: 720px) {
+  .dash-vault-dismiss { width: 44px; height: 44px; } /* touch floor (WCAG 2.5.5) */
+}
+/* S197 (the touch+optical audit): the floor above was WIDTH-keyed only — a
+   coarse pointer on a wide viewport (tablet landscape, desktop-with-touch)
+   still got the 32px box. The floor now keys to the POINTER too; the icon
+   grows to the S195 1.25rem register with it. */
+@media (pointer: coarse) {
+  .dash-vault-dismiss { width: 44px; height: 44px; }
+  .dash-vault-dismiss .icon { width: 1.25rem; height: 1.25rem; }
+}
+
+/* ==========================================================================
+   S179 (advisor block 5) — the UNIFIED projects container RETIRES
+   ==========================================================================
+   The S124 wrapper (one card around the stage carousel + the overview row) is
+   gone: boxes-in-a-box read as a container around a board. Each .stat-box paints
+   its OWN card chrome now (the exact surface/border/radius/shadow recipe the
+   wrapper carried — the eye sees the same cards, one nesting level shallower),
+   and the overview cards below were already their own .cards. Sections group by
+   SPACING (the section's grid gap), not by borders — the wrapper's divider and
+   padding left with it. S129's note stands: the global capture FAB owns creation. */
+
+/* S184: the two sibling panels (projects + overview) ride the SAME 1.5rem beat
+   as every other card pair on the page — one gap value everywhere. */
+.dash-projects-section { display: grid; gap: 1.5rem; }
+/* the S93 head-row margin (misc.css) retires — the section's grid gap is the beat now */
+.dash-projects-section .dash-projects-head { margin-block-end: 0; }
+/* the stage boxes' own card chrome — the S124 wrapper's exact recipe, one level down */
+.stat-carousel .stat-box {
+  background: var(--surface-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.85rem 0.85rem 0.95rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+/* the carousel's own beat inside the (now chromeless) section */
+.dash-projects-section .stat-carousel { margin-block-end: 0; } /* S184: the carousel's own padding-block (0.75rem 1rem) is the panel's foot */
+
+/* The overview row: a HORIZONTAL row of the four cards (Ideas · Problems ·
+   Plans · In Progress — one fixed order). Overflow scrolls sideways (snap + thin
+   scrollbar). S179: the border-block-start DIVIDER is retired — the section's
+   spacing groups the row, never a rule line; the row's own margin carries the
+   separation the divider used to paint. Logical properties only — RTL is the
+   same geometry mirrored. */
+.dash-proj-lower {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(15.5rem, 19.5rem);
+  gap: 0.75rem;
+  align-items: stretch;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding: 0.15rem 0.15rem 0.35rem;
+  margin-block-start: 0.35rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.dash-proj-lower::-webkit-scrollbar { block-size: 6px; }
+.dash-proj-lower::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }
+.dash-proj-lower > .card { scroll-snap-align: start; margin-block-end: 0; }
+.dash-proj-lower .ov-box { min-block-size: 100%; }
+/* S126 (owner: the grid leaves unused space after the last column): at ≥900px the
+   four cards STOP being fixed-width scroller columns and instead share the row
+   evenly — minmax(0, 1fr) tracks consume the container's full width (the old
+   minmax(15.5rem, 19.5rem) capped the row at ~78rem and let the rest sit empty).
+   Below 900px the horizontal swipe stays, and the snap/scrollbar rules stay
+   harmless when nothing overflows. */
+@media (min-width: 900px) {
+  .dash-proj-lower { grid-auto-columns: minmax(0, 1fr); }
+}
+/* phone: a comfortable swipe-step — wide enough to read, still snapping */
+@media (max-width: 640px) {
+  .dash-proj-lower { grid-auto-columns: minmax(13.5rem, 85%); }
+}
+/* S179 (advisor block 5): the dashboard's ov block is a CHROMELESS section — the
+   shared .dash-ov class keeps the collapse store + the Settings hide working, but
+   the nested-card look (own background/border) is gone; only the head row + the
+   cards' own surfaces remain. Spacing groups; nothing boxes. */
+.dash-ov { display: grid; gap: 0.55rem; }
+.dash-ov .ov-head { margin-block-end: 0; }
+
+/* S129 (owner request): the container's floating "New project" FAB is RETIRED
+   (was S126's caramel folder-plus anchored bottom-inline-end; it also carried
+   the mobile corner-reservation padding on .dash-proj-lower and the container's
+   position:relative anchor). The global capture FAB's "New project" menu item
+   (data-projectquickadd, app.js-delegated) remains the dashboard's creation
+   path, so no behavior is lost — the container's corner is simply quiet now. */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   S72 — Stale-projects nudge ("Untouched for 2+ weeks", job #2: what you left
+   hanging). Server-rendered inside the projects section (dashboard.ts); shows
+   only when an in-motion project (unreviewed/investigating/awaiting/doing —
+   NOT halted, NOT operational) went 14+ days without an update. Design: the
+   the S124 unified-container card chrome with an AMBER edge (waiting / attention-
+   needed per variables.css §color law) — quiet, not an alarm.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dash-stale-row {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  margin-block: 0.35rem 0.55rem;
+  padding: 0.45rem 0.65rem;
+  /* S137: the stale strip's amber is the SEMANTIC warning token (--warn) — it rode the
+     queued badge pair when that WAS the app's amber; the Up Next status is slate-teal
+     now, and "waiting" amber must not follow it. */
+  border: 1px solid color-mix(in srgb, var(--warn, #b45309) 26%, var(--line));
+  border-inline-start: 4px solid var(--warn, #b45309);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warn, #b45309) 10%, var(--card));
+}
+.dash-stale-flag {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: var(--fs-xs, 0.78rem); font-weight: 700;
+  color: var(--warn, #b45309);
+  white-space: nowrap;
+}
+.dash-stale-flag svg { inline-size: 0.95rem; block-size: 0.95rem; flex: none; }
+.dash-stale-chips { display: flex; gap: 0.45rem; flex-wrap: wrap; min-inline-size: 0; }
+.dash-stale-chip {
+  display: inline-flex; align-items: baseline; gap: 0.45rem;
+  max-inline-size: 17rem;
+  padding: 0.3rem 0.6rem;
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--warn, #b45309) 18%, var(--line));
+  border-radius: 999px;
+  text-decoration: none; color: inherit;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.dash-stale-chip:hover, .dash-stale-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--warn, #b45309) 55%, var(--line));
+  box-shadow: 0 2px 8px -3px rgb(0 0 0 / 0.12);
+  transform: translateY(-1px);
+  outline: none;
+}
+.dash-stale-chip:active { transform: translateY(0); }
+.dash-stale-name {
+  font-size: var(--fs-xs, 0.78rem); font-weight: 600; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dash-stale-age { font-size: 0.72rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .dash-stale-row { align-items: flex-start; flex-direction: column; gap: 0.4rem; }
+  .dash-stale-chips { inline-size: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; }
+  .dash-stale-chip { flex: 0 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-stale-chip { transition: none; }
+  .dash-stale-chip:hover, .dash-stale-chip:focus-visible { transform: none; }
+}
+
+/* =====================================================================
+   S161 (0063) — the Ideas redesign. The shelf's own surfaces: search chrome,
+   the folder header (banner/pastel), spark cards/list/sticky (thumbs, pins,
+   glyphs), the swatch picker, chip drop-targets, the crop dialog, and the
+   LEAN idea page's layout. All logical properties (spec #15), all motion
+   reduced-motion-guarded.
+   ===================================================================== */
+
+/* ---- the SEARCH row (spec #12) ---- */
+.spark-search-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-block: 0.8rem 1rem;
+}
+.spark-search {
+  position: relative;
+  display: flex; align-items: center;
+  flex: 1 1 16rem; max-inline-size: 34rem;
+  min-inline-size: 12rem;
+}
+.spark-search .icon {
+  position: absolute; inset-inline-start: 0.65rem;
+  inline-size: 1rem; block-size: 1rem;
+  color: var(--muted); pointer-events: none;
+}
+.spark-search input {
+  inline-size: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  padding: 0.45rem 2.2rem 0.45rem 2.1rem;
+  font-size: var(--fs-sm);
+}
+.spark-search input::placeholder { color: var(--muted); }
+.spark-search input:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+.spark-search input[type="search"]::-webkit-search-cancel-button { display: none; }
+.spark-search #sparks-q-clear {
+  position: absolute; inset-inline-end: 0.35rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 1.5rem; block-size: 1.5rem;
+  border: 0; border-radius: 50%;
+  background: var(--bg-soft); color: var(--muted);
+  cursor: pointer;
+}
+.spark-search #sparks-q-clear:hover { background: var(--line); color: var(--text); }
+.spark-search #sparks-q-clear .icon { position: static; inline-size: 0.85rem; block-size: 0.85rem; color: inherit; pointer-events: auto; }
+#sparks-q-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---- the FOLDER HEADER (spec #1/#2/#3) ---- */
+.sfh { margin-block-end: 1rem; }
+.sfh-banner {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* spec #2: no banner → the folder's OWN pastel as the solid placeholder */
+  background: var(--folder-fill, var(--accent-soft));
+  block-size: min(240px, 32vh); /* the cap: a wide image never dominates the viewport */
+  min-block-size: 96px;
+  display: grid; place-items: center;
+}
+.sfh-banner-img {
+  position: absolute; inset: 0;
+  inline-size: 100%; block-size: 100%;
+  object-fit: cover;
+  cursor: pointer;
+}
+.sfh-banner.has-banner { background: var(--bg-soft); }
+.sfh-prompt {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  border: 0; border-radius: 999px;
+  /* S163 folded: the pill mixes the banner's OWN fill — the curated AA pair holds
+     in BOTH themes (a neutral pill went dark-on-dark over pastels in claude-dark) */
+  background: color-mix(in srgb, var(--folder-fill, var(--card)) 92%, #000 8%);
+  color: var(--folder-ink, var(--text));
+  padding: 0.5rem 1rem;
+  font-size: var(--fs-sm); font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.sfh-prompt:hover { transform: translateY(-1px); box-shadow: 0 4px 14px -6px rgb(0 0 0 / 0.35); }
+.sfh-prompt .icon { inline-size: 1rem; block-size: 1rem; }
+.sfh-actions {
+  position: absolute; inset-block-end: 0.6rem; inset-inline-end: 0.6rem;
+  display: flex; gap: 0.4rem;
+}
+.sfh-act {
+  /* S163 folded: a dark scrim pill + light ink — readable over pastels AND busy photos */
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  border: 0; border-radius: 999px;
+  background: rgb(15 20 15 / 0.62);
+  color: #fff;
+  padding: 0.32rem 0.75rem;
+  font-size: var(--fs-xs); font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(3px);
+  transition: background-color 0.14s ease;
+}
+.sfh-act:hover { background: rgb(15 20 15 / 0.82); }
+.sfh-act .icon { inline-size: 0.9rem; block-size: 0.9rem; }
+.sfh-act-x { padding: 0.32rem 0.5rem; }
+.sfh-meta { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; margin-block-start: 0.7rem; }
+.sfh-name { margin: 0; font-size: var(--fs-md, 1.05rem); font-weight: 700; }
+.sfh-emoji { font-size: 1.1em; }
+.sfh-metrics { margin: 0; font-variant-numeric: tabular-nums; }
+
+/* ---- the identity DOT (chips, bar, kanban heads — one color per folder) ---- */
+.sf-dot {
+  inline-size: 0.55rem; block-size: 0.55rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.14);
+}
+.sf-chip .sf-dot { margin-inline-end: 0.1rem; }
+.kanban-col-head .sf-dot { order: 2; margin-inline-start: auto; }
+.kanban-col-head .board-count { order: 3; margin-inline-start: 0.35rem; }
+
+/* ---- the folder GRID tiles' pastel (spec #3) ---- */
+.spark-folder-card { overflow: hidden; }
+.spark-folder-bar {
+  position: absolute;
+  inset-block: 0; inset-inline-start: 0;
+  inline-size: 0.3rem;
+  background: var(--folder-fill, transparent);
+}
+.spark-folder-card .spark-folder-emoji { font-size: 1.3rem; }
+.spark-folder-card:hover { border-color: color-mix(in srgb, var(--folder-fill, var(--brand)) 70%, var(--line)); }
+
+/* ---- chip DROP-TARGETS (S160 drag-to-file; :where() keeps the lean at (0,2,0)
+       so .drag-over can override the hover fill) ---- */
+:where(.sf-chip, .kanban-col[data-spark-folder]) { transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease; }
+.sf-chip.drag-over, .kanban-col[data-spark-folder].drag-over {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, var(--card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+
+/* ---- the spark CARD (spec #4/#5/#14) ---- */
+.spark-grid { margin-block-end: 1.2rem; }
+.spark-card {
+  position: relative;
+  display: flex; flex-direction: column;
+  padding: 0; overflow: hidden;
+}
+.spark-card.is-pinned { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+.spark-card-link {
+  display: flex; flex-direction: column; gap: 0.55rem;
+  padding: 0.9rem;
+  color: inherit; text-decoration: none;
+  flex: 1;
+}
+.spark-card-link:hover .spark-card-title { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 3px; }
+.spark-card-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 2.5 / 1;
+  border-radius: calc(var(--radius) - 3px);
+  overflow: hidden;
+  background: var(--bg-soft);
+  flex: 0 0 auto;
+}
+.spark-card-thumb img { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+.spark-card-thumb.is-empty { display: grid; place-items: center; color: var(--muted); background: color-mix(in srgb, var(--line) 30%, var(--card)); }
+.spark-card-thumb.is-empty .icon { inline-size: 1.4rem; block-size: 1.4rem; opacity: 0.55; }
+.spark-cover-mark {
+  position: absolute; inset-block-start: 0.4rem; inset-inline-end: 0.4rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 1.45rem; block-size: 1.45rem;
+  border-radius: 999px;
+  background: rgb(15 20 15 / 0.62);
+  color: #f5d76e;
+}
+.spark-cover-mark .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+.spark-card-body { display: flex; flex-direction: column; gap: 0.3rem; }
+.spark-card-title { font-weight: 600; font-size: var(--fs-sm); line-height: 1.35; }
+.spark-card-desc { margin: 0; }
+.spark-card-meta { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; margin-block-start: 0.15rem; }
+/* S171 (backlog): the search's WHY — the matched substring lights up in place
+   (<mark class="spark-hit">) and one small pill per match reason rides the meta
+   (Title / Description / Tag: x / Link: y / Folder: z). Token-built: the mark is a
+   brand-tinted wash, never the browser's default yellow. */
+.spark-hit {
+  background: color-mix(in srgb, var(--brand) 24%, transparent);
+  color: inherit; border-radius: 3px; padding: 0 0.06em;
+}
+.spark-hit-badges { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
+.spark-hit-badge {
+  display: inline-flex; align-items: center;
+  font-size: var(--fs-xs); color: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 999px; padding: 0.02rem 0.45rem;
+  max-inline-size: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.spark-glyphs { display: inline-flex; gap: 0.3rem; align-items: center; }
+.spark-glyph { display: inline-flex; color: var(--muted); }
+.spark-glyph .icon { inline-size: 0.9rem; block-size: 0.9rem; }
+/* the PIN toggle (cards + rows + sticky): one tap, no confirm (spec #5) */
+.spark-pin {
+  position: absolute; inset-block-start: 0.5rem; inset-inline-end: 0.5rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 1.7rem; block-size: 1.7rem;
+  border: 0; border-radius: 50%;
+  background: color-mix(in srgb, var(--bg-soft) 72%, transparent);
+  color: var(--muted);
+  cursor: pointer;
+  z-index: 2;
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+.spark-pin .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.spark-pin:hover { color: var(--text); background: var(--bg-soft); }
+.spark-pin:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.spark-pin.is-on { color: var(--brand); background: color-mix(in srgb, var(--brand) 14%, var(--bg-soft)); }
+.spark-card .spark-menu { position: absolute; inset-block-start: 0.5rem; inset-inline-end: 2.4rem; }
+/* spec #14: MOBILE — condensed cards (title + thumb); the first tap expands.
+   S171: an idea with NO image hides its empty placeholder on mobile — a grey slab
+   under every text-only card was pure noise; the thumb slot stays for real covers. */
+@media (max-width: 640px) {
+  .spark-card-desc, .spark-card-meta { display: none; }
+  .spark-card.is-expanded .spark-card-desc, .spark-card.is-expanded .spark-card-meta { display: block; }
+  .spark-card.is-expanded .spark-card-meta { display: flex; }
+  .spark-card-thumb.is-empty { display: none; }
+}
+
+/* ---- the spark LIST (spec #9: the icon column replaces Tags/Signals) ---- */
+.spark-table .spark-row-title { display: flex; align-items: center; gap: 0.5rem; min-height: 1.9rem; }
+.spark-row-thumb {
+  position: relative;
+  display: inline-flex; flex: 0 0 auto;
+  inline-size: 2.1rem; block-size: 2.1rem;
+  border-radius: 6px; overflow: hidden;
+  background: var(--bg-soft);
+}
+.spark-row-thumb img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.spark-row-thumb .spark-cover-mark { inset-block-start: auto; inset-block-end: -0.7rem; inset-inline-end: -0.55rem; inline-size: 1.1rem; block-size: 1.1rem; }
+.spark-row-ico { display: flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+.spark-table .spark-pin { position: static; background: transparent; }
+.spark-ico-h { inline-size: 1%; }
+/* spec #5: >5 pins → the pinned rows collapse to conserve space */
+.pins-compact .spark-card-link { padding: 0.6rem 0.9rem; gap: 0.35rem; }
+.pins-compact .spark-card-thumb { aspect-ratio: 3 / 1; }
+.pins-compact tr[data-pinned="1"] .spark-row-title { font-size: var(--fs-xs); }
+.pins-compact tr[data-pinned="1"] .spark-row-thumb { inline-size: 1.5rem; block-size: 1.5rem; }
+
+/* ---- the spark STICKY notes (thumbs + pins) ---- */
+.sticky-note { position: relative; }
+.spark-sticky-thumb {
+  position: relative;
+  display: block;
+  border-radius: 6px; overflow: hidden;
+  aspect-ratio: 2.5 / 1;
+  background: rgb(0 0 0 / 0.05);
+}
+.spark-sticky-thumb img { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+.sticky-note .spark-pin { inset-block-start: 0.3rem; inset-inline-end: 0.3rem; inline-size: 1.5rem; block-size: 1.5rem; background: color-mix(in srgb, #fff 55%, transparent); }
+.sticky-note .spark-menu { inset-block-start: 0.3rem; inset-inline-end: 2.1rem; }
+
+/* ---- the SWATCH picker (the folder dialog's 16 curated tiles) ---- */
+.sf-color-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-block: 0.4rem; }
+.sf-swatches { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.sf-swatch {
+  inline-size: 1.55rem; block-size: 1.55rem;
+  border-radius: 8px;
+  border: 1px solid rgb(0 0 0 / 0.12);
+  background: var(--sw-fill);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.sf-swatch:hover { transform: scale(1.12); box-shadow: 0 2px 8px -2px rgb(0 0 0 / 0.3); }
+.sf-swatch:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.sf-swatch.is-on { box-shadow: 0 0 0 2px var(--folder-ink, var(--text)), 0 0 0 4px var(--card); }
+.sf-swatch.is-on::after {
+  content: "✓";
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: var(--sw-ink);
+  font-size: 0.8rem; font-weight: 700;
+}
+
+/* ---- the CROP dialog (checkered stage, grab cursor) ---- */
+.crop-dialog .crop-stage {
+  inline-size: 100%;
+  aspect-ratio: 2.5 / 1;
+  max-block-size: 46vh;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background:
+    repeating-conic-gradient(rgb(0 0 0 / 0.06) 0% 25%, transparent 0% 50%) 0 0 / 18px 18px,
+    var(--bg-soft);
+  touch-action: none;
+}
+.crop-dialog canvas { display: block; inline-size: 100%; block-size: 100%; cursor: grab; }
+.crop-dialog canvas:active { cursor: grabbing; }
+.crop-dialog .crop-hint { margin-block: 0.4rem 0.6rem; }
+
+/* ---- the LEAN idea page (/spark.html) ---- */
+.spark-top { margin-block-end: 0.9rem; }
+/* S171: the WHEN line — sits right under the top row, above the layout grid. */
+.spark-meta-line { margin: 0 0 0.9rem; font-variant-numeric: tabular-nums; }
+.spark-back { display: inline-flex; align-items: center; gap: 0.3rem; }
+.spark-top-actions { gap: 0.5rem; align-items: center; }
+.spark-top-actions .spark-pin { position: static; background: var(--bg-soft); }
+.spark-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(16rem, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 880px) { .spark-layout { grid-template-columns: 1fr; } }
+.spark-main { display: flex; flex-direction: column; gap: 1rem; padding: 1.2rem; }
+.spark-field { display: flex; flex-direction: column; gap: 0.35rem; }
+.spark-lbl { font-size: var(--fs-xs); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.spark-field input, .spark-field textarea, .spark-field select { font: inherit; }
+.spark-tags { gap: 0.4rem; }
+.spark-tag { display: inline-flex; align-items: center; gap: 0.35rem; }
+/* S171: the tag NAME is a button (tap → the Ideas shelf searched by that tag) —
+   it must read as chip text, not as a form control: inherit the chip's type, no
+   chrome, underline only on hover/focus so the affordance is discoverable. */
+.spark-tag-name {
+  border: 0; background: transparent; color: inherit;
+  font: inherit; padding: 0; cursor: pointer; border-radius: 4px;
+}
+.spark-tag-name:hover { text-decoration: underline; text-underline-offset: 2px; }
+.spark-tag-name:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.spark-tag-x {
+  border: 0; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 0.72rem; padding: 0 0.1rem; border-radius: 4px;
+}
+.spark-tag-x:hover { color: var(--err); }
+.spark-tag-x:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.spark-tag-in {
+  border: 1px dashed var(--line); border-radius: 999px;
+  background: transparent; color: var(--text);
+  padding: 0.18rem 0.7rem; font-size: var(--fs-xs);
+  inline-size: 9rem;
+}
+.spark-tag-in:focus-visible { outline: none; border-color: var(--brand); border-style: solid; }
+.spark-links { margin: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.spark-links .row { margin: 0; }
+.spark-link-form { margin-block-start: 0.5rem; flex-wrap: wrap; }
+.spark-link-form input { flex: 1 1 8rem; min-inline-size: 0; }
+.spark-save-row { border-block-start: 1px solid var(--line); padding-block-start: 0.8rem; margin-block-start: 0.2rem; }
+#spark-status { font-variant-numeric: tabular-nums; }
+/* S193: the review queue bar — the place-keeper in the unreviewed set. The soft
+   teal tint family (the S189/S190 attention/navigation grammar — --nav-active-*
+   tokens, their contrast floors already proven on their own tint both themes),
+   a hairline of the deeper tint token, the position in tabular-nums. Contextual
+   by construction: spark-page.js mounts it only for an idea IN the unreviewed
+   set with siblings (§7: never a nag). The flex row mirrors under RTL (prev
+   rides the inline-start end) and the .icon.arrow chevrons flip with it. */
+.spark-queue {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  margin-block: 0 0.9rem; padding: 0.4rem 0.55rem;
+  background: var(--nav-active-bg);
+  border: 1px solid var(--nav-active-bg-hover);
+  border-radius: var(--radius-sm);
+}
+/* the position line rides the label ink proven on this exact tint (6.56:1 light /
+   6.45:1 dark, the S189 floors) — the .muted rung would sit under the 4.5:1 small-
+   text bar on the blended tint */
+.spark-queue-pos { color: var(--nav-active-label); font-variant-numeric: tabular-nums; }
+.spark-queue-btn { flex-shrink: 0; }
+/* S193: the promote action — a neutral ghost secondary (the ONE-primary rule: Save
+   stays the row's primary), the up-arrow glyph carrying the decision's weight. */
+.spark-promote { flex-shrink: 0; }
+/* the images side panel */
+.spark-side { padding: 1rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.spark-images-h { margin: 0; font-size: var(--fs-sm); font-weight: 700; }
+.spark-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: 0.6rem; }
+.spark-gallery-empty { margin: 0; }
+.spark-tile { margin: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.spark-tile-img {
+  border: 0; padding: 0; border-radius: 8px; overflow: hidden;
+  aspect-ratio: 2.5 / 1; background: var(--bg-soft);
+  position: relative; cursor: zoom-in; display: block;
+}
+.spark-tile-img img { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+.spark-tile.is-cover .spark-tile-img { box-shadow: 0 0 0 2px var(--brand); border-radius: 8px; }
+.spark-tile-acts { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.spark-cover-btn.is-on { color: var(--brand); font-weight: 600; }
+.spark-drop {
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem; flex-wrap: wrap;
+  border: 1.5px dashed var(--line); border-radius: var(--radius);
+  padding: 0.9rem 0.6rem;
+  transition: border-color 0.14s ease, background-color 0.14s ease;
+}
+.spark-drop.is-over { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 7%, transparent); }
+.spark-drop.is-busy { opacity: 0.6; pointer-events: none; }
+/* the not-found / loading states */
+#spark-notfound { margin-block-start: 2rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sfh-prompt, .sf-swatch, .sf-chip, .kanban-col[data-spark-folder] { transition: none; }
+  .sfh-prompt:hover, .sf-swatch:hover { transform: none; }
+}

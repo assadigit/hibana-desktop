@@ -1,0 +1,482 @@
+/* --- Calendar view (Phase B4.1) ---------------------------------------------- */
+.cal-head { margin-block-end: 1rem; }
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  min-block-size: 28rem;
+}
+.cal-grid.loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-soft);
+  opacity: 0.3;
+  border-radius: var(--radius);
+}
+.cal-dow {
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-block-end: 0.4rem;
+  border-block-end: 1px solid var(--line);
+}
+.cal-cell {
+  min-block-size: 5.5rem;
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: relative;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.cal-cell.empty { border-color: transparent; background: transparent; cursor: default; }
+.cal-cell:hover:not(.empty) { border-color: var(--line-strong); background: var(--bg-soft); }
+.cal-cell.today { border-color: var(--brand); border-width: 2px; }
+.cal-cell.has-items { background: var(--bg-soft); border-color: var(--line-strong); }
+.cal-day-num { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.cal-cell.today .cal-day-num { color: var(--link); } /* F14 (session 9): --brand as text was 2.9:1 — --link is the text-safe teal */
+/* Day markers: PIN-STYLE (22-a #3+#8, supersedes the 14→18px bumps) — 24px, saturated
+   system hue per kind, a white separation ring, a gloss highlight and a soft drop
+   shadow so days with items read like pins stuck on the month. Done items keep 45%
+   opacity (quiet, but findable). */
+.cal-dots { display: flex; gap: 5px; flex-wrap: wrap; padding-block-start: 2px; }
+.cal-dot {
+  /* 22-a: 18 → 24px — clearly larger/bolder day signals */
+  inline-size: 24px;
+  block-size: 24px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 2.5px solid var(--card);
+  box-shadow:
+    inset 0 2px 2px rgb(255 255 255 / 0.4),   /* pin-head gloss */
+    0 2px 5px rgb(30 20 10 / 0.35),           /* soft drop shadow */
+    0 0 0 1px rgb(30 20 10 / 0.06);           /* hairline so light hues hold the edge */
+}
+/* 22-a #4/#8: kind hues are design-system tokens only — info blue / warning amber /
+   brand teal / ok green (the note dot moved from --color-success to the deeper AA
+   --ok for contrast on the near-white grid; sadhana now links to the identity --brand
+   token instead of the duplicate --color-primary). */
+.cal-dot-project { background: var(--color-info); }
+.cal-dot-task { background: var(--color-warning); }
+.cal-dot-sadhana { background: var(--brand); }
+.cal-dot-note { background: var(--ok); }
+.cal-dot-done { opacity: 0.45; }
+.cal-day-detail {
+  margin-block-start: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.cal-day-list { list-style: none; margin: 0.75rem 0; padding: 0; display: grid; gap: 0.4rem; }
+.cal-day-item { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.cal-day-item a { font-weight: 500; }
+.cal-kind { font-size: var(--fs-xs); color: var(--muted); background: var(--accent-soft); padding: 0.05rem 0.4rem; border-radius: 999px; }
+
+/* --- Day creators (user request 2026-08-30): sticky / task / note composers in the
+       day-detail panel. Clicking a calendar day plans it three ways. --- */
+.cal-day-actions { margin-block-start: 0.4rem; gap: 0.5rem; }
+.row.end { justify-content: flex-end; }
+.cal-composer {
+  display: grid;
+  gap: 0.5rem;
+  margin-block-start: 0.6rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+}
+.cal-composer[hidden] { display: none; } /* author display:grid defeats the UA [hidden] */
+.cal-composer textarea, .cal-composer input[type='text'] { width: 100%; }
+.cal-composer select { min-inline-size: 12rem; }
+.cal-colors { gap: 0.45rem; }
+.cal-color-dot {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.cal-color-dot:hover { transform: scale(1.12); }
+.cal-color-dot.active { border-color: var(--text); }
+/* Sticky chip: its pastel comes inline (--sticky-bg) from the stored color name. */
+.cal-day-sticky {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  background: var(--sticky-bg, #fff59d);
+  /* Session 17: same sticky-paper DNA as the note papers — near-sharp 2px corners and
+     the layered directional shadow (light from the top-left), scaled DOWN for a chip
+     that lives inside a dense calendar day cell: the full 4px 12px 20px layer would
+     flood neighboring cells, so this carries the same recipe at chip scale. */
+  border-radius: 2px;
+  padding: 0.45rem 0.6rem;
+  box-shadow: 1px 2px 3px rgb(0 0 0 / 0.10), 2px 6px 10px rgb(0 0 0 / 0.12);
+}
+.cal-day-sticky-text { flex: 1; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.cal-day-note-text { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.cal-note-glyph { font-size: var(--fs-sm); }
+.cal-note-x {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  opacity: 0.55;
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  position: relative; /* S200 (UX-6): the fine-world ring anchor */
+}
+/* S200 (UX-6): the fine-world hit ring — the ~20px ✕ box sat under the 24px
+   WCAG 2.5.8 minimum; the transparent ::after lifts the EFFECTIVE hit area
+   ≥24px without growing the compact inline shape (the ringed-family idiom,
+   fine-pointer edition; coarse pointers already get the 40px grid box below). */
+.cal-note-x::after { content: ""; position: absolute; inset: -3px; }
+.cal-note-x:hover { opacity: 1; background: rgb(0 0 0 / 0.08); }
+/* S197 (the touch+optical audit): the day-note/sticky ✕ — a ~12px text glyph in
+   a ~20px box, the smallest control on the calendar (half the 40px coarse
+   floor). The compact inline shape stays on fine pointers; coarse pointers get
+   the 40px floor via the grid-centered box grammar. */
+@media (pointer: coarse) {
+  .cal-note-x {
+    display: inline-grid;
+    place-items: center;
+    min-inline-size: 2.5rem;
+    min-block-size: 2.5rem;
+  }
+}
+.cal-dot-note { background: var(--ok); }
+.cal-dot-sticky { /* background set inline from the note's own pastel */ }
+
+/* --- Right-click day menu (22-a #6) — same chrome as the app's dropdowns ---------- */
+.cal-ctx-menu {
+  position: fixed;
+  z-index: 80;
+  min-inline-size: 11.5rem;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.3rem;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
+}
+.cal-ctx-date {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  padding: 0.25rem 0.55rem 0.4rem;
+  margin-block-end: 0.15rem;
+  border-block-end: 1px solid var(--line);
+}
+.cal-ctx-menu button {
+  text-align: start;
+  border: 0;
+  background: none;
+  padding: 0.42rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.cal-ctx-menu button:hover,
+.cal-ctx-menu button:focus-visible { background: var(--accent-soft); outline: none; }
+/* Day-binding chip on notebook cards (quick notes pinned to a calendar day, 0028) —
+   S70: the chip's full styling (note-color tint, hover/focus affordances — it is now a
+   LINK to this day) lives in quicknotes.css beside its notebook anatomy; the duplicate
+   rules that used to live here (accent-soft background + .note-head-main sizing) lost
+   the cascade race on every page that loads both sheets and were consolidated. */
+@media (max-width: 560px) {
+  .cal-cell { min-block-size: 3.5rem; padding: 0.25rem; }
+  .cal-day-num { font-size: var(--fs-xs); }
+  .cal-dow { font-size: 0.65rem; }
+  .cal-dot { inline-size: 19px; block-size: 19px; border-width: 2px; } /* 24px pins shrink one step on phones */
+  .cal-legend-item .cal-dot { inline-size: 19px; block-size: 19px; }
+}
+
+/* --- Activity timeline feed (Phase B4.2) ------------------------------------- */
+.feed { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: 0.5rem; max-inline-size: 42rem; }
+/* S43 (mobile audit): the feed's single implicit grid track sizes to the items'
+   min-content, and a .feed-item's min-content is its nowrap .feed-title (a long
+   project name measured 547px → the reports page scrolled +286 sideways at 390px,
+   the whole shell zoomed to fit). A minmax(0,1fr) track lets the li shrink and the
+   title's own ellipsis (overflow:hidden) do its job. */
+.feed { grid-template-columns: minmax(0, 1fr); }
+.feed-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.feed-item:hover { border-color: var(--line-strong); background: var(--bg-soft); }
+.feed-icon { flex: none; width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--muted); }
+.feed-icon .icon { width: 1.1em; height: 1.1em; }
+.feed-project .feed-icon { background: color-mix(in srgb, var(--color-info) 18%, transparent); color: var(--color-info); }
+.feed-sadhana .feed-icon { background: color-mix(in srgb, var(--color-primary) 18%, transparent); color: var(--color-primary); }
+.feed-note .feed-icon { background: color-mix(in srgb, var(--color-warning) 18%, transparent); color: var(--color-warning); }
+.feed-body { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.feed-title { font-weight: 500; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-title:hover { color: var(--brand); }
+.feed-meta { display: flex; gap: 0.4rem; align-items: center; }
+
+/* --- On this day (Phase B4.3) ------------------------------------------------ */
+.otd {
+  margin-block-end: 2rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--brand) 4%, var(--card));
+}
+.otd h2 { margin: 0 0 0.75rem; font-size: var(--fs-xl); color: var(--brand); }
+.otd-content { display: grid; gap: 1rem; }
+.otd-window h3 { margin: 0 0 0.4rem; font-size: var(--fs-md); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.otd-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.otd-item { display: flex; align-items: center; gap: 0.5rem; }
+.otd-item a { color: var(--text); text-decoration: none; font-weight: 500; }
+.otd-item a:hover { color: var(--brand); }
+.otd-item .feed-icon { width: 1.5rem; height: 1.5rem; }
+
+/* ===========================================================================
+   Round 1 polish — focus rings, calendar skeleton, mobile, print, hover states
+   =========================================================================== */
+
+/* Focus rings on the new interactive elements (calendar cells, feed items, heatmap
+   cells, tabs) — extends the global a/button focus-visible pattern to role=button +
+   grid cells so keyboard users get a visible ring everywhere. */
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="option"]:focus-visible,
+.cal-cell:focus-visible,
+.heatmap-cell:focus-visible,
+.feed-item:focus-within,
+.detail-tab:focus-visible,
+.settings-tab:focus-visible,
+.cmdk-item:focus-visible,
+.mobile-nav a:focus-visible,
+.mobile-nav .mobile-nav-more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+/* Feed items: ring the whole row when a link inside is focused */
+.feed-item:focus-within {
+  outline-offset: -2px;
+}
+
+/* Calendar skeleton loader — the .loading class currently has no visual. Add a shimmer
+   overlay so the user sees the grid is fetching, not frozen. */
+.cal-grid.loading {
+  position: relative;
+  min-block-size: 28rem;
+}
+.cal-grid.loading::before {
+  content: '';
+  position: absolute;
+  inset: 1.5rem 0 0 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--accent-soft) 0,
+    var(--accent-soft) calc(12.5% - 4px),
+    transparent calc(12.5% - 4px),
+    transparent 12.5%
+  );
+  opacity: 0.4;
+  border-radius: var(--radius-sm);
+}
+.cal-grid.loading::after {
+  content: '';
+  position: absolute;
+  inset: 1.5rem 0 0 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 8%, transparent), transparent);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: cal-skel 1.2s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes cal-skel {
+  0% { background-position: -50% 0; }
+  100% { background-position: 150% 0; }
+}
+
+/* Mobile calendar — the 7-column grid is cramped under 480px. Allow horizontal scroll
+   + compact the cells so a full week is visible without zoom. */
+@media (max-width: 480px) {
+  .cal-grid { overflow-x: auto; min-block-size: 22rem; }
+  .cal-cell { min-inline-size: 2.75rem; }
+  .cal-dow { min-inline-size: 2.75rem; }
+  .cal-head { flex-wrap: wrap; gap: 0.5rem; }
+}
+
+/* Heatmap cell hover — already has scale, add a subtle ring on focus */
+.heatmap-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Feed item hover lift (desktop only) */
+@media (hover: hover) {
+  .feed-item {
+    transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+  }
+  .feed-item:hover {
+    transform: translateX(2px);
+    border-color: var(--line-strong);
+    box-shadow: 0 2px 8px -4px rgb(0 0 0 / 0.1);
+  }
+}
+
+/* --- Print stylesheet (reports + calendar) ---------------------------------- */
+/* Hide nav, FAB, mobile nav, toasts; expand the main content; force light theme. */
+@media print {
+  .topbar, .mobile-nav, .mobile-more-sheet, .mobile-more-backdrop, .fab-stack, .toast, .cmdk, dialog, .fab-menu, .sync-badge, .offline-banner,
+  .cal-day-detail, #feed-more, button[id^="cal-"] {
+    display: none !important;
+  }
+  body { background: #fff !important; color: #000 !important; }
+  body::after { display: none !important; } /* film grain off in print */
+  .shell { min-block-size: auto !important; }
+  .card, .cal-cell, .feed-item {
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    break-inside: avoid;
+  }
+  .cal-grid { gap: 2px; }
+  .cal-cell { min-block-size: 3rem; }
+  .cal-dot { opacity: 0.8; }
+  a { color: #000 !important; text-decoration: underline; }
+  .muted { color: #555 !important; }
+  .badge { border: 1px solid #999 !important; background: #eee !important; color: #000 !important; }
+}
+
+/* ===========================================================================
+   Global Focus / Zen Mode (Ctrl+.) — Round 1 new feature
+   Hides nav + chrome, expands main content for deep work. Toggle with Ctrl+. or a
+   button. ESC to exit. Applies to all authed pages via body.zen-mode.
+   =========================================================================== */
+body.zen-mode .topbar,
+body.zen-mode .mobile-nav,
+body.zen-mode .mobile-more-sheet,
+body.zen-mode .mobile-more-backdrop,
+body.zen-mode .fab-stack,
+body.zen-mode .sync-badge,
+/* S88: the navigation rail + its secondary panel leave with the rest of the chrome,
+   and the gutter they reserved collapses (content reclaims the full viewport). */
+body.zen-mode .rail,
+body.zen-mode .rail-panel {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-0.5rem);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+body.zen-mode .topbar { height: 0; min-height: 0; overflow: hidden; padding: 0; margin: 0; border: 0; }
+/* S88: reclaim the rail gutter + close the panel's push while zen'd. */
+body.zen-mode .rail,
+body.zen-mode .rail-panel { visibility: hidden; }
+body.zen-mode:has([data-nav]) { padding-inline-start: 0; }
+body.zen-mode .shell { max-inline-size: 56rem; margin: 0 auto; padding-block: 2rem; }
+body.zen-mode { padding-block-end: 0; }
+/* A small "exit zen" pill that floats top-right so the user always knows how to get back */
+.zen-exit {
+  position: fixed;
+  inset-block-start: 1rem;
+  inset-inline-end: 1rem;
+  z-index: 70;
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-dropdown);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+.zen-exit:hover {
+  /* Session 23: green fill + light text (was green-bg leak under dark text) */
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.zen-exit .icon { width: 1em; height: 1em; }
+body.zen-mode .zen-exit { display: inline-flex; animation: zen-exit-in 0.3s ease-out 0.2s both; }
+@keyframes zen-exit-in {
+  from { opacity: 0; transform: translateY(-0.5rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.zen-mode .topbar, body.zen-mode .mobile-nav, body.zen-mode .fab-stack,
+  .zen-exit { transition: none; animation: none; }
+}
+
+/* ===========================================================================
+   Round 2 — Notification Center + styling polish
+   =========================================================================== */
+
+
+/* ==========================================================================
+   S30 batch 3 (user request 2026-09-12): Task analytics on the reports page
+   ==========================================================================
+   Priority mix stats + the backlog share bar + label distribution chips + the sprint
+   velocity table. Counts-only (the vision rejects time tracking). */
+
+.rep-tasks h4 { margin-block: 1rem 0.4rem; font-size: var(--fs-md, 1rem); }
+.rep-tasks .stat { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+
+/* the backlog share bar — one horizontal strip, urgent first; segments reuse the
+   .prio-* background colors with 0.55 alpha (pastel, AA-safe as fills). */
+.rep-share {
+  display: flex;
+  block-size: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-block: 0.8rem 0.3rem;
+  border: 1px solid var(--line);
+  background: var(--bg-inset, var(--bg));
+}
+.rep-share-seg { block-size: 100%; min-inline-size: 0; }
+/* S154: the four share-bar segments read the ONE --prio-banner-* family — the retired
+   S143 rgb literals (low/medium/high) and the stale #d9365b fallback (urgent) leave.
+   Light now matches the S150 fills (the S145 "every priority indicator shares one hue
+   family" intent finally reaches this file; no e2e pins the segment colors) and dark
+   inherits the owner's S154 badge tints from claude-dark-theme.css. */
+.rep-share-seg.prio-low { background: var(--prio-banner-low); }
+.rep-share-seg.prio-medium { background: var(--prio-banner-medium); }
+.rep-share-seg.prio-high { background: var(--prio-banner-high); }
+.rep-share-seg.prio-urgent { background: var(--prio-banner-urgent); }
+.rep-share-seg.bg.prio-urgent { background: var(--prio-banner-urgent); }
+.rep-share-note { margin-block: 0 0.4rem; }
+
+/* label chips — dot + name + count + done/fresh riders */
+.rep-label-chip { gap: 0.35rem; min-block-size: 40px; }
+.rep-label-dot { inline-size: 9px; block-size: 9px; border-radius: 999px; flex: none; }
+.rep-label-fresh { color: var(--brand); }
+
+/* sprint velocity — compact table, numbers centered, dots as column heads */
+.rep-vel-table { inline-size: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.rep-vel-table th, .rep-vel-table td { padding: 0.3rem 0.45rem; text-align: start; border-block-end: 1px solid var(--line); }
+.rep-vel-num { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rep-vel-num .prio-dot { display: inline-block; margin-inline-end: 0.15rem; }
+.rep-vel-name a { font-weight: 600; }
+.rep-vel-name .muted { margin-inline-start: 0.25rem; }
+@media (max-width: 640px) {
+  .rep-vel-name .muted { display: none; }
+}

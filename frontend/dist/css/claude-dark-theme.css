@@ -1,0 +1,491 @@
+/* claude-dark-theme.css — S86 (owner request): the Claude-style dark mode.
+   ============================================================
+   S87 (owner request 2026-09-20): this is now THE app's ONLY dark mode. The old
+   `dark` theme and every prefers-color-scheme auto-dark fallback were retired —
+   light lives in themes.css, dark lives HERE. The component rules in the S87
+   section below absorbed themes.css's dark treatments (they previously reached
+   claude-dark through un-gated :not([data-theme='light']) twins), so the claude
+   look is deterministic no matter the OS color scheme.
+   Recreates the look and feel of Claude's dark mode: a warm near-black
+   background (never pure black), a soft terracotta accent used sparingly,
+   generously rounded corners, and warm off-white text instead of stark white.
+
+   Source: Anthropic's published brand palette (Slate/Ivory/Clay/Sky/Olive + the
+   extended swatches), rebuilt onto HIBANA'S OWN token names (--bg, --card,
+   --text, --accent, the --badge-* roles…) so the whole app re-skins through the
+   same variable system every theme already speaks. Surfaces step UP in lightness
+   toward the user (page < card < modal) — depth without drop shadows.
+
+   ACTIVATION: <html data-theme="claude-dark"> — stored in localStorage
+   ('hibana-theme') by the Settings picker + the header cycle (app.js).
+
+   Status mapping (the owner's requested Claude-family assignment):
+     spark   → Kraft tan   #D4A27F  (soft, low-commitment)
+     awaiting→ Fig pink    #C46686  (waiting)
+     doing   → Clay accent #D97757  (the one status that gets the real accent)
+     operational → Olive   #9BA77A  (stable / working)
+     halted  → burnt clay  #C2643F
+     unreviewed → Sky      #6A9BCC ; investigating → Heather #CBCADB
+   ============================================================ */
+
+html[data-theme='claude-dark'] {
+  color-scheme: dark;
+
+  /* ---------- Surfaces (elevation: page < card < modal) ---------- */
+  --bg: #141413;            /* page background — the warm near-black base */
+  --bg-soft: #1f1e1c;       /* wells, sidebars, inset strips */
+  /* S183 (the depth audit — the dark L4 split): --statcard-bg LEFT the card
+     color — the in-card row fill becomes its own recessed step (#191817, one
+     rung below #1f1e1c, mirroring light's #FFFFFF → #F5F6F7 relationship:
+     the row well sits BETWEEN the page and the card, never ON the card's own
+     tone). The audit measured dark's L4 collapsed INTO L3 — card, row fill and
+     hover wash were one color, hairlines alone separating them. */
+  --statcard-bg: #191817;
+  --card: #1f1e1c;          /* cards, list rows */
+  --card-hover: #2a2927;
+  /* S155 INK RUNGS — dark per the owner's spec ("invert per the Scandinavian
+     system's dark-canvas rules — don't reuse the light percentages unchanged"):
+     secondary ≈ white 0.56, tertiary from the spec's 0.40–0.50 band — pinned at
+     the TOP of the band (0.50) because the canvas is a warm near-black, not pure
+     black: 0.45 white computes ≈4.2:1 on the #1f1e1c CARD surface (below AA for
+     the 12px captions that wear this rung); 0.50 computes ≈5.1:1 there and ≈5.6:1
+     on the #141413 page. --text/--muted are the primary/secondary rungs FLATTENED
+     ON THE CARD (0.92→#EDEDEC, 0.56→#9C9C9B) and deliberately OPAQUE — same
+     mixing contract as the light block (the ink-anchored color-mix recipes and
+     their e2e pins need an opaque anchor; see variables.css). The warm off-white
+     #e8e6dc retires — the neutrality arc S95 started on surfaces completes on ink. */
+  --ink-primary: rgba(255, 255, 255, 0.92);
+  --ink-secondary: rgba(255, 255, 255, 0.56);
+  --ink-tertiary: rgba(255, 255, 255, 0.50);
+  --text: #EDEDEC;  /* was #e8e6dc — warm off-white */
+  --muted: #9C9C9B; /* was #b0aea5 — 6.06:1 on the card, 6.38:1 on the page — AA holds */
+  --faint: #7a7870;
+
+  /* ---------- Borders ---------- */
+  --line: #34322f;          /* hairline dividers, card edges */
+  --line-strong: #45423d;   /* input outlines, focus dividers */
+
+  /* ---------- S185 — the Project Detail palette's dark twins ----------
+     The batch-1 role tokens (variables.css's S185 :root block) resolve onto the
+     app's dark identity here: warm near-black canvas, card surface, hairline,
+     muted ink, and the CLAY primary (teal is the light-mode identity; dark keeps
+     its own). The kanban column family flips to the S88 low-alpha washes of the
+     stage triplets (the light-mode pastels would blind on #1f1e1c) — same values,
+     now named, so project-header.css needs ONE rule set for both themes. The
+     --prio-* option pairs are NOT overridden: native dropdowns keep the light
+     pastel pairs in dark (same as pre-S185 behavior). */
+  --page-bg: #141413;
+  --surface: #1f1e1c;
+  --border-soft: #34322f;
+  --text-muted: #9C9C9B;
+  --primary: #d97757;
+  --col-idea-bg: rgb(80 100 128 / 0.14);      --col-idea-dot: #7B9AB8;  --col-idea-ink: #7B9AB8;  --col-idea-edge: 80 100 128;
+  --col-planned-bg: rgb(110 115 122 / 0.14);  --col-planned-dot: #C49A6E; --col-planned-ink: #A0A8B0; --col-planned-edge: 110 115 122;
+  --col-progress-bg: rgb(150 120 85 / 0.16);  --col-progress-dot: #C49A6E; --col-progress-ink: #C49A6E; --col-progress-edge: 150 120 85;
+  --col-done-bg: rgb(100 145 115 / 0.14);     --col-done-dot: #7BAA8E;  --col-done-ink: #7BAA8E;  --col-done-edge: 100 145 115;
+  --col-bug-bg: rgb(150 110 120 / 0.16);      --col-bug-dot: #C098A0;   --col-bug-ink: #C098A0;   --col-bug-edge: 150 110 120;
+
+  /* ---------- Accent — Clay terracotta. PRIMARY actions only ---------- */
+  --accent: #d97757;
+  /* S200 (UX-3): accent-as-text ink, dark twin. --accent itself passes on the dark
+     base (5.34:1) but the ink-grade register mirrors what --link already does —
+     the lighter clay tint reads as TEXT, not as a fill that escaped its button.
+     7:1 on the dark base (same value family as --link below). */
+  --accent-ink: #d9997f;
+  --accent-hover: #c2643f;
+  --accent-soft: rgba(217, 119, 87, 0.14);
+  /* S189 (owner, CHANGE 7 — the rail's active SHAPE, dark twins): the rail's
+     active family keeps its TEAL in the dark theme (the rail is navigation,
+     not a primary action — the clay stays the CTA accent), at the dark-tint
+     lesson's HIGHER alpha (20% vs light's 14% — low-alpha washes die on
+     #1f1e1c) and with LIGHTER teals so the ink clears the same floors:
+     icon #8FCCCF 5.91:1 and label #9AD4D7 6.45:1 on the 20% tint
+     (rgba blends to #354140); the label steps one rung LIGHTER the way the
+     light label steps darker — toward MORE contrast on its own tint.
+     Proofs: qa/s189-rail-active.mjs + the identity-palette S189 block. */
+  --nav-active-bg: rgba(143, 204, 207, 0.20);
+  --nav-active-bg-hover: rgba(143, 204, 207, 0.25);
+  --nav-hover-bg: rgba(143, 204, 207, 0.10);
+  --nav-active-icon: #8FCCCF;
+  --nav-active-label: #9AD4D7;
+  --cta: #c2643f;           /* solid CTA keeps white ink legible (4.6:1) */
+  --cta-hover: #b25a37;
+  --btn-text: #ffffff;
+  --link: #d9997f;          /* warm clay-tinted link, 7:1 on the base */
+  /* S94 (owner items 7+8 — "no khaki anywhere"): the Quick Notebook keeps the TEAL
+     register in the dark theme too. The light-mode deep CTA teal (#2E7B7F) sinks under
+     3:1 on the near-black card, so the dark sheet carries a lightened teal of the same
+     family (#6FA6A8 — already the sheet's syntax-function hue; 5.9:1 on --card). The
+     notebook's washes/borders re-tint through this one token. */
+  --quicknote-accent: #6FA6A8;
+
+  /* ---------- Semantic ---------- */
+  --ok: #9BA77A;            /* olive */
+  --err: #d98a6f;           /* clay-toned error — warm, not neon */
+  --warn: #d4a27f;          /* kraft tan */
+  --danger: #e89b85;
+  --danger-soft: rgba(217, 119, 87, 0.14);
+  --danger-soft-hover: rgba(217, 119, 87, 0.24);
+  --pastel-tool: #3a2f24;
+  --pastel-tool-strong: #4d3e2e;
+  --code-fg: #F09B7E;
+  --code-bg: #2a2622;
+  --code-border: #45423d;
+  --code-panel-bg: #1a1917;
+  --code-panel-fg: #e8e6dc;
+  /* S88 syntax tokens on the dark panel — the light set dimmed to claude warmth. */
+  --md-kw: #E08A6B;
+  --md-str: #9DB584;
+  --md-com: #6F6A61;
+  --md-num: #D2A258;
+  --md-fn: #6FA6A8;
+  --md-op: #8A857B;
+
+  /* ---------- Status badges — the Claude secondary palette (S137 hues) ----------
+     One --st-* hue per status (muted chroma that reads on the dark ground); each
+     badge pair is that hue's dark wash + light AA ink. */
+  --st-idea: #6FA3E8;
+  --st-planning: #D9AC3F;
+  --st-queued: #55AED2;      /* S141: chroma raise (was #5FA0B5) — keeps pace with the light cyan-blue */
+  --st-developing: #DE9260;
+  --st-awaiting_dev: #9189B8; /* S141: violet-slate (was #8D979E gray) — the on-hold violet, dark register */
+  --st-operational: #5ABB78;  /* S141: chroma raise (was #63B377) */
+  --st-bug: #E06A6A;
+  --badge-spark-bg: #22304A;         --badge-spark-fg: #8FB4E8;      /* blue */
+  --badge-unreviewed-bg: #212831;    --badge-unreviewed-fg: #8FB4D9; /* Sky        */
+  --badge-planning-bg: #332E18; --badge-planning-fg: #D9C07A; /* yellow */
+  --badge-queued-bg: #16333F;      --badge-queued-fg: #7FC4DE;   /* S141: cyan family, AA 6.9 */
+  --badge-developing-bg: #3A2718;         --badge-developing-fg: #E09A6A;      /* orange */
+  --badge-awaiting_dev-bg: #2D2B3D;        --badge-awaiting_dev-fg: #ABA5CC;     /* S141: violet family, AA 5.9 */
+  --badge-operational-bg: #1F3222;   --badge-operational-fg: #94C9A2; /* green     */
+  /* S191: the missing amber pair's DARK twin ("due soon"/pending) — mirrors the
+     planning yellow's dark relationship but a hair warmer; fg #DCC078 on bg #332C17
+     = 7.8:1, proven in qa/s191-attention-surface.mjs. */
+  --badge-pending-bg: #332C17;  --badge-pending-fg: #DCC078;
+
+  /* ---------- Priority badges — the owner's S154 dark pairs ----------
+     Light keeps the S150 fill+ink pairs untouched; in dark the full-opacity
+     light fills read as a luminance jump on the near-black canvas, so each
+     badge becomes a low-opacity tint of its own hue blended into the dark
+     surface with a lightened same-hue ink (the owner's rationale). The exact
+     values below are the owner's — do NOT shift a channel: High (4.68:1) and
+     Urgent (4.54:1) sit just above the AA floor and any drift drops them
+     under 4.5:1. Owner-verified + independently re-checked here:
+       Low    ink #83A3C3 on fill #292F36  (5.14:1)
+       Medium ink #E2BE5A on fill #383325  (7.04:1)
+       High   ink #E97949 on fill #3E2A23  (4.68:1)
+       Urgent ink #EC6E65 on fill #3E2828  (4.54:1)
+     The kanban banner, the detail slide-over chip and the reports share-bar
+     all read the ONE --prio-banner-* family, so this block re-colors every
+     TEXT badge surface at once; the dots (no text) keep their light fills. */
+  --prio-banner-low: #292F36;      --prio-banner-ink-low: #83A3C3;
+  --prio-banner-medium: #383325;   --prio-banner-ink-medium: #E2BE5A;
+  --prio-banner-high: #3E2A23;     --prio-banner-ink-high: #E97949;
+  --prio-banner-urgent: #3E2828;   --prio-banner-ink-urgent: #EC6E65;
+
+  /* S138 (owner correction on the S137 redesign): the per-status kanban card tints
+     are BACK — the card mixes the (muted-chroma dark) --st-* token over the dark
+     --card via the shared color-mix rules (notifications.css). Dark keeps the same
+     one-notch-stronger strength the S88 lesson established for dark tints (light
+     ships 24%) so the hue still reads on the near-black card. S139 raised both
+     dials together — 12%/18% read washed-out, the five tints looked alike. */
+  --kanban-tint: 32%;
+
+  /* ---------- Dots / paper ---------- */
+  --dot-spark: #d4a27f;
+  --dot-pending: #cbcadb;
+  --dot-building: #d97757;
+  --dot-grid: rgb(232 230 220 / 0.06);
+  --nb-paper: #262524;
+  --nb-grid: rgb(232 230 220 / 0.05);
+  --nb-ink: invert(1) hue-rotate(180deg) brightness(0.92);
+
+  /* ---------- Brand ---------- */
+  --brand: #d97757;
+  --brand-hover: #e28f6c;
+  --brand-logo: url('/logo-light.png');
+  --inline-logo: url('/logo-light.png');
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b0aea5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
+  /* ---------- Shadows — very soft; strong shadows read as murk on dark ---------- */
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* ---------- S87: tokens the retired auto-dark block used to answer ---------- */
+  --color-primary-strong: #e28f6c;  /* clay text shade of the accent — AA on the base */
+  /* canvas papers — carried over VERBATIM from the retired dark's un-gated twins
+     (claude-dark already rendered on these today; preserving them = zero drift) */
+  --paper-white: #151412;
+  --paper-checkered: #1a1916;
+  --paper-shaded: #1e1b15;
+  --checker-a: rgb(255 240 200 / 0.02);
+  --checker-b: rgb(255 240 200 / 0.045);
+}
+
+/* Elevated layers the base system hardcodes lighter-than-card: step them up the
+   Claude ladder (card #1f1e1c < elevated #262524). */
+html[data-theme='claude-dark'] .modal,
+html[data-theme='claude-dark'] dialog,
+html[data-theme='claude-dark'] .vault-pop,
+html[data-theme='claude-dark'] .emoji-pop,
+html[data-theme='claude-dark'] .magic-popover,
+html[data-theme='claude-dark'] .cmdk-panel,
+html[data-theme='claude-dark'] .dropdown-menu {
+  background: #262524;
+  border-color: #34322f;
+}
+
+/* Inputs sit one step DARKER than the card (Claude's --bg-input) — the inset read. */
+html[data-theme='claude-dark'] input:not([type='checkbox']):not([type='radio']):not([type='range']),
+html[data-theme='claude-dark'] textarea,
+html[data-theme='claude-dark'] select,
+html[data-theme='claude-dark'] .vault-ed-title,
+html[data-theme='claude-dark'] .vault-src {
+  background: #1a1917;
+  border-color: #45423d;
+}
+
+/* The wand keeps its pastel-purple identity but warms it to sit in the family. */
+html[data-theme='claude-dark'] { --mw-accent: #d97757; --mw-accent-ink: #141413; }
+html[data-theme='claude-dark'] .magic-popover { background: #262524; color: #e8e6dc; }
+html[data-theme='claude-dark'] .magic-prompt-ta { background: #1a1917; }
+
+/* Sticky quick-notes — S105 (owner: “in dark mode the sticky notes are almost
+   black; they must still be seen colored — yellow, green… — but muted, not
+   straining”). The old #2E2818-family steps sat at ~10% lightness — invisible
+   tints, not colors. The new register keeps each hue READABLE at muted
+   saturation (~35%), scoped to the sticky/grid PAPER views only — list view
+   keeps its neutral dark card (light-mode parity: color paints the paper, not
+   the list). Ink flips to a warm dark so text sits comfortably on the fills. */
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card[data-note-color='yellow'] { background: #b3975b !important; --note-color: #b3975b; }
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card[data-note-color='green']  { background: #5c9973 !important; --note-color: #5c9973; }
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card[data-note-color='pink']   { background: #c48aab !important; --note-color: #c48aab; }
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card[data-note-color='blue']   { background: #7a95bd !important; --note-color: #7a95bd; }
+/* S179 (advisor block 9): the DASHBOARD's compact stickies (.note-card-dash) ride
+   the same muted dark register — they render WITHOUT the view radios, so the
+   radio-chain selectors above can't reach them; the .note-card-dash scope is the
+   dashboard's own equivalent. Ink + meta + controls follow the paper. */
+html[data-theme='claude-dark'] #notebook .note-card-dash[data-note-color='yellow'] { background: #b3975b !important; --note-color: #b3975b; }
+html[data-theme='claude-dark'] #notebook .note-card-dash[data-note-color='green']  { background: #5c9973 !important; --note-color: #5c9973; }
+html[data-theme='claude-dark'] #notebook .note-card-dash[data-note-color='pink']   { background: #c48aab !important; --note-color: #c48aab; }
+html[data-theme='claude-dark'] #notebook .note-card-dash[data-note-color='blue']   { background: #7a95bd !important; --note-color: #7a95bd; }
+html[data-theme='claude-dark'] #notebook .note-card-dash { color: #292520 !important; }
+html[data-theme='claude-dark'] #notebook .note-card-dash .note-render,
+html[data-theme='claude-dark'] #notebook .note-card-dash .markdown-body,
+html[data-theme='claude-dark'] #notebook .note-card-dash .dash-note-title { color: #292520 !important; }
+html[data-theme='claude-dark'] #notebook .note-card-dash .note-meta,
+html[data-theme='claude-dark'] #notebook .note-card-dash .note-footer .small { color: #292520 !important; } /* S180 (owner block 2): was #3a352d — 4.34:1 on the muted #b3975b paper, under the 4.5:1 floor; the paper's own body ink #292520 measures 5.43:1 */
+/* dark ink + hairline on the colored papers (beats the light-ink rules below by
+   the sticky/grid view prefix); list view keeps #e8e6dc on the neutral card. */
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card { color: #292520 !important; }
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-text,
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-render,
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .markdown-body { color: #292520 !important; }
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card button.ghost { color: #4a4238 !important; }
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-meta,
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .note-footer .small,
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .attach-btn,
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .attach-btn .small { color: #3a352d !important; }
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card .attach-btn { border-color: rgb(0 0 0 / 0.28) !important; }
+html[data-theme='claude-dark'] #notebook :is(#nv-sticky:checked, #nv-grid:checked) ~ .note-list > .note-card { border-color: rgb(0 0 0 / 0.18); }
+/* list-view (neutral dark card) keeps the light ink — unchanged semantics */
+html[data-theme='claude-dark'] .note-card { color: #e8e6dc !important; }
+
+/* The header/address-bar tint for mobile browsers (app.js also sets the meta tag). */
+html[data-theme='claude-dark'] { --theme-color: #141413; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   S87 — THE dark skin (absorbed from the retired themes.css dark rules)
+   These reached claude-dark through the old un-gated :not([data-theme='light'])
+   twins; converting them to explicit claude-dark scope preserves that rendering
+   while making it independent of the OS color scheme.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Dev bug bubble — the warm red pair reads on the near-black base. */
+html[data-theme='claude-dark'] .bug-bubble { background: rgb(248 113 113 / 0.16); color: #f2a3a3; }
+
+/* Quick-note list-view card border (the light neutral flips to a light-on-dark one). */
+html[data-theme='claude-dark'] .note-card { border-color: rgba(232 230 220 / 0.10); }
+
+/* The dash to-do style pop keeps legibility with a softer shadow on dark. */
+html[data-theme='claude-dark'] .dash-todo-style-pop { box-shadow: 0 6px 22px rgb(0 0 0 / 0.35); }
+
+/* Canvas palette active swatch — light ring on the dark toolbar. */
+html[data-theme='claude-dark'] .palette button.active {
+  border-color: transparent;
+  box-shadow: 0 0 0 1.5px rgb(15 15 14 / 0.9), 0 0 0 3px var(--text);
+}
+
+/* Blue pen toolbar icon (the drawn ink stays #2f6fd1; the icon lifts on dark). */
+html[data-theme='claude-dark'] .pen-blue { color: #7fb5f0; }
+
+/* Quick-note text inks on the dark sticky fills. */
+html[data-theme='claude-dark'] .note-card .note-text,
+html[data-theme='claude-dark'] .note-card .note-render,
+html[data-theme='claude-dark'] .note-card .markdown-body { color: #e8e6dc; }
+html[data-theme='claude-dark'] .note-card button.ghost { color: #b0aea5; }
+html[data-theme='claude-dark'] .note-card .note-meta,
+html[data-theme='claude-dark'] .note-card .note-footer .small,
+html[data-theme='claude-dark'] .note-card .attach-btn,
+html[data-theme='claude-dark'] .note-card .attach-btn .small,
+html[data-theme='claude-dark'] .note-card button.ghost.small.attach-btn,
+html[data-theme='claude-dark'] .note-card button.ghost.small.attach-btn .small { color: #e8e6dc; }
+html[data-theme='claude-dark'] .note-card .attach-btn { border-color: rgb(232 230 220 / 0.35); }
+
+/* Note color picker dots mirror the muted dark sticky fills above (they preview
+   the paper the pick will paint). */
+html[data-theme='claude-dark'] .note-color-picker .dot-yellow { background: #b3975b; }
+html[data-theme='claude-dark'] .note-color-picker .dot-green { background: #5c9973; }
+html[data-theme='claude-dark'] .note-color-picker .dot-pink { background: #c48aab; }
+html[data-theme='claude-dark'] .note-color-picker .dot-blue { background: #7a95bd; }
+
+/* Auth split brand word — warm off-white on the dark pane. */
+html[data-theme='claude-dark'] .auth-brand { color: #e8e6dc; }
+
+/* Sadhana cards — clay (in-progress) + heather (on-hold) status tints, claude family. */
+html[data-theme='claude-dark'] .sadhana-card.p-in_progress { --sadhana-status-tint: rgb(217 119 87 / 0.14); }
+html[data-theme='claude-dark'] .sadhana-card.p-on_hold { --sadhana-status-tint: rgb(203 202 219 / 0.14); }
+
+/* Cards flatten to the solid surface (no light-mode gradient highlight) and carry
+   the stronger top border. S209: the embedded board's section.pd-board (the
+   .db-frame that replaced `section.card.pd-board`) joins at the same specificity
+   so the S185 warm-twin interplay is unchanged (top rung strong, warm elsewhere). */
+html[data-theme='claude-dark'] .card,
+html[data-theme='claude-dark'] section.pd-board {
+  background: var(--card);
+  border-block-start-color: var(--line-strong);
+}
+
+/* S95 r2 (owner item 7): the Quick Notebook's SOLID pastel priority fill — the
+   dark twin of quicknotes.css's .card.notebook-dashboard (this sheet's .card rule
+   is (0,2,1) and would flatten the tint back to the plain card). 13% of the
+   lightened dark teal (#6FA6A8) over the near-black card — one notch stronger
+   than light's 11% so the priority read survives on dark surfaces (the S94
+   lightened-for-dark lesson).
+   S97 (the flat-card system, B): the Notes Vault onboarding banner joins the
+   notebook precedent — its SOLID accent fill (dashboard.css, (0,2,0)) would be
+   flattened by this sheet's .card at (0,2,1), so it carries its own dark twin.
+   13% over the near-black card (light ships 8%) — the same one-notch-stronger
+   lesson so the accent read survives on dark surfaces. */
+html[data-theme='claude-dark'] .card.notebook-dashboard {
+  background: color-mix(in srgb, var(--quicknote-accent) 13%, var(--card));
+}
+/* S184 (the layout audit, item 6 — the dark composer twin): light moved the
+   composer onto the CARD surface with a visible border (gray-on-gray read as
+   disabled there); dark keeps the RECESSED well — --bg sits a rung BELOW the
+   tinted card (#141413 under #1f1e1c+13% teal), and on a dark canvas a lower,
+   bordered well is the native input register. Without this twin the light rule
+   would paint the field the card's own tone — the dark inversion of the very
+   white-on-white bug S183 fixed. */
+html[data-theme='claude-dark'] .notebook-dashboard .note-compose-text {
+  background: var(--bg);
+  border-color: var(--line-strong);
+}
+/* S182: the To-Do section panel joins the notebook's dark card grammar — the same
+   13% quicknote-accent tint (one section-card language on the dark dashboard; the
+   light sheet's .dash-todo-panel is the plain surface twin of .card.notebook-
+   dashboard, so the dark twin mirrors its notebook counterpart exactly). */
+html[data-theme='claude-dark'] .card.dash-todo-panel {
+  background: color-mix(in srgb, var(--quicknote-accent) 13%, var(--card));
+}
+/* S183 (the depth audit): the NEW section panels join the same dark section-card
+   language — Projects, the Overall-tasks overview, Recent activity, and the resume
+   strip all carry the 13% quicknote-accent tint (one section-card grammar, first
+   section to last; the light sheet's twins are the plain surface cards). */
+html[data-theme='claude-dark'] .card.dash-projects-panel,
+html[data-theme='claude-dark'] .card.dash-ov-panel,
+html[data-theme='claude-dark'] .card.dash-activity-panel,
+html[data-theme='claude-dark'] .card.resume-strip {
+  background: color-mix(in srgb, var(--quicknote-accent) 13%, var(--card));
+}
+html[data-theme='claude-dark'] .dash-vault-banner.card {
+  /* S181 (opening block 3 — the quieted nudge): the dark twin follows the light
+     sheet's 7% accent tint one notch stronger (11%) so the accent read survives
+     the near-black card — the banner is a tinted nudge card, not a plain one. */
+  background: color-mix(in srgb, var(--accent) 11%, var(--card));
+}
+
+/* Kanban chassis — flat card surface for the NO-STATUS cards (the sparks folder
+   board); stat cards transparent until hover. S138: the status cards' tinted fills
+   are the LIGHT sheet's --kanban-tint color-mix rules (0-3-0) — they outrank this
+   fallback (0-2-1) and auto-derive the dark tint by mixing the dark --st-* token
+   over the dark --card at --kanban-tint 32% (raised above, one-notch-stronger). */
+html[data-theme='claude-dark'] .kanban-card { background: var(--card); }
+html[data-theme='claude-dark'] .stat-kanban-card { background: transparent; }
+html[data-theme='claude-dark'] .card.kanban-card.stat-kanban-card { background: transparent; }
+
+/* Dash quadrants + report cards — FLAT solid surfaces (the S97 flat-card system
+   retired the one-step-elevated gradient cap app-wide); the stronger top border
+   (line-strong) keeps them one quiet step above the plain cards. */
+html[data-theme='claude-dark'] .dash-todo-quadrant {
+  background: var(--card);
+  border-color: var(--line-strong);
+}
+/* S94 (owner item 1 — a LATENT S93 BUG fixed with the visibility raise): the flat cap
+   above (html[data-theme] .dash-todo-quadrant, specificity 0-2-1) outranks
+   dashboard-todo.css's attribute-selector wash (0-2-0) — a quadrant's PICKED pastel
+   once fell back to the plain gradient in claude-dark because the wash only lived in
+   the light sheet. The dark wash MUST live here (0-3-1) — the lesson, twice-learned.
+   S95 r2 retired the wash app-wide; S102 brought it BACK pale (11% + 32% edge —
+   pastels need MORE presence on the dark card: the S97 banner precedent 8/13).
+   S104 (owner round — the calibration): "too pale — like 95% pale, no visual
+   visibility." The dark wash is RE-WEIGHTED with the light one to a VISIBLE pastel:
+   25% fill + 52% edge, title 52%, count 66%, icon 88% (dark keeps its +5pt lift
+   over the light 20/48/48/62/85 — the same additive step as the S97 8/13 rule). */
+html[data-theme='claude-dark'] .dash-todo-quadrant[style*='--dash-q-accent'] {
+  background: color-mix(in srgb, var(--dash-q-accent) 25%, var(--card));
+  border-color: color-mix(in srgb, var(--dash-q-accent) 52%, var(--line-strong));
+}
+html[data-theme='claude-dark'] .dash-todo-quadrant[style*='--dash-q-accent'] .dash-todo-qtitle strong {
+  color: color-mix(in srgb, var(--dash-q-accent) 52%, var(--text));
+}
+html[data-theme='claude-dark'] .dash-todo-quadrant[style*='--dash-q-accent'] .dash-todo-counter {
+  --badge-fg: color-mix(in srgb, var(--dash-q-accent) 66%, var(--text));
+}
+html[data-theme='claude-dark'] .dash-todo-quadrant[style*='--dash-q-accent'] .dash-todo-style {
+  color: color-mix(in srgb, var(--dash-q-accent) 88%, var(--text));
+}
+/* S104: the standalone board's quadrant box wash, dark-tuned — the light rule
+   (sadhana-board.css) is 20%/48%; 25%/52% keeps the SAME visible pastel legible on
+   the dark card, and the small elements lift with the dashboard set above. */
+html[data-theme='claude-dark'] .sadhana-wrap .quadrant[style*='--q-accent'] {
+  background: color-mix(in srgb, var(--q-accent) 25%, var(--surface));
+  border-color: color-mix(in srgb, var(--q-accent) 52%, var(--q-edge));
+}
+html[data-theme='claude-dark'] .sadhana-wrap .quadrant[style*='--q-accent'] .q-title {
+  color: color-mix(in srgb, var(--q-accent) 52%, var(--text));
+}
+html[data-theme='claude-dark'] .sadhana-wrap .quadrant[style*='--q-accent'] .q-cnt {
+  border-color: color-mix(in srgb, var(--q-accent) 46%, var(--border));
+  color: color-mix(in srgb, var(--q-accent) 66%, var(--text));
+}
+html[data-theme='claude-dark'] .sadhana-wrap .quadrant[style*='--q-accent'] .q-big {
+  border-color: color-mix(in srgb, var(--q-accent) 48%, var(--border));
+  background: color-mix(in srgb, var(--q-accent) 24%, var(--surface));
+}
+html[data-theme='claude-dark'] .reports .card,
+html[data-theme='claude-dark'] #report-body .card {
+  background: var(--card);
+  border-color: var(--line-strong);
+}
+
+/* Heatmap peak level — success mixed onto the claude card. */
+html[data-theme='claude-dark'] .heatmap-l4 {
+  background: color-mix(in srgb, var(--color-success) 80%, var(--card));
+}
+
+/* The standalone Sadhana board's own variables — the claude register. */
+html[data-theme='claude-dark'] .sadhana-wrap {
+  --text-dim: #b0aea5; --shadow-lg: 0 8px 40px rgb(0 0 0 / 0.5); --q-edge: rgba(69, 66, 61, 0.5);
+}
+
+/* Project board column inks — the muted dark set (label inks + softened borders). */
+html[data-theme='claude-dark'] .pd-col[data-status='idea']        { --pd-c: 80 100 128; --pd-ink: #7B9AB8; }
+html[data-theme='claude-dark'] .pd-col[data-status='planned']     { --pd-c: 110 115 122; --pd-ink: #A0A8B0; }
+html[data-theme='claude-dark'] .pd-col[data-status='in_progress'] { --pd-c: 150 120 85; --pd-ink: #C49A6E; }
+html[data-theme='claude-dark'] .pd-col[data-status='done']        { --pd-c: 100 145 115; --pd-ink: #7BAA8E; }
+html[data-theme='claude-dark'] .pd-col[data-status='bug']         { --pd-c: 150 110 120; --pd-ink: #C098A0; }
+/* S136: the .db-col dark mirror is RETIRED — board.html renders .pd-col[data-status]
+   columns now, so the pd dark tokens above style BOTH boards. */

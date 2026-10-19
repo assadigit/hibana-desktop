@@ -1,0 +1,32 @@
+/* Manrope — Latin UI font (self-hosted, roast plan Phase 3). Used by --font-sans in
+   app.css and as the default Canvas/Notebook text font (textFont in canvas.js). Four
+   static latin-subset woff2 files, downloaded from Google Fonts — zero runtime CDN
+   dependency, no font flash on load in Iran networks. Vazir (Farsi) is a separate
+   face injected by i18n.js when the UI is in fa. */
+@font-face {
+  font-family: 'Manrope';
+  src: url('Manrope-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Manrope';
+  src: url('Manrope-500.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Manrope';
+  src: url('Manrope-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Manrope';
+  src: url('Manrope-700.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}

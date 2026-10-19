@@ -1,0 +1,2240 @@
+/* --- app shell ------------------------------------------------------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.625rem clamp(1.25rem, 3vw, 2.5rem);
+  border-block-end: 1px solid var(--line);
+  background: var(--bg);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 30;
+}
+.topbar a { color: var(--muted); font-size: var(--fs-lg); padding: 0.45rem 0.35rem; border-block-end: 2px solid transparent; transition: color 0.12s ease, border-color 0.12s ease; }
+/* Brand identity (audit 20): hover + the active page underline use the warm spark amber. */
+.topbar a:hover { color: var(--brand); text-decoration: none; }
+/* UI/UX R3 (2026-09-12): strengthened the active-page indicator from a 3px brand underline
+   + dark text to a 4px brand underline + brand-colored text + 600 weight. The previous
+   3px/`var(--text)` recipe read as "slightly darker than hover" on a muted base — VLM
+   flagged the dashboard before-screenshot as having NO visible active state (the projects
+   screenshot did show it, but the contrast was marginal). The thicker bar + the teal ink
+   make aria-current='page' unmissable on every page. The 4px floor also clears the WCAG
+   1.4.11 non-text-contrast 3:1 minimum on the underline itself (brand on bg = 4.7:1). */
+.topbar a[aria-current='page'] { color: var(--brand); font-weight: 600; border-block-end-color: var(--brand); border-block-end-width: 4px; }
+.topbar .brand a { color: var(--text); font-weight: 700; font-size: 1rem; border-block-end: 0; }
+/* Brand subtree as a deterministic flex chain: blockifies the anchor + img so no
+   inline/line-box quirks can shift the logo against the centered nav links. */
+.topbar .brand { display: flex; align-items: center; }
+/* Header logo — theme-aware (light/dark variants), swapped via the --brand-logo token. */
+.brand-logo {
+  display: block;
+  height: 1.4rem;
+  width: auto;
+  content: var(--brand-logo);
+  /* The wordmark's ink mass sits at 60.3% of the canvas height (measured via
+     scripts/probe-png.mjs) — a centered box still reads ~2.3px low against the nav
+     links. -2px compensates at the 1.4rem render size. */
+  translate: 0 -2px;
+}
+/* The five page links sit in a .nav-links wrapper: display: contents on desktop so
+   the topbar's own gap rules everything (identical layout to plain direct children);
+   at ≤720px it becomes a real flex row spanning 100% (roast plan Phase 4). */
+.topbar .nav-links { display: contents; }
+
+.topbar .muted { flex: 1; font-size: var(--fs-md); }
+/* header account cluster: avatar + theme + sign out, tight together */
+.nav-actions { gap: 0.5rem; }
+/* S200 (HLTH-5): the S61 .topbar-search pill (command-palette entry in the topbar)
+   deleted — the entry lives in the rail as .rail-search [nk-open] since the rail
+   redesign; zero references across HTML/JS. */
+.user-chip { display: inline-flex; align-items: center; gap: 0.55rem; }
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  /* Session 20 (AA): the initial is real text — white on --accent #4A9FA3 was 3.1:1.
+     --cta is the design system's white-text fill (4.93:1) per the "CTA fills sit one
+     shade deeper" rule; the avatar is an identity mark, so it stays teal, just deeper. */
+  background: var(--cta);
+  color: var(--btn-text);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  overflow: hidden;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-lg { width: 4.5rem; height: 4.5rem; font-size: 1.6rem; flex-shrink: 0; }
+.avatar-row { gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+.user-name { color: var(--muted); font-size: var(--fs-md); }
+
+/* ===========================================================================
+   S88 — THE NAVIGATION RAIL (Material "navigation rail") replaces the horizontal
+   topbar on desktop (≥1025px). Icons only — no text labels (every icon carries an
+   aria-label + title); vertical stack with equal spacing; the ACTIVE section wears
+   a filled rounded-square indicator; secondary icons (Settings, Help) sit at the
+   bottom behind a thin divider. Selecting a primary icon opens the SECONDARY PANEL
+   (below) — the VS Code Activity-Bar + Side-Bar pattern.
+   ≤1024px the rail is hidden: the slim brand-only .mobile-brandbar (partial) + the
+   bottom-tab nav (mobile-nav.js) carry everything, exactly as before.
+   =========================================================================== */
+:root { --rail-w: 5.5rem; --rail-panel-w: 17.5rem; --rail-panel-gap: 0.625rem; }
+
+/* S89: the themed-logo pair — the new square brand marks ship ONE image per theme
+   and CSS keeps exactly one visible. html[data-theme] is explicit by first paint
+   (boot.js sets it synchronously in <head>), so there is never a wrong-logo flash.
+   Works on any element that carries both imgs (the rail brand, the mobile brandbar). */
+html[data-theme='claude-dark'] .themed-logo--light { display: none; }
+html:not([data-theme='claude-dark']) .themed-logo--dark { display: none; }
+
+.rail {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--rail-w);
+  z-index: 38; /* above content + the panel; below dialogs (60+) + toasts */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;              /* the equal vertical rhythm between icons */
+  padding: 0.625rem 0 0.75rem;
+  /* S95 r2 (owner items 1+8): the rail is a solid WHITE sidebar surface with the
+     one neutral hairline — it reads as one continuous sidebar with its panel
+     (both --card) floating on the gray canvas, the reference's restrained split. */
+  background: var(--card);
+  border-inline-end: 1px solid var(--line);
+}
+.rail-brand { display: grid; place-items: center; inline-size: 3.4rem; block-size: 3.4rem; border-radius: 0.9rem; }
+.rail-brand:hover { background: var(--bg-soft); }
+.rail-logo { inline-size: 2rem; block-size: 2rem; display: block; border-radius: 0.45rem; }
+.rail-primary { display: flex; flex-direction: column; align-items: center; gap: 0.375rem; margin-block-start: 0.25rem; }
+.rail-btn {
+  position: relative;
+  /* S189 (owner, CHANGE 7 — the active SHAPE's footprint): the labeled hit column
+     widens 68px → 72px so the active item's filled background shape sits ~8px
+     off each edge of the 88px rail (the change's 6–8px inset band; the button IS
+     the shape, so the hit target and the visible tile are one geometry —
+     centered by the rail's flex inside its content box, so the shape mirrors
+     under RTL by construction). 72px stays far past the 44px floor. */
+  inline-size: 4.5rem;
+  min-block-size: 3.1rem;     /* icon (20px) + label (~12px) + rhythm — grows if needed */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0;                 /* S89 ALIGNMENT FIX: base.css's global `button { padding:
+                                 .55rem 1rem }` leaked into every rail <button> — the
+                                 16px inline padding shrank the 44px content box under
+                                 the 20px icon and pushed the SEARCH + HELP icons +4px
+                                 off the rail's axis (measured live: svg centers 35.5
+                                 vs 31.5). Buttons and anchors now align identically. */
+  border-radius: 0.75rem;     /* the rounded square */
+  color: var(--muted);
+  background: transparent;
+  transition: color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
+}
+.rail-btn .icon { inline-size: 1.25rem; block-size: 1.25rem; transition: transform 0.14s ease; }
+/* S89: the small label under each icon — muted with the icon, inherits the
+   active/hover color flips so icon + label read as one control. Persian renders in
+   Vazir via the html[lang='fa'] global family swap.
+   S179 (advisor block 10): the label steps UP to 11px (was 10px — under the
+   advisor's 11–12px legibility band; the FA labels were the smallest text in the
+   app) and the line-height breathes with it. The ink stays the sidebar's existing
+   gray (--muted — 6.7:1 on the white rail, 5.4:1 on the canvas: the 5.06:1 gray
+   the advisor measured, AA holds everywhere it sits). */
+.rail-label {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  color: inherit;
+  white-space: nowrap;
+  text-align: center;
+}
+/* S189 (owner, CHANGE 7): the inactive hover speaks the SAME teal the active
+   shape speaks, at a quieter alpha (~7% vs the active 14%) — one hue family
+   down the whole rail, hover always reading as a whisper of active. The ink
+   keeps the app's hover grammar (muted → --text). */
+.rail-btn:hover { color: var(--text); background: var(--nav-hover-bg); text-decoration: none; }
+/* The focus ring is its OWN signal (S179's one focus ink) — a 2px outline
+    OUTSIDE the shape, never the active tint doubling as focus (CHANGE 7's
+    instruction 11): the shape marks the current page, the ring marks keyboard
+    focus, and the two can never be confused. */
+.rail-btn:focus-visible { outline: 2px solid var(--focus-ring, var(--brand)); outline-offset: 2px; }
+/* The ACTIVE section (aria-current='page' is set by nav.js's markNav on every soft
+   navigation + hib-init on hard load).
+   S189 (owner, CHANGE 7 — SUPERSEDES the S179/S184 bar): the current page speaks
+   a soft FILLED BACKGROUND SHAPE — the button itself paints the teal at LOW
+   alpha (--nav-active-bg: 14% light / 20% dark), corners rounded ~12px (the
+   button's own 0.75rem radius), covering the icon AND its label as ONE unit,
+   and inset from the rail's edges (the 72px button centers in the rail's 87px
+   content box → ~8px shoulders off each outer edge: 7.5px start / 8.5px end —
+   the 1px inline-end hairline's split, mirrored under RTL; the change's 6–8px
+   band). The thin start-edge accent bar RETIRES ENTIRELY — a filled shape is a larger and
+   clearer active target than a 3px bar (visibility of system status), and the
+   low alpha keeps the saturated teal reserved for the CTA fills. The alpha
+   rides the background COLOR ONLY (rgba) — never the opacity property, which
+   would fade the icon and the label with it. The ICON keeps the full #2F7B7F
+   teal (--nav-active-icon, 4.12:1 on its own tint — past the 3:1 non-text
+   floor); the LABEL steps one rung darker (--nav-active-label #1F5A5D, 6.56:1
+   on the tint — past the 4.5:1 text floor); the dark twins are lighter teals
+   at a higher alpha (claude-dark-theme.css). Hover deepens the tint one notch
+   (--nav-active-bg-hover) rather than washing it away. The geometry is already
+   logical (the shape IS the flex-centered button) so RTL mirrors true with
+   zero extra rules. ONE active pattern (S188's CHANGE 5 contract holds): the
+   aria-current shape alone; the panel-open icon stays plain (aria-expanded
+   keeps the semantics, the visible panel is the indicator). */
+.rail-btn[aria-current='page'] {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-icon);
+}
+.rail-btn[aria-current='page']:hover { background: var(--nav-active-bg-hover); color: var(--nav-active-icon); }
+.rail-btn[aria-current='page'] .rail-label { font-weight: 600; color: var(--nav-active-label); }
+/* The icon whose PANEL is open speaks QUIETLY — a panel can be open while you sit
+   on ANY page, so it must never read as a second active state competing with the
+   current-page shape.
+   S188 (owner, CHANGE 5 — the whole visual accent RETIRED): the owner's report —
+   "Dashboard and Projects both look active". ONE active-state pattern: the
+   aria-current shape (S189's filled tile). The panel-open state keeps ONLY its
+   semantics (aria-expanded on the toggle — S179's announcement) with NO visual
+   accent at all; the visible panel itself is the indicator. markNav still keys
+   aria-current="page" to the CURRENT ROUTE on every navigation, so the shape
+   can never go stale. */
+.rail-spacer { flex: 1; }
+.rail-divider { inline-size: 1.75rem; block-size: 1px; background: var(--line); flex: none; }
+.rail-secondary { margin-block-start: 0.125rem; }
+
+/* S205 (the 8th primary destination): the labeled rail now overflows short viewports —
+   brand + search + 8 primaries + divider + settings/help/theme + account at the 3.1rem
+   rhythm needs ~790px, so at ≤780px height the ACCOUNT chip was pushed below the fold of
+   the FIXED (unscrollable) rail (measured: chip y=736 at 720p — unreachable). The compact
+   rhythm keeps every destination reachable: 2.875rem tiles (46px — above the 44px touch
+   floor; the S189 ≥48px doctrine is pinned at the default rhythm, which taller viewports
+   keep untouched), 3px gaps, tighter brand + paddings — 8 primaries + all secondary +
+   account fit in 720px with ~50px headroom (zoom/rounding safe). */
+@media (max-height: 780px) {
+  .rail { gap: 3px; padding: 5px 0 7px; }
+  .rail-brand { block-size: 2.4rem; }
+  .rail-primary { gap: 3px; margin-block-start: 2px; }
+  .rail-btn { min-block-size: 2.875rem; }
+  .rail-secondary { margin-block-start: 3px; }
+}
+
+/* the avatar: name hidden — icon-only rail (hover/focus opens the menu pop) */
+.rail-user { display: flex; }
+.rail-user-chip { padding: 0.25rem; border-radius: 999px; }
+.rail-user-chip .user-name { display: none; }
+.rail-user-chip:hover { background: var(--bg-soft); }
+.rail-user .user-menu-pop {
+  inset-block-start: auto;
+  inset-block-end: calc(100% + 0.5rem);
+  inset-inline-end: auto;
+  inset-inline-start: calc(100% + 0.85rem);
+  translate: -6px 0;
+}
+.rail-user .user-menu-pop::before {
+  inset-block-start: auto;
+  inset-block-end: -0.5rem;
+  inset-inline: 0;
+  inset-inline-start: 100%;
+}
+.rail-user:hover .user-menu-pop,
+.rail-user:focus-within .user-menu-pop { translate: 0 0; }
+/* S89: the sync chip LEFT THE RAIL — offline-sync status + retry live in Settings →
+   Preferences now (settings.html owns the row; hib-init's wireSyncBadge no-ops
+   with zero [data-sync-badge] chrome). The old .rail-sync rules are retired. */
+
+/* ── the SECONDARY PANEL (VS Code side-bar): persistent — PUSHES the main content
+   via body padding (rail-panel-open), never an overlay. nav.js renders its lists. ──
+   S188 (owner, CHANGE 6 — the floating surface): the flat full-height sidebar strip
+   becomes a ROUNDED SURFACE that sits INSIDE the tinted page canvas — a small gap
+   (~10px, --rail-panel-gap) on the block + outer edges, ~16px corners, a thin
+   --line border + the soft shadow (both, so the edge survives for users who cannot
+   see small color differences — the border never rides the tint alone), inner
+   padding, and overflow:hidden so the scrolling body clips to the rounded corners
+   (the body itself keeps the scroll). The icon rail stays EXACTLY as it was — the
+   rail is its own full-height surface; the panel floats beside it on the canvas
+   (the gap between them reads as two surfaces, the shared edge tidy). All logical
+   (inset-inline-start / margin-inline) so RTL mirrors true. Colors stay tokens
+   (--card on --bg — the tint decision belongs to the palette, not this change). */
+.rail-panel {
+  position: fixed;
+  inset-block: var(--rail-panel-gap);
+  inset-inline-start: calc(var(--rail-w) + var(--rail-panel-gap));
+  inline-size: var(--rail-panel-w);
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.18s ease, visibility 0s linear 0.18s;
+}
+body.rail-panel-open .rail-panel { visibility: visible; opacity: 1; transition: opacity 0.18s ease; }
+.rail-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.75rem 0.75rem 0.625rem;
+  border-block-end: 1px solid var(--line);
+  /* S178 (owner, block 1 — the panel header): the head's S95 pale-well fill is
+     RETIRED — it wears the SAME surface as the sidebar (the panel's --card), so
+     the header reads as part of one continuous sidebar instead of a gray band.
+     The thin divider along its bottom edge stays (the only head separation). */
+  background: var(--card);
+  flex: none;
+}
+.rail-panel-title { flex: 1; min-inline-size: 0; font-weight: 700; font-size: var(--fs-md); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-panel-open-link {
+  display: inline-flex; align-items: center; gap: 0.2rem;
+  padding: 0.3rem 0.5rem; border-radius: 0.5rem;
+  color: var(--brand); font-size: var(--fs-xs); font-weight: 600;
+}
+.rail-panel-open-link:hover { background: var(--accent-soft); text-decoration: none; }
+/* S97 (the tree fold): the panel head's fold button rides the .rail-panel-close
+   recipe — a quiet icon button, muted ink, bg-soft hover, brand focus ring.
+   S195 (the owner's fix — the close button): the box steps 2rem→2.25rem (36px)
+   and the icon grows with it (1.25rem, the .rail-btn .icon size — the old
+   17.6px render turned the X's stroke into a hairline: the 1.8 stroke lives in
+   the 24-unit viewBox, so at 17.6px the math gives 1.32px, pixel-probed 1px
+   runs — and the 32px target sat under the app's own 40px coarse-pointer
+   floor). Coarse pointers get the full 40px box; the X's path carries its own
+   optical stroke-width 2 in nav.js (at equal stroke the crossing X reads
+   lighter than the chevron's vertex — the pair now reads matched at 20px). */
+.rail-panel-close,
+.rail-panel-tree {
+  display: grid; place-items: center;
+  inline-size: 2.25rem; block-size: 2.25rem;
+  border: 0; border-radius: 0.5rem;
+  background: transparent; color: var(--muted); cursor: pointer;
+  flex: none;
+}
+.rail-panel-close .icon,
+.rail-panel-tree .icon { inline-size: 1.25rem; block-size: 1.25rem; }
+@media (pointer: coarse) {
+  .rail-panel-close, .rail-panel-tree { inline-size: 2.5rem; block-size: 2.5rem; }
+}
+.rail-panel-close:hover,
+.rail-panel-tree:hover { background: var(--bg-soft); color: var(--text); }
+.rail-panel-close:focus-visible,
+.rail-panel-tree:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+/* S98 (styling): the panel body's thin quiet scrollbar — the projects TREE scrolls
+   daily; the platform-default bar read heavy on the quiet white panel (the
+   project-header.css recipe: thin + muted-45% scrollbar-color).
+   S188 (CHANGE 2): the body's BLOCK-START padding drops to 0 — the sticky group
+   heads pin flush against the scrollport's top edge (a non-zero top padding on
+   the SCROLLER insets the sticky rect in Chrome, leaving an 8px band where rows
+   peek above the stuck head). The panel head's own divider + the panel's 8px
+   padding already own the top spacing; the bottom keeps its 1rem breathing room. */
+.rail-panel-body {
+  flex: 1; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 0.5rem 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent;
+}
+/* S177 (owner, block 1 — text-only section headers): the groups separate by
+   VERTICAL SPACE, not boxes — the stage bands read as typographic sections.
+   S178 (owner, block 5 — spacing between groups): the separation moves to the
+   TOP-LEVEL groups only (`.rail-panel-body >` — stages, spark folders, note
+   folders, to-do quadrants) and grows to 1.125rem (18px, the 16–20px band),
+   while the groups' nested children separate like ROWS (2px body gap) — the
+   gap between groups is now clearly larger than the gap between rows. The
+   generic .rail-group margin-block-end is gone (0): sibling margin owns ALL
+   top-level separation, so nothing double-spaces. */
+.rail-group { margin-block-end: 0; }
+.rail-panel-body > .rail-group + .rail-group { margin-block-start: 1.125rem; }
+.rail-group-head {
+  display: flex; align-items: center; gap: 0.375rem;
+  inline-size: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 0;
+  /* S177 (owner, block 1): the group heads are TEXT-ONLY now — no background
+     fill, no rounded corners. The section header relies on typographic hierarchy
+     (the eyebrow register below: 12px / 500 / muted ink) instead of a filled
+     region, so the panel carries ONE filled element (the selected row — block 2).
+     The S90 wash → S94 well-bg → S177 bare-text lineage. The muted ink is the
+     --muted token: 6.7:1 on the white card / 6.06:1 on the dark card — AA holds
+     on both themes (the 4.5:1 floor).
+     NOTE the two explicit resets: the GLOBAL button{} rule in base.css paints
+     radius --radius-sm + a teal CTA hover on every <button> — a bare override-less
+     head would leak both (measured: 14px corners + --cta-hover fill on hover), so
+     the radius and the hover background are pinned OFF here, not just omitted. */
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  /* S155: the group head is the EYEBROW rung (section group label): 12px/500,
+     +0.03em, secondary ink, SENTENCE CASE — the hierarchy reads through the ink
+     rungs + this label's 12px secondary register, not through weight or fills.
+     (The sub-group head at :398 keeps its own 500/no-transform override — same
+     rung, quieter surface.) */
+  font: var(--text-eyebrow-weight) var(--text-eyebrow-size)/var(--text-eyebrow-line-height) var(--font-sans);
+  letter-spacing: var(--text-eyebrow-tracking); text-transform: none;
+  cursor: pointer;
+}
+/* S177 (block 1): the hover is an INK change only — no fill, so the resting
+   text-only contract survives interaction (the panel keeps zero boxes until the
+   pointer meets a row). The explicit transparent background KILLS the global
+   button:hover teal (base.css) — an omitted declaration would let it leak. */
+.rail-group-head:hover { color: var(--text); background: transparent; }
+/* S116: the group heads join the panel's brand focus-ring convention — keyboard
+   users tabbing the tree (stage → project branch → aspect sub-groups) get the same
+   2px brand ring every other rail control speaks; the UA default outline read as
+   foreign ink in the panel. Inset (-2px, the .rail-item recipe) so a ringed head
+   can never spill outside the headrow/panel gutter. */
+.rail-group-head:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* S178 (owner, block 2 — the count rides INLINE): the label is a shrinkable
+   single line (flex 0 1 auto — it never GROWS, so the count always hugs the
+   title's end), and the count is a flex:none meta runt directly AFTER it — the
+   far-edge auto margin is retired.
+   S188 (owner, CHANGE 4 — SUPERSEDES the inline placement): the count is a BADGE
+   pinned to the row's INLINE-END edge (margin-inline-start:auto — one vertical
+   column of numbers the eye can compare across rows without reading labels). A
+   NEUTRAL tint (--bg-soft + --muted — never the accent, so it never competes with
+   the selected-row wash); a CIRCLE at one digit (min inline-size = the height),
+   growing into a pill at two-plus digits (same height, wider, fully rounded);
+   ZERO hides it entirely (nav.js renders no badge at 0); an EXPANDED project row
+   hides it too (the children are visible — the number would only repeat them).
+   The accessible name rides aria-label (nav.js, "11 ideas" — localized). */
+.rail-group-label {
+  flex: 0 1 auto; min-inline-size: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rail-group-count {
+  flex: none;
+  margin-inline-start: auto;
+  display: inline-grid;
+  place-items: center;
+  min-block-size: 1.25rem;
+  min-inline-size: 1.25rem;
+  padding-inline: 0.35rem;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  font-size: 0.625rem;
+  line-height: 1;
+}
+/* S188 (CHANGE 4, rule 7): no badge on an EXPANDED project row — its sections are
+   on screen; the number would only repeat them. */
+.rail-project-group:not(.is-collapsed) .rail-project-head .rail-group-count { display: none; }
+.rail-group-head .icon { inline-size: 0.85rem; block-size: 0.85rem; transition: transform 0.14s ease; }
+/* S188 (owner, CHANGE 2 — the sticky group headers): the panel body scrolls inside
+   its own container (the S98 contract), so each TOP-LEVEL group head now STICKS to
+   the top of the scroll area while its group is in view — the user keeps the
+   section context ("which group am I inside?") through a long list. Solid --card
+   background + z-index so rows slide quietly under the stuck head; both head
+   shapes covered (the bare head, and the chip-carrying headrow the goto groups
+   ride). Nested headers do NOT stick — one pinned register at a time. */
+.rail-panel-body > .rail-group > .rail-group-head,
+.rail-panel-body > .rail-group > .rail-group-headrow {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--card);
+}
+/* S177 (owner, block 5 — the platform chevron convention): the COLLAPSED chevron
+   points toward the INLINE-END ("there's more here"), the EXPANDED one points
+   DOWN ("the content lives below") — right = collapsed, down = expanded, Jakob's
+   Law. The glyph ships right-pointing (nav.js), layout.css rotates the SAME icon
+   90° on expand (one short transition, no glyph swap). The S95 r2 down-when-
+   collapsed convention is superseded.
+   RTL: the collapsed tip must point at the inline-end (LEFT under [dir='rtl']) —
+   scaleX(-1) mirrors the resting glyph; the expanded rotate(90deg) REPLACES the
+   transform (specificity (0,4,0) beats (0,3,0)), and a down-tip is direction-
+   neutral, so no composed-state branch is needed.
+   NOTE the > child combinators: a bare descendant selector also matched through
+   the EXPANDED stage group an expanded sub-tree sits inside (the stage → project
+   → box nesting) — every sub-chevron rode the ancestor's rotation.
+   S98 (the goto chips): chip-carrying heads sit one level DEEPER (group >
+   headrow > head), so the rotation rule covers both paths. */
+[dir='rtl'] .rail-group-head > .icon { transform: scaleX(-1); }
+.rail-group:not(.is-collapsed) > .rail-group-head > .icon,
+.rail-group:not(.is-collapsed) > .rail-group-headrow > .rail-group-head > .icon { transform: rotate(90deg); }
+.rail-group.is-collapsed .rail-group-body { display: none; }
+/* S98 (the goto chips): a group carrying a deep link rides its head inside a flex
+   row — the toggle button keeps flex:1 (its width contract is untouched) and the
+   chip sits as its SIBLING on the inline END (an <a> can never nest in a <button>).
+   The chip is the .rail-panel-close recipe: quiet 2rem icon, muted ink, bg-soft
+   hover, brand focus ring.
+   S177 (owner, block 6 — the reveal): the ↗ chip HIDES by default and shows on
+   hover over the row, on :focus-within (the chip itself is tabbable — it lights
+   the moment it takes focus, so the invisible-focusable smell is covered), and
+   ALWAYS on the SELECTED branch (.is-here — the row you are on keeps its afford-
+   ance lit). Coarse pointers have no hover — @media (hover: none) keeps every
+   chip visible (the tap target stays discoverable). Opacity (never display:none)
+   keeps the chip in the tab order and clickable for Playwright's real-pointer
+   taps.
+   S188 (owner, CHANGE 4): the chip goes ABSOLUTE at the headrow's inline-end — it
+   leaves the flow so the head fills the row and its count badge lands in the SAME
+   inline-end column every other badge speaks (one column, per the badge contract).
+   The chip paints the panel's own surface (--card) so its reveal cleanly covers
+   the badge beneath instead of bleeding both glyphs together; hover keeps the
+   bg-soft recipe. */
+.rail-group-headrow { display: flex; align-items: center; gap: 0.25rem; position: relative; }
+.rail-group-headrow .rail-group-head { flex: 1; min-inline-size: 0; }
+.rail-group-goto {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block: 0;
+  display: grid; place-items: center;
+  inline-size: 2rem; block-size: 2rem;
+  flex: none;
+  border: 0; border-radius: 0.5rem;
+  background: var(--card); color: var(--muted); cursor: pointer;
+  opacity: 0; /* S177: hidden until the row is hovered / focused / selected */
+  transition: opacity 0.14s ease, background 0.14s ease;
+}
+.rail-group-headrow:hover .rail-group-goto,
+.rail-group-headrow:focus-within .rail-group-goto,
+.rail-project-group.is-here > .rail-group-headrow .rail-group-goto { opacity: 1; }
+@media (hover: none) {
+  /* S177 (block 6 note): touch screens have no hover — the chip stays visible */
+  .rail-group-goto { opacity: 1; }
+}
+.rail-group-goto:hover { background: var(--bg-soft); color: var(--text); text-decoration: none; }
+.rail-group-goto:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+/* S177 (owner, block 3 — the connectors are GONE): the tree's vertical guide
+   lines and horizontal branch elbows are removed — with two nesting levels,
+   INDENTATION + proximity already carry the parent-child relationship, so the
+   lines only added clutter. Every level indents a moderate ~16px from its parent
+   via LOGICAL padding-inline-start (mirrors in RTL); the child rows read lighter
+   + smaller than their parents (the sub-group's fs-xs/muted register, the S106
+   ink ladder).
+   S188 (owner, CHANGE 3 — SUPERSEDES the S177 retirement, scoped to the NESTED
+   levels): the guide lines return for the projects tree's nested levels ONLY —
+   one thin 1px vertical guide from each expanded parent row down through its
+   children (the body's logical border), plus a short ROUNDED elbow from the guide
+   to each child row (.rail-elbow spans nav.js renders — real elements, never
+   pseudo-elements, so they can never collide with the selected-row accent bar).
+   The TOP-LEVEL groups (Planning / Queued / Developing / folders / quadrants)
+   stay plain text + chevron, NO lines — the noise the S177 round killed stays
+   dead there. The ink is the app's own --line hairline (low contrast by design —
+   the line color decision stays with the palette tokens, nothing new is set). */
+.rail-group-body {
+  display: flex; flex-direction: column; gap: 0.125rem;
+  /* ONE indent per nesting level — ~16px, logical, RTL-true */
+  /* S178 (owner, blocks 4+5): the header→first-item space drops to ~4px, and
+     rows separate by a tight 2px (the group gap above is an order larger). */
+  padding-block: 0.25rem;
+  padding-inline-start: 1rem;
+}
+/* S188 (CHANGE 3): the guide — 1px, logical, on the NESTED bodies only (the
+   project branch's body + each section's body; a collapsed group's body is
+   display:none, so a folded branch carries no line). */
+.rail-project-group > .rail-group-body,
+.rail-sub-group > .rail-group-body {
+  border-inline-start: 1px solid var(--line);
+}
+/* S188 (CHANGE 3): the elbow — the short rounded connector from the guide to
+   each child row. Absolutely positioned at the child's leading edge (the row is
+   its containing block — position:relative below), vertically centered at 50% so
+   every row height (desktop 32px, coarse 40px) centers itself. Logical inset —
+   the elbow mirrors to the inline-start guide under RTL. */
+.rail-elbow {
+  position: absolute;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+  inset-inline-start: calc(-1rem - 1px);
+  inline-size: calc(1rem + 1px);
+  block-size: 1px;
+  border-radius: 999px;
+  background: var(--line);
+  pointer-events: none;
+}
+.rail-sub-group > .rail-group-head,
+.rail-sub-group .rail-item { position: relative; }
+/* S94 (owner item 6 — the deeper projects tree): a project's idea-groups nest ONE
+   MORE .rail-group level inside the stage body (stage → project → idea-group → item);
+   each level compounds the same 1rem indent (16px → 32px → 48px), so the branch
+   stays visually owned by its project row through indentation + the S106 ink
+   ladder alone (no connectors — S177). The sub-head reuses the group-head contract
+   (same [data-rail-group] toggle, same chevron/count) and speaks as the project's
+   own CHILD ROW (S178 owner, blocks 3+4): regular weight, secondary ink, at the
+   child row height (~27.6px) — the stage heads own the section register, these
+   read as rows. Separation between siblings rides the tight row margins below
+   (the S178 top-level group gap never reaches here — these nest deeper). */
+.rail-sub-group { margin-block: 1px 0.2rem; }
+.rail-sub-group .rail-group-head {
+  /* S188 (CHANGE 1 + CHANGE 4): the section rows join the tree's ONE row height
+     (min-block-size 2rem = 32px, the project rows' own rhythm — single-line,
+     equal-height rows scan; the S178 26–28px child register is superseded), and
+     the padding-inline normalizes to 0.5rem so every row's count badge ends in
+     the SAME inline-end column (one vertical line of numbers). */
+  padding: 0.375rem 0.5rem;
+  background: transparent;
+  border-radius: 0; /* S177: the global button radius stays dead here too */
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 400; /* S178 block 3: child rows weigh REGULAR — the hierarchy rides size + ink */
+  letter-spacing: 0;
+  text-transform: none;
+  min-block-size: 2rem;
+}
+.rail-sub-group .rail-group-head:hover { color: var(--text); background: transparent; } /* S177: ink-only — heads carry no fills (global teal killed) */
+/* S178 (block 3): the child-row leaves — one register with their sub-heads
+   (regular, secondary, ~27.6px) — tighter than the project rows above them.
+   S188 (owner, CHANGE 1 — SUPERSEDES): the leaves sit at the SAME 32px row height
+   as every other row in the tree and speak ONE line — title only, ellipsis on
+   overflow (white-space nowrap + text-overflow — the old 2-line clamp is what
+   made each idea read as a two-line text blob). The base .rail-item-label
+   contract (nowrap + ellipsis) now reaches these rows un-overridden. */
+.rail-sub-group .rail-item { font-size: var(--fs-xs); color: var(--muted); padding-block: 0.375rem; padding-inline: 0.5rem; min-block-size: 2rem; }
+.rail-sub-group .rail-item:hover { color: var(--text); }
+.rail-item {
+  display: flex; align-items: center; gap: 0.45rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: 0.5rem;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+.rail-item:hover { background: var(--bg-soft); text-decoration: none; }
+.rail-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.rail-item-label { flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-item .prio-dot { flex: none; }
+/* S106 r2 (owner: "it's not deployed yet, I still see regular font for project names
+   in sidebar"): the rail tree's PROJECT rows join the 700 bold register. S106's six
+   surfaces covered the rail's STAGE heads but the project names beneath them stayed
+   400 — the owner read the sidebar as unchanged (the deploy WAS live; the surface
+   was missing). The tree's full hierarchy now reads by weight AND size AND case:
+   stage head (700, fs-xs, uppercase, wash) → PROJECT name (700, fs-sm) → sub-group
+   head (500, fs-xs) → items (400, fs-xs, content). ONLY the project rows bold:
+   the class rides projectBranch's rows alone (nav.js), so sparks, notes, calendar,
+   to-do items and the sub-group's idea/bug leaves all keep their 400 — content
+   stays regular, the S106 hierarchy contract. */
+.rail-item.rail-project-row { /* S155: the H3 register — sidebar project names weigh 500 (the spec's "Minor heading / nav item" rung; the S106 700 bold register is superseded — hierarchy now rides the ink rungs: names primary, group labels secondary) */ font-weight: var(--text-h3-weight); }
+/* S178 (owner, blocks 3+4 — the type hierarchy + row heights): the plain project
+   row speaks the PROJECT register — the h3 size (14px, one step over the 12px
+   group header), medium 500 weight, primary ink — and stands at the same 2rem
+   (32px) min height as the branch heads, so a folded branch and a childless row
+   read as one rhythm of rows. The chevron SLOT (nav.js) keeps the name aligned
+   with the branch heads' names — one inline-start edge for every project name. */
+.rail-item.rail-project-row {
+  font-size: var(--text-h3-size);
+  line-height: var(--text-h3-line-height);
+  padding-block: 0.3rem;
+  min-block-size: 2rem;
+}
+/* S178 (owner, block 9 — the fixed chevron slot): every project row reserves the
+   chevron's exact width at the inline-start edge (childless rows included — the
+   slot is an empty span), so ALL project names align at one inline-start edge
+   whether their row expands or not. Width = the head's .icon (0.85rem); the row
+   gap (0.45rem) spaces it — identical geometry to the branch head's chevron. */
+.rail-chev-slot { inline-size: 0.85rem; flex: none; }
+/* S88: the status dot speaks the --badge-*-fg roles (the same seven the status
+   badges speak) — the panel item's glanceable state cue.
+   S90 (owner request: "too saturated"): the dots now render as LOW-KEY washes —
+   each status hue color-mixed to ~40% over transparent instead of the full-badge
+   ink. The glanceable hue survives (a pale amber spark, a pale teal doing…) but
+   the panel stops shouting; the hover row bg stays the strongest signal. */
+.rail-dot {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 999px;
+  flex: none;
+  background: var(--muted);
+}
+.rail-dot[data-status='spark']        { background: color-mix(in srgb, var(--badge-spark-fg, #2E5FA3) 40%, transparent); }
+.rail-dot[data-status='planning'] { background: color-mix(in srgb, var(--badge-planning-fg, #5F51B5) 40%, transparent); }
+.rail-dot[data-status='queued']     { background: color-mix(in srgb, var(--warn, #b45309) 40%, transparent); }
+.rail-dot[data-status='developing']        { background: color-mix(in srgb, var(--badge-developing-fg, #96511A) 40%, transparent); }
+.rail-dot[data-status='awaiting_dev']       { background: color-mix(in srgb, var(--badge-awaiting_dev-fg, #4C4370) 40%, transparent); }
+.rail-dot[data-status='operational']  { background: color-mix(in srgb, var(--badge-operational-fg, #277334) 40%, transparent); }
+.rail-dot[data-status='done']         { background: color-mix(in srgb, var(--badge-operational-fg, #277334) 40%, transparent); }
+.rail-dot[data-status='todo']         { background: color-mix(in srgb, var(--warn, #b45309) 40%, transparent); }
+.rail-item-emoji { flex: none; font-size: 0.9rem; line-height: 1; }
+/* ── S115 r2 (owner, the sidebar sketch): the per-project COLLAPSIBLE branch ────
+   Stage head → PROJECT branch (collapsed until its title is clicked) → aspect
+   sub-groups (New ideas / Problems / Plans / In Progress / Done) → items. The
+   branch head reuses the group-head TOGGLE contract but speaks the ROW register,
+   not the section register: sentence case, no wash, the project name at the row's
+   inline-start edge (S125: the problems count pill left; S177 block 4: the status
+   dot left too — the stage grouping already encodes the status, so it was noise).
+   The ↗ goto chip (the S98 recipe) sits beside the head inside the headrow and
+   keeps the S89 deep link — expanding and opening stop fighting over one click.
+   A project with no board tasks renders as a plain .rail-item row (nothing to
+   expand → the click opens the project), so the glance stays honest. */
+.rail-project-group > .rail-group-headrow > .rail-project-head {
+  background: transparent;
+  text-transform: none;
+  letter-spacing: normal;
+  /* S178 (owner, block 3 — the type hierarchy): the branch head's PROJECT name
+     speaks the h3 register — 14px (one step over the 12px group header), MEDIUM
+     500 weight, primary ink — the same rung every plain project row wears now
+     (.rail-item.rail-project-row), so both project-row shapes read as one class. */
+  font: var(--text-h3-weight) var(--text-h3-size)/var(--text-h3-line-height) var(--font-sans);
+  color: var(--text);
+  padding-block: 0.3rem;
+  /* S178 (owner, block 9): the gap matches .rail-item's 0.45rem EXACTLY — the
+     chevron slot (0.85rem) + this gap put the branch names at the very edge the
+     childless rows' slot puts theirs (one aligned inline-start edge). */
+  gap: 0.45rem;
+  min-block-size: 2rem;
+}
+.rail-project-group > .rail-group-headrow > .rail-project-head:hover { background: var(--bg-soft); }
+/* S178 (owner, block 6 — the collapsed-project gap): a project branch is a ROW
+   among rows — its own margins are ZERO (the stage body's 2px gap separates the
+   rows), and the folded branch's body is display:none (the .rail-group contract),
+   so a collapsed project row stands at exactly any other project row's height. */
+.rail-project-group { margin-block: 0; }
+.rail-project-head .rail-project-row {
+  /* S155: the H3 register (500) — the branch-head name is the same "sidebar project
+     name" surface as .rail-item.rail-project-row above; the S106 700 here wins the
+     cascade on position, so it moves to the token too (hierarchy rides the inks). */
+  font-weight: var(--text-h3-weight);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The branch you are ON (markRailRows walks the goto chip's href) carries the
+   current-location register: the accent-soft PILL (rounded corners kept) + a
+   SHORT vertical brand bar INSIDE the pill (S178 owner, block 11 — the flush
+   edge bar is retired): inset ~4px from the pill's inline-start edge, ~3px
+   wide, rounded ends, ~60% of the row's height. Logical inset — RTL mirrors. */
+.rail-project-group.is-here > .rail-group-headrow {
+  position: relative;
+  background: var(--accent-soft);
+  border-radius: 0.5rem;
+}
+.rail-project-group.is-here > .rail-group-headrow::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0.25rem; /* ~4px in from the pill's edge — S178 block 11 */
+  inset-block: 20%;            /* ~60% of the row height, rounded ends */
+  inline-size: 0.1875rem;      /* ~3px wide */
+  border-radius: 999px;
+  /* S181 (the sidebar color block): the --brand-hover rung — the wash-tinted
+     selected pill is the bar's REAL ground (2.73:1 was a miss; 3.42 clears). */
+  background: var(--brand-hover);
+}
+/* S95 ("never lose your place" — the app's second job): the panel row of the page
+   you are ON carries the current-location mark: the accent-soft PILL + the same
+   S178 inset brand bar the branch headrow speaks (4px in from the pill's
+   inline-start edge, ~3px wide, rounded ends, ~60% of the row height — the S95
+   flush edge pill is retired with the branch's). Absolutely positioned — zero
+   layout shift, logical inset so RTL mirrors true. Applies to any panel row: the
+   project row while you're on its page, the exact tree leaf when you deep-linked
+   to its section, a note row under notes.html#n=. Hover keeps the wash (source
+   order wins over .rail-item:hover). */
+.rail-item.is-row-active {
+  position: relative;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.rail-item.is-row-active:hover { background: var(--accent-soft); }
+.rail-item.is-row-active::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0.25rem; /* ~4px in from the pill's edge — S178 block 11 */
+  inset-block: 20%;            /* ~60% of the row height, rounded ends */
+  inline-size: 0.1875rem;      /* ~3px wide */
+  border-radius: 999px;
+  /* S181 (the sidebar color block): the --brand-hover rung (3.42:1 on the
+     accent-soft wash in light; 5.47 in dark — the 3:1 graphic floor holds). */
+  background: var(--brand-hover);
+}
+.rail-item.is-row-active .rail-item-label { color: inherit; }
+.rail-panel-empty { padding: 1.25rem 0.75rem; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+.rail-panel-loading { padding: 1.25rem 0.75rem; color: var(--muted); font-size: var(--fs-sm); }
+
+/* S178 (owner, block 4 — coarse-pointer row floors): on touch-class devices the
+   tree's rows grow to a ≥40px floor (2.5rem) — the same house touch law the
+   board's fold chevrons speak. Desktop keeps the tight 32/27.6px rhythm.
+   NOTE the selector weights: media queries add NO specificity, so the branch
+   head must re-state its full (0,3,0) compound here or the desktop rule below
+   it keeps winning (measured: 32px under coarse emulation). */
+@media (pointer: coarse) {
+  .rail-project-group > .rail-group-headrow > .rail-project-head,
+  .rail-item.rail-project-row,
+  .rail-sub-group .rail-group-head,
+  .rail-sub-group .rail-item { min-block-size: 2.5rem; }
+}
+
+/* ── S89: the CALENDAR panel — a real mini month grid, not a bare hint. The owner's
+   report: clicking the Calendar rail icon opened an EMPTY sidebar. The panel now
+   renders a compact month (Gregorian when en, Jalali when fa — nav.js carries the
+   conversion), weekday header, today ring, per-day due dots off the /api/rail
+   deadlines, and ‹ › month stepping. Below it the Due-next-7-days list stays. ── */
+.rail-cal { padding: 0.6rem 0.6rem 0.2rem; }
+.rail-cal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-block-end: 0.45rem;
+}
+.rail-cal-title {
+  flex: 1;
+  min-inline-size: 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-cal-nav {
+  display: grid;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  padding: 0; /* same base.css button-padding leak guard as .rail-btn */
+}
+.rail-cal-nav:hover { background: var(--bg-soft); color: var(--text); }
+.rail-cal-nav:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.rail-cal-nav .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.rail-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.rail-cal-dow {
+  text-align: center;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding-block: 0.2rem 0.3rem;
+}
+.rail-cal-day {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: 100%;
+  aspect-ratio: 1;
+  max-block-size: 2.2rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  padding: 0; /* base.css button-padding leak guard */
+  cursor: pointer;
+}
+.rail-cal-day:hover { background: var(--bg-soft); }
+.rail-cal-day:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* S200 (HLTH-5): .rail-cal-day.is-other deleted — the rail calendar never renders
+   other-month cells (nav.js only ever adds .is-today). */
+.rail-cal-day.is-today {
+  background: var(--accent-soft);
+  color: var(--brand);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+/* due dots — up to three per day, then a +n overflow marker; the dot speaks the
+   same --badge-*-fg roles as the rail status dots (projects + todos mix in one day) */
+.rail-cal-dots {
+  position: absolute;
+  inset-block-end: 2px;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.rail-cal-dots i {
+  inline-size: 0.22rem;
+  block-size: 0.22rem;
+  border-radius: 999px;
+  background: var(--warn, #b45309);
+}
+.rail-cal-dots i[data-kind='done'] { background: var(--badge-operational-fg, #277334); }
+.rail-cal-dots i[data-kind='doing'] { background: var(--badge-developing-fg, #96511A); }
+/* S200 (HLTH-5): .rail-cal-legend + .rail-cal-legend i deleted — the legend never
+   shipped in nav.js's rail-calendar markup. */
+/* the mobile brandbar's square mark (S89 pair) — sized to the slim bar */
+.brand-logo-sq { inline-size: 1.65rem; block-size: 1.65rem; display: block; border-radius: 0.35rem; }
+
+/* The main content's gutter: the RAIL occupies it from first paint (the [data-nav]
+   mount is server-rendered static HTML, so :has() resolves pre-JS — no layout jump
+   when the partial lands). The PANEL widens it (persistent push, not overlay). */
+@media (min-width: 1025px) {
+  body:has([data-nav]) { padding-inline-start: var(--rail-w); }
+  /* S188: the gutter widens by the panel's two gaps — the floating surface's
+     footprint (start gap + panel + a comfortable end gap) — so the content never
+     collides with the rounded edge. */
+  body.rail-panel-open { padding-inline-start: calc(var(--rail-w) + var(--rail-panel-gap) + var(--rail-panel-w) + var(--rail-panel-gap)); }
+  body:has([data-nav]) { transition: padding-inline-start 0.22s ease; }
+  .mobile-brandbar { display: none; }
+  /* the topbar-shaped skeleton is desktop-dead: the rail pops in over the gutter */
+  .sk-topbar { display: none; }
+}
+@media (max-width: 1024px) {
+  .rail, .rail-panel { display: none !important; }
+}
+/* Short desktop viewports (≤660px tall): the labeled column (≈610px of stacked
+   buttons) would clip the avatar — collapse to the compact icon-only 4rem rail
+   (labels hide, buttons to compact squares; --rail-w drives body padding +
+   the panel offset, so the whole gutter re-flows in sync). */
+@media (min-width: 1025px) and (max-height: 660px) {
+  :root { --rail-w: 4rem; }
+  .rail-label { display: none; }
+  /* S189 (CHANGE 7): the icon-only squares widen 44px → 48px so the active
+     shape keeps the SAME 8px shoulders off the rail's edges as the labeled
+     rail (64 − 48 = 16px / 2) — one shape geometry across both rail forms;
+     48px still clears the 44px floor. */
+  .rail-btn { inline-size: 3rem; min-block-size: 3rem; gap: 0; }
+  .rail-brand { inline-size: 2.75rem; block-size: 2.75rem; border-radius: 0.75rem; }
+}
+/* S95 r2 (owner item 9): MODULE-SIDEBAR pages — a page carrying its own
+   list-sidebar (the Notes vault) collapses the labeled rail to this SAME icon
+   rail at ANY viewport height, so the same navigation hierarchy is never rendered
+   twice at full width (Notion/Obsidian/VS Code: exactly one sidebar shows labels
+   at a time). nav.js toggles body.rail-icons-only per page (notes.html); leaving
+   the module restores the labeled rail. The rail PANEL never mounts on these
+   pages (nav.js openRailPanel guards it) — the module's own sidebar owns the
+   space beside the rail. */
+@media (min-width: 1025px) {
+  body.rail-icons-only { --rail-w: 4rem; }
+  body.rail-icons-only .rail-label { display: none; }
+  body.rail-icons-only .rail-btn { inline-size: 3rem; min-block-size: 3rem; gap: 0; } /* S189: 48px — the 8px shape shoulders, both rail forms */
+  body.rail-icons-only .rail-brand { inline-size: 2.75rem; block-size: 2.75rem; border-radius: 0.75rem; }
+}
+/* S206 (owner ask, 2026-10-18): the EDGE-AUTO rail — the /kanban pages go TRULY
+   full-bleed. The rail (even its collapsed icon form — the S136 contract the board
+   used to carry) is HIDDEN off-canvas and the body gutter drops to 0, so the five
+   board columns own the whole viewport. The rail returns ONLY when the pointer
+   approaches the start edge: nav.js mounts an invisible #rail-edge-zone strip;
+   hovering it (or keyboard-focusing into the rail) slides the icon rail back in
+   as an OVERLAY (the board never reflows — no padding jump mid-hover). Leaving
+   the rail + zone hides it again (300ms grace). Touch devices never see the zone
+   (no hover) — their bottom mobile-nav owns navigation there, as always. The
+   revealed rail is the COMPACT icon form (the same geometry as rail-icons-only)
+   and the panel + collapse-toggle stay suppressed (the board owns the width). */
+@media (min-width: 1025px) {
+  body.rail-edge { --rail-w: 0rem; } /* the BODY GUTTER drops to 0 — the rail keeps its own width below */
+  body.rail-edge .rail { inline-size: 4rem; } /* the revealed compact rail's own geometry (the gutter var no longer sizes it) */
+  body.rail-edge .rail-label { display: none; }
+  body.rail-edge .rail-btn { inline-size: 3rem; min-block-size: 3rem; gap: 0; }
+  body.rail-edge .rail-brand { inline-size: 2.75rem; block-size: 2.75rem; border-radius: 0.75rem; }
+  body.rail-edge .rail-collapse { display: none !important; } /* auto-hides — no manual collapse contract here */
+  body.rail-edge .rail {
+    transform: translateX(-100%); /* off-canvas start edge; RTL mirrors below */
+    transition: transform 0.18s ease;
+    border-inline-end: 1px solid var(--line);
+    box-shadow: 0 0 18px rgb(0 0 0 / 0.06); /* a floating surface now — a whisper of lift so it reads above the board */
+  }
+  [dir='rtl'] body.rail-edge .rail { transform: translateX(100%); }
+  body.rail-edge.rail-edge-open .rail,
+  [dir='rtl'] body.rail-edge.rail-edge-open .rail { transform: translateX(0); }
+  /* the hover tripwire: a 16px full-height strip at the start edge. Invisible,
+     above the rail (z 39 > 38) so a revealed rail's first 16px stay inside the
+     keep-open region. */
+  #rail-edge-zone {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: 1rem;
+    z-index: 39;
+    background: transparent;
+  }
+}
+/* the zone only exists on rail-edge pages (nav.js mounts it there); below the
+   desktop breakpoint the rail is already display:none — no zone, no dead strip */
+@media not all and (min-width: 1025px) { #rail-edge-zone { display: none; } }
+/* touch pointer: no hover to reveal with — the zone would be a dead invisible
+   strip; the mobile bottom-nav owns navigation there */
+@media (hover: none) { #rail-edge-zone { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  body.rail-edge .rail { transition: none; }
+}
+/* S136: the rail's collapse toggle (partials/nav.html) — board.html auto-collapses
+   the rail (nav.js RAIL_ICON_PAGES) and this button is the always-reachable control
+   back. It shows ONLY while the rail is COLLAPSED: the page contract owns the
+   labeled state (auto-collapse on board.html, labels restored on exit), so the
+   control exists exactly where the job needs it — the re-expand path. Hiding it on
+   the labeled rail also costs zero height there: the 720p labeled column measured
+   EXACTLY full (773px content vs 720px viewport with a visible toggle; the S88
+   short-viewport contract stays intact). The double-chevron points outward while
+   collapsed (the expand affordance). RTL mirrors the horizontal pair. */
+.rail-collapse { display: none; }
+body.rail-icons-only .rail-collapse { display: flex; }
+body.rail-icons-only .rail-collapse .icon { transform: rotate(180deg); }
+[dir='rtl'] body.rail-icons-only .rail-collapse .icon { transform: scaleX(-1) rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  body:has([data-nav]) { transition: none; }
+  .rail-panel { transition: none; }
+}
+
+.shell { padding: clamp(1.5rem, 3.5vw, 3rem); max-inline-size: 64rem; margin-inline: auto; }
+/* batch (p) 2026-09-06: board.html goes FULL-WIDTH (user request) — the five board
+   columns take the whole viewport instead of the 64rem reading measure. */
+.shell.shell-flush { max-inline-size: none; }
+
+/* Settings → View options (2026-08-26): ordered list of dashboard sections, reorderable
+   by drag (handle) or ↑/↓ arrows, each with a show/hide toggle. */
+.view-sort { display: flex; flex-direction: column; gap: 0.4rem; margin-block-start: 0.5rem; }
+.view-sort-row {
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+}
+.view-sort-row[draggable='true'] { cursor: grab; }
+.view-sort-row[draggable='true']:active { cursor: grabbing; }
+.view-sort-handle { display: inline-grid; place-items: center; color: var(--muted); cursor: grab; }
+.view-sort-handle .icon { inline-size: 1.05rem; block-size: 1.05rem; }
+.view-sort-name { flex: 1; font-size: var(--fs-md); }
+.view-sort-actions { gap: 0.3rem; }
+.view-sort-actions .icon-btn { min-inline-size: 2rem; min-block-size: 2rem; inline-size: 2rem; block-size: 2rem; }
+.view-sort-toggle { display: inline-flex; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+  margin-block-end: clamp(1.25rem, 2.5vw, 2rem);
+}
+.card ul { padding-inline-start: 1.25rem; }
+.card li { margin-block-end: 0.5rem; }
+
+/* --- status / chips --------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15em 0.6em;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  /* No nowrap: Farsi labels like «در حال ساخت» must wrap instead of clipping (roast
+     plan Phase 4). Word-level wrapping keeps single-word pills unchanged. */
+  white-space: normal;
+  background: var(--badge-bg, var(--bg-soft));
+  color: var(--badge-fg, var(--muted));
+  border: 1px solid transparent;
+}
+/* Status badges now carry their per-status SVG icon (idea/pending/building/…), so the
+   matching pastel dot is redundant — the icon IS the marker. */
+
+/* One quiet pastel tint per stage (spec §7 — status via a small badge, minimal color).
+   Tints are theme variables (light pastels / muted dark fills) so dark mode can't glare.
+   Hue mapping follows the shared semantic tokens (S137: one --st-* hue per status —
+   Ideas blue · Planning yellow · Up Next cyan-blue · Developing orange · On Hold
+   violet-slate · Operational green (S141 chroma raise); the fallback literals mirror
+   variables.css). */
+.badge-spark        { --badge-bg: var(--badge-spark-bg, #E8EFFB);         --badge-fg: var(--badge-spark-fg, #2E5FA3); }
+.badge-planning { --badge-bg: var(--badge-planning-bg, #FAF1CF); --badge-fg: var(--badge-planning-fg, #77590A); }
+.badge-queued      { --badge-bg: var(--badge-queued-bg, #D6ECF3);      --badge-fg: var(--badge-queued-fg, #14536C); }
+.badge-developing         { --badge-bg: var(--badge-developing-bg, #FBE9DA);         --badge-fg: var(--badge-developing-fg, #96511A); }
+.badge-awaiting_dev        { --badge-bg: var(--badge-awaiting_dev-bg, #E9E5F2);        --badge-fg: var(--badge-awaiting_dev-fg, #4C4370); }
+.badge-operational   { --badge-bg: var(--badge-operational-bg, #E2F1E6);   --badge-fg: var(--badge-operational-fg, #277334); }
+
+/* --- S93 (owner round, item 1): the to-do panel's TICKABLE rows -------------------
+   A quadrant item is a <label> wrapping a real checkbox + the title — the owner can
+   complete/reopen work straight from the sidebar, no page trip. The checkbox is
+   accent-tinted when checked; a done row strikes + dims and rides the group's end. */
+.rail-todo-item { cursor: pointer; }
+.rail-check {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex: none;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.rail-todo-item.is-done .rail-item-label {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.rail-todo-item:has(.rail-check:checked) { background: var(--bg-soft); }
+/* S113 (owner, URGENT): the sidebar shows OPEN work only — a ticked task FOLDS
+   itself away instead of striking+sinking (the board page keeps that register).
+   The collapse is a measured max-height + fade: JS pins the row's current height
+   inline, then .is-leaving drops it to 0 so the transition has a real start value.
+   The checked wash above stays as the tick's first beat before the fold. */
+.rail-todo-item { transition: opacity 0.3s ease, max-height 0.34s ease, padding-block 0.34s ease; }
+.rail-todo-item.is-leaving {
+  opacity: 0;
+  max-height: 0 !important;
+  padding-block: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-todo-item { transition: none; }
+}
+/* The finish line: when the last open task leaves, the panel flips to a quiet
+   all-clear state — a brand-accent check in a soft ring + one muted line.
+   (The generic rail.empty stays for a list with no tasks at all.) */
+.rail-todo-clear {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2.25rem 1rem 2rem;
+  text-align: center;
+  color: var(--muted);
+}
+.rail-todo-clear-badge {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.rail-todo-clear-badge .icon { inline-size: 1.25rem; block-size: 1.25rem; }
+.rail-todo-clear p { margin: 0; font-size: var(--fs-sm); line-height: 1.5; max-inline-size: 26ch; }
+/* S93 (item 6): a quadrant group whose quadrant carries a picked pastel once wore
+   the tint as a full-width wash on its head.
+   S95 r2 (owner item 6 — the restraint rule): the head fill is GONE — the
+   category's color lives ONLY on its small leading dot + its count badge (color
+   marks a small accent, never paints a whole strip). S177 (block 1): the head's
+   base is bare TEXT now (no well, no fill — the S94 well lineage ended); hover
+   is the ink-only rule above. */
+.rail-group[style*='--ga'] .rail-group-count {
+  color: color-mix(in srgb, var(--ga) 68%, var(--text));
+  font-weight: 600;
+  opacity: 1;
+}
+.rail-group-dot {
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 50%;
+  flex: none;
+  background: var(--sw, var(--muted));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sw, var(--muted)) 22%, transparent);
+}
+/* “Linked” state on Settings — the success tint family (--ok) so any theme reads it */
+.badge-ok { --badge-bg: var(--ok); --badge-fg: var(--bg); }
+.badge .icon { width: 0.85em; height: 0.85em; } /* the status glyph inside a small badge */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2em 0.7em;
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+}
+.chip a { color: var(--link); }
+
+/* --- loading / empty -------------------------------------------------------- */
+.loading { padding: 2rem 0; color: var(--muted); }
+
+/* 2026-09-09 (user request): animated moving loader. Two reusable variants:
+   - .hibana-spinner: a rotating ring (border + transparent gap + accent arc).
+     Use inline: <span class="hibana-spinner" role="status" aria-label="Loading"></span>
+   - .hibana-dots: three bouncing dots. Use inline:
+     <span class="hibana-dots" role="status" aria-label="Loading"><i></i><i></i><i></i></span>
+   Both inherit currentColor for the visible arc/dots; the base color is var(--muted)
+   but a parent can set color: var(--brand) for the teal accent. Respects
+   prefers-reduced-motion (the animation stops, the element stays visible).
+   2026-09-09 (user follow-up): made it BIGGER + more eye-catching. The spinner is now
+   2.4rem (was 1.5rem), 3px border (was 2px), with a soft pulsing glow ring so the eye
+   is drawn to it. The loading-row label is also larger (fs-md, not fs-sm). */
+.hibana-spinner {
+  display: inline-block;
+  inline-size: 2.4rem;
+  block-size: 2.4rem;
+  border: 3px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-block-start-color: currentColor;
+  border-radius: 50%;
+  animation: hibana-spin 0.8s linear infinite;
+  vertical-align: middle;
+  /* Soft pulsing glow so the spinner is eye-catching, not just a thin ring. The
+     box-shadow breathes (1.6s) in a second animation layered on the spin. */
+  box-shadow: 0 0 0 0 currentColor;
+  animation: hibana-spin 0.8s linear infinite, hibana-spin-glow 1.6s ease-in-out infinite;
+}
+.hibana-dots {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  vertical-align: middle;
+}
+.hibana-dots i {
+  display: inline-block;
+  inline-size: 0.7rem;
+  block-size: 0.7rem;
+  border-radius: 50%;
+  background: currentColor;
+  animation: hibana-dot-bounce 1.2s ease-in-out infinite;
+}
+.hibana-dots i:nth-child(2) { animation-delay: 0.15s; }
+.hibana-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes hibana-spin { to { transform: rotate(360deg); } }
+@keyframes hibana-spin-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+  50% { box-shadow: 0 0 0.6rem 0.15rem color-mix(in srgb, currentColor 35%, transparent); }
+}
+@keyframes hibana-dot-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hibana-spinner { animation: none; border-block-start-color: currentColor; box-shadow: none; }
+  .hibana-dots i { animation: none; transform: none; opacity: 1; }
+}
+/* A loading row: spinner + label, centered. Drop-in replacement for the old plain
+   "Loading…" text. The spinner rides the brand teal; the label sits next to it with
+   a larger gap + a larger font so the whole row reads as a deliberate loading state. */
+.hibana-loading-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 2.5rem 0;
+  color: var(--muted);
+  font-size: var(--fs-md);
+}
+.hibana-loading-row .hibana-spinner { color: var(--brand); flex: none; }
+.hibana-loading-row > span:last-child { font-weight: 500; }
+.empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+}
+
+/* Session-9 extra: the projects page's header row and the filter bar sat flush
+   (0px gap — user report "no white space between sections"); 1.25rem above the
+   filters mirrors the 1.5rem below it. Projects page is the only .filters user. */
+.filters { margin-block-start: 1.25rem; margin-block-end: 1.5rem; }
+.filters input[type='search'] { flex: 1; }
+/* S94 (owner item 5 — "shrink the gigantic filter controls"): the projects toolbar's
+   status/tag/sort selects + search rode the GLOBAL control sizing (1rem font,
+   .55rem/.75rem padding) — visually louder than the row they sit in and taller than
+   the already-compact view-select beside them. The filter bar drops to the compact
+   register: fs-sm type + .4rem/.65rem padding (the exact recipe .view-select select
+   uses), so the whole toolbar reads as one aligned row. Scope is safe: projects.html
+   is the only .filters user (comment above). */
+.filters input,
+.filters select {
+  font-size: var(--fs-sm);
+  padding: 0.4rem 0.65rem;
+}
+/* The header row's "New project" CTA rides the same compact register (the FAB menu's
+   copy of the button keeps the full-size hit target — this selector can't reach it). */
+main.shell .row.spread [data-projectquickadd] {
+  font-size: var(--fs-sm);
+  padding: 0.42rem 0.8rem;
+  gap: 0.35rem;
+}
+main.shell .row.spread [data-projectquickadd] .icon { inline-size: 1rem; block-size: 1rem; }
+/* S45: mobile-first filter reflow. At phone widths the search input used to collapse
+   to ~48px beside two 44px selects — an unusable sliver. ≤640px the form becomes a
+   grid: the search takes its own full-width line, the three selects (status/tag/sort)
+   share the row below. Desktop keeps the flex row (search flex-1 + selects inline). */
+@media (max-width: 640px) {
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .filters input[type='search'] { grid-column: 1 / -1; flex: none; }
+}
+
+/* --- project lists ---------------------------------------------------------- */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+/* S156 (owner report): a grid item's min-width:auto floors its track at min-content —
+   one long unbreakable token (a URL) widened the whole 1fr column past the container.
+   Zero minimum lets the item shrink; .clip-2 below does the rest. */
+.card-grid > * { min-inline-size: 0; }
+.project-card { display: grid; gap: 0.5rem; margin: 0; transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+/* Redesign 2026-09 (Ali, UI/UX): flatter, more professional card. Hover lifts with a
+   soft warm shadow + a hair-stronger border instead of a flat background flip. The warm
+   rgb(30 20 10 / 0.08) matches the system's --shadow family (not a neutral gray, not
+   blue/indigo). transform/box-shadow are paint-only → no layout shift in the grid. */
+.project-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px -2px rgb(30 20 10 / 0.08); border-color: var(--line-strong); }
+/* Session 20 (390px sweep): the clients page's add-task / add-payment forms inside
+   <details> kept their inputs' intrinsic ~217px width in one non-wrapping row — the
+   Amount field bled 83px off-canvas on phones. Wrap + let inputs shrink/grow. */
+.project-card details > form.row { flex-wrap: wrap; row-gap: 0.4rem; }
+.project-card details > form.row > input { min-inline-size: 0; flex: 1 1 8.5rem; }
+.project-card details > form.row > input[type='number'] { flex: 0 1 7rem; }
+
+/* P-signals: notification-style icon+count chips on project rows (user request 2026-09-02).
+   Shown on dashboard kanban cards + projects page cards/list/kanban. Only non-zero signals
+   render. Each chip: icon + count, tinted by signal type. Compact + scannable.
+   User request 2026-09-02 (revision): make them BIGGER + place on the SAME ROW as the title.
+   User request 2026-09-02 (revision 2): BUG count gets its own solid red bubble (strong visual
+   weight, like a notification badge) right next to the project name. Other signals stay as
+   lighter chips. Also added: latest backlog update time metadata. */
+
+/* The standalone BUG notification bubble — next to the project name, renders when
+   bugs > 0. Session 21 (owner request): PASTEL red + no shadow — the solid #dc2626
+   badge read as too harsh next to the muted card surface. Same recipe as the sig-chip
+   family (translucent tint + deep-red ink): light 12% red tint + #b91c1c ink is
+   ≥5.1:1 everywhere it renders; dark 16% red tint + #f2a3a3 ink is ≥6.2:1. */
+/* S126 (owner: the row badge and the header count badge "share one visual style"):
+   the bug bubble is now a rounded-SQUARE chip carrying the bug GLYPH + the count —
+   shape (square vs the circular .board-count pills), content (glyph + number vs a
+   bare number), and ink (deep red vs the stage pastels) all differ, so the two
+   badge roles can't be confused. Same recipe as the sig-chip family (translucent
+   tint + deep-red ink): light 12% red tint + #b91c1c ink is ≥5.1:1 everywhere it
+   renders; dark 16% red tint + #f2a3a3 ink is ≥6.2:1. */
+.bug-bubble {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.14rem;
+  min-inline-size: 1.4rem; height: 1.4rem; padding: 0 0.35rem;
+  border-radius: 0.45rem;
+  background: rgb(220 38 38 / 0.12); color: #b91c1c;
+  font-size: 0.72rem; font-weight: 700; line-height: 1;
+  vertical-align: middle; margin-inline-start: 0.35rem;
+  flex-shrink: 0;
+}
+.bug-bubble .icon { inline-size: 0.9em; block-size: 0.9em; flex: none; }
+@media (prefers-color-scheme: dark) {
+}
+
+.project-signals { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; flex-shrink: 0; }
+.sig-chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.8rem; line-height: 1.4; font-weight: 600; white-space: nowrap; }
+.sig-chip .icon { width: 1em; height: 1em; }
+/* S85 (owner redesign instruction #3): the sig-chips join the FIXED pastel role
+   palette — the same --badge-*-bg/-fg token pairs the status badges, stat-box
+   icon-chips and the new .board-count pills speak. Ideas = the spark/amber role,
+   hurdles = the halted/red role, backlog stays the brand-teal role (its long-
+   standing "primary signal" meaning). Every chip: pastel fill + DARK ink (light
+   theme; the dark theme flips via the theme token overrides, keeping ≥4.5:1),
+   plus a matching 22% border tint so the pill reads on the card surface.
+   History: R5 (2026-09-12) made ideas+hurdles NEUTRAL GRAY after an orange-on-
+   orange collision; the owner's S85 brief restores distinct color-coding ("faster
+   at-a-glance recognition of project state") WITHOUT the old collision — ideas
+   and hurdles now map to two DIFFERENT fixed roles, and the per-type icons keep
+   carrying the meaning for WCAG 1.4.1 (color is never the only signal). */
+.sig-chip {
+  background: var(--sig-bg, color-mix(in srgb, var(--muted) 10%, transparent));
+  color: var(--sig-fg, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--sig-fg, var(--muted)) 22%, transparent);
+}
+.sig-ideas { --sig-bg: var(--badge-spark-bg); --sig-fg: var(--badge-spark-fg); }
+.sig-backlog { --sig-bg: rgb(74 159 163 / 0.15); --sig-fg: var(--accent, #4A9FA3); }
+.sig-hurdles { --sig-bg: var(--badge-awaiting_dev-bg); --sig-fg: var(--badge-awaiting_dev-fg); }
+/* dashboard kanban card: the title row (open-arrow + title + bug bubble) stays on line 1.
+   The lighter signal chips (ideas/backlog/hurdles) dropped to their own line 2 (user
+   request 2026-09-09) so a 14rem-min card never crowds. Bug stays on the title row —
+   it's the only signal that warrants the red-bubble weight next to the name. */
+.stat-kanban-card .skc-row { align-items: center; }
+.stat-kanban-card .skc-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-block-start: 0.2rem;
+  margin-block-end: 0.1rem;
+}
+/* projects list table: signals in their own column (replaces the old % progress) */
+.projects-table .signals-cell { white-space: nowrap; }
+.projects-table .signals-cell .sig-chip { font-size: 0.75rem; }
+/* projects list table: bug bubble next to the title */
+.projects-table td .bug-bubble { margin-inline-start: 0.3rem; }
+/* card view: title + bug bubble wrap together; signals on the right */
+.pc-title-row { align-items: center; gap: 0.5rem; }
+.pc-title-wrap { display: inline-flex; align-items: center; gap: 0; }
+.pc-meta-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.backlog-meta { font-size: 0.7rem; }
+
+/* --- wireframe project card (2026-08-30 sketch) — minimal centered card -----
+   [Updated 5m ago]      [stage pill]   ← head row (.title-meta also hosts the ⋯ menu)
+            Title of project            ← centered, largest text
+       Description — smaller font       ← centered, muted, 2-line clamp
+   ▞ color-coded hatched corner = first tag's color, top inline-end corner. */
+.pc-wire { gap: 0.5rem; }
+.pc-wire .pc-head { align-items: center; }
+.pc-wire .pc-head > .badge,
+.pc-wire .pc-head > .small { margin-block-start: 0; } /* undo .title-meta optical nudges */
+/* Batch (q) 2026-09-07 — the reported wrap glitch: «به‌روزرسانی ۲ ساعت پیش» + the stage
+   badge overflowed the head row, so the badge's TEXT wrapped INSIDE the pill onto two
+   lines. The row now never wraps; the UPDATED meta is the flexible item, the badge keeps
+   its single line.
+   Fix 2026-09-09 (user report): removed `overflow: hidden; text-overflow: ellipsis` —
+   it was cutting the Persian word mid-way («به‌روزر…»). The label now sizes to its
+   content. The badge stays `flex: none; white-space: nowrap`. If horizontal space is
+   genuinely tight, the source string itself should be shortened (drop the leading
+   «به‌روزرسانی» label word), not truncated by CSS. The card's grid handles the rest. */
+.pc-wire .pc-head .pc-updated {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  white-space: nowrap;
+}
+.pc-wire .pc-head .badge { flex: none; white-space: nowrap; }
+.pc-updated { white-space: nowrap; font-size: 0.68rem; } /* ~50% smaller than body, per user 2026-08-30 */
+/* Fix 2026-09-09 (normalize card height): the empty placeholder rows reserve the same
+   vertical space as a real line so cards with no description / no backlog-meta don't
+   collapse shorter than cards that have them. The placeholder is invisible (aria-hidden
+   + &nbsp;) but takes a line of height. */
+.pc-desc-empty { min-block-size: 1.4rem; opacity: 0; }
+.pc-meta-empty { min-block-size: 1rem; opacity: 0; }
+input::placeholder, textarea::placeholder { font-size: 0.88em; opacity: 0.7; } /* Session 19: opacity bump so placeholders read clearly (was browser default ~0.5) */
+.note-compose-text::placeholder { font-size: 0.8em; opacity: 0.75; }
+.pc-wire .pc-title {
+  justify-self: start;
+  text-align: start;
+  /* S155: the project card title is the H2 rung — 18px/600 ("Section/card title";
+     the spec's "Projects" example row). The S106 700 bold register is superseded:
+     600 is the title weight, hierarchy below rides the ink rungs. */
+  font-size: var(--text-h2-size);
+  font-weight: var(--text-h2-weight);
+  line-height: var(--text-h2-line-height);
+  padding-inline: 0;
+  transition: color 0.15s ease;
+}
+.pc-wire .pc-title:hover { color: var(--brand); text-decoration: none; }
+.pc-wire .pc-desc {
+  justify-self: start;
+  text-align: start;
+  max-inline-size: none;
+  margin: 0;
+}
+/* Hatched triangle clipped to the card's 20px corner radius (Q 52 0 52 20 = the curve).
+   pointer-events:none keeps the whole card clickable through the decoration.
+   (Task 4-F-impl: the .pc-corner rule below was removed — the .pc-corner HTML element
+   was deleted in Session 24h, audit confirmed zero references in HTML/JS/TS.) */
+.project-title {
+  font-weight: 600;
+  font-size: var(--fs-xl);
+  color: var(--text);
+  /* FULL title, always (user request 2026-08-29): the heading wraps to as many lines
+     as it needs — it was a single ellipsized line that hid most of the text.
+     overflow-wrap:anywhere also keeps long unbroken tokens (URLs, no-space titles)
+     inside the card instead of overflowing it (same pattern as .dash-todo-qtitle). */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
+}
+/* [title][status tag][meta] one row: the spread pushes badge/time/⋯ to the right edge.
+   The row is a grid item and must never widen the card: it can shrink (min-inline-size: 0)
+   and caps at the card width. overflow-x: clip (not hidden) guards horizontal overflow
+   while keeping the ⋯ dropdown, which opens BELOW the row, visible.
+   The title may now wrap to several lines — flex-start keeps the badge / time / ⋯
+   locked to the FIRST title line (the ⋯ menu still lives in the top corner), and the
+   tiny block-start margins re-center the smaller items on that first line optically. */
+.title-meta {
+  flex-wrap: nowrap;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-x: clip;
+  overflow-y: visible;
+  align-items: flex-start;
+}
+.title-meta > .badge { margin-block-start: 0.14rem; }
+.title-meta > .small { margin-block-start: 0.26rem; }
+.title-meta > .spark-menu { align-self: flex-start; }
+.clip-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* S156 (owner report): the clamp hides extra LINES but never fixes the BOX — an
+     unbreakable token kept the desc's min-content width and the box painted past
+     the card's edge. overflow-wrap:anywhere (NOT break-word — anywhere also
+     collapses the token's min-content contribution) + min-inline-size:0 let the
+     box shrink inside its grid item. Serves .arc-desc identically. */
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
+}
+/* S156: same disease, sibling face — sparkKanbanHtml's bare <strong> title is a grid
+   item (canvas.css .kanban-card is display:grid); a long token overflowed the card. */
+.kanban-card strong { overflow-wrap: anywhere; min-inline-size: 0; }
+
+.projects-table { width: 100%; border-collapse: collapse; }
+.projects-table th,
+.projects-table td { text-align: start; padding: 0.6rem 0.75rem; border-block-end: 1px solid var(--line); }
+.projects-table th { font-size: var(--fs-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.projects-table tr:hover td { background: var(--bg-soft); }
+.projects-table a { color: var(--text); }
+
+.progress {
+  block-size: 5px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+.progress span { display: block; block-size: 100%; background: var(--text); border-radius: 999px; }
+
+/* --- hurdles / lists -------------------------------------------------------- */
+.hurdles { list-style: none; padding: 0; margin: 0 0 1rem; display: grid; gap: 0.35rem; }
+/* S100 (the deep-link system): a client-checklist row landed on via #task-<id>
+   (the rail's Coming-up list + the calendar page) wears the ARRIVAL MARK — the
+   accent frame + a 1.6s ring flash, the same treatment the board quadrants
+   (S97) and columns (S99) get; reduced-motion collapses to the frame alone.
+   The 4.5rem scroll-margin clears the sticky topbar on anchor landings. */
+.hurdle {
+  scroll-margin-block-start: 4.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.hurdle:hover { background: var(--bg-soft); }
+.hurdle.done span { text-decoration: line-through; color: var(--muted); }
+/* S100 (the deep-link arrival mark) — the accent frame + ring flash, reduced-motion
+   collapses to the frame alone (the .pd-col/.quadrant/.detail-tab siblings). */
+.hurdle.q-arrived { border-color: var(--accent); animation: hurdleArrived 1.6s ease; }
+@keyframes hurdleArrived {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hurdle.q-arrived { animation: none; }
+}
+/* pre-line: legacy list items that stored multiple lines as one task render as real line breaks */
+.hurdle span { white-space: pre-line; }
+.hurdle .toggle { border: 0; background: transparent; color: var(--muted); }
+.hurdle .toggle:hover { color: var(--text); background: transparent; }
+.hurdle .toggle[aria-label^="Mark solved"] { color: var(--ok); }
+/* Hover-pen hurdle editing (user request 2026-09-05 — chosen over double-click): the
+   pen keeps its layout slot (no hover jank) but only reveals on row hover or keyboard
+   focus; touch devices have no hover, so it stays visible there. */
+.hurdle .hurdle-edit { visibility: hidden; border: 0; background: transparent; color: var(--muted); padding: 0.2rem; }
+.hurdle:hover .hurdle-edit, .hurdle:focus-within .hurdle-edit, .hurdle .hurdle-edit:focus-visible { visibility: visible; }
+.hurdle .hurdle-edit:hover { color: var(--text); background: transparent; }
+@media (hover: none) { .hurdle .hurdle-edit { visibility: visible; } }
+.hurdle .hurdle-edit-input { flex: 1 1 auto; min-inline-size: min(100%, 14rem); padding: 0.25rem 0.5rem; }
+
+.links, .history, .activity, .search-results { list-style: none; padding: 0; margin: 0 0 1rem; display: grid; gap: 0.35rem; }
+.history { font-size: var(--fs-sm); }
+.activity li, .links li { padding: 0.4rem 0.5rem; margin: 0; border-radius: 4px; }
+.activity li:hover, .links li:hover { background: var(--bg-soft); }
+/* Activity rows: the project name keeps its status badge right next to it (user request),
+   with the note/time pinned to the opposite edge — no dead space between title and badge. */
+.activity-item { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; min-width: 0; }
+.activity-main { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.activity-main a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-sub { margin-inline-start: auto; text-align: end; font-size: var(--fs-xs); }
+
+/* Recent activity — flat, compact, secondary (2026-08-25): no card surface, small muted
+   heading, tight rows. Overrides the shared .links/.history/.activity base rules. */
+.activity-section { margin-block-start: 1rem; display: grid; gap: 0.35rem; }
+.activity-section h3 { margin: 0; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); }
+.activity-section .activity { margin: 0; gap: 0.15rem; }
+.activity-section .activity li { padding: 0.1rem 0.15rem; }
+.activity-section .activity li:hover { background: transparent; }
+.activity-section .activity-main a { font-size: var(--fs-sm); color: var(--muted); }
+.activity-section .activity-main a:hover { color: var(--text); }
+/* S200 (HLTH-5): .activity-section .activity-more deleted — no renderer emits it. */
+
+/* --- media --------------------------------------------------------------- */
+.shot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 0.75rem; margin-block-start: 1rem; }
+.shot { margin: 0; }
+.shot img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  cursor: zoom-in;
+}
+.shot img:hover { filter: brightness(0.97); }
+/* S115: webm screen recordings ride the media pipeline END-TO-END — the tile is a
+   real <video> (native controls; preload="metadata" keeps a big grid cheap). The
+   .shot frame contract (radius + hairline + tile ratio) carries over from the img
+   rule above; the black ground reads as a player, not a broken tile. */
+.shot video.shot-video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #000;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+}
+.shot video.shot-video:hover { filter: brightness(0.97); }
+/* S119: the tiles are keyboard-focusable (tabindex="0" + Enter = the big view) —
+   focus speaks the app's brand-ring dialect (the .rail-btn recipe), never the UA ink. */
+.shot video.shot-video:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.shot-card.is-fixed .shot-video { opacity: 0.75; }
+
+/* S118: the zoom lightbox speaks video — the recording gets the img's exact sizing
+   contract (bounded to the viewport, radius + shadow language); the black ground
+   reads as a player. Tokens only, so dark theme rides free. */
+.shot-lightbox video.shot-video {
+  max-inline-size: 100%;
+  max-block-size: 100%;
+  background: #000;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 40px rgb(0 0 0 / 0.5);
+  cursor: default;
+}
+.shot-lightbox[data-lb] video.shot-video { max-block-size: calc(100% - 1rem); }
+
+/* S35: screenshots are UI/UX PROBLEM REPORTS — a card per broken thing: image +
+   note + open/fixed state. The old bare figure kept its base styles above (the
+   .shot-card layer adds the report structure on top). */
+.shot-card { display: flex; flex-direction: column; }
+.shot-img-btn { padding: 0; border: 0; background: none; cursor: zoom-in; display: block; }
+.shot-img-btn img { display: block; }
+.shot-card.is-fixed .shot-img-btn img { opacity: 0.75; }
+/* S60 zoom affordance: the image BUTTONS now open a browser lightbox on both the
+   project page and the gallery — say so before the click. Hover grows the image a
+   touch (clip inside the button so rounded card corners stay clean), focus gets a
+   real ring (it's a button — keyboard users had nothing). Hover-growth only on
+   devices that hover; reduced-motion flattens the transition. */
+.shot-img-btn { overflow: hidden; border-radius: var(--radius-sm); }
+@media (hover: hover) {
+  .shot-img-btn img { transition: transform 0.18s ease; }
+  .shot-img-btn:hover img { transform: scale(1.04); }
+}
+.shot-img-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .shot-img-btn img { transition: none; }
+  .shot-img-btn:hover img { transform: none; }
+}
+.shot-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.3rem; padding: 0.4rem 0.1rem 0.1rem; min-inline-size: 0; }
+.shot-note { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.shot-note-empty { font-style: italic; opacity: 0.75; }
+.shot-state {
+  font-size: var(--fs-xs); font-weight: 600; color: #B4762E;
+  background: rgb(201 151 59 / 0.12); border-radius: 999px; padding: 0.05rem 0.5rem;
+}
+.shot-state.is-fixed { color: #3E7D5A; background: rgb(143 211 169 / 0.2); }
+.shot-card.is-fixed { border: 1px solid rgb(143 211 169 / 0.55); border-radius: var(--radius-sm); padding: 0.3rem; }
+/* the zoom lightbox — click or Esc closes */
+.shot-lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-items: center; padding: 2rem;
+  background: rgb(10 8 4 / 0.82); cursor: zoom-out;
+}
+.shot-lightbox img {
+  max-inline-size: 100%; max-block-size: 100%;
+  border-radius: var(--radius-sm); box-shadow: 0 8px 40px rgb(0 0 0 / 0.5);
+}
+/* S59b/S60: the BROWSER lightbox — prev/next walk the browse set (the gallery's
+   filtered set; the project page's grid siblings — main grid, pinned-shots dialog,
+   staged grid, task-edit dialog). [data-lb] marks the browser variant; a bare
+   .shot-lightbox without it stays click-to-close (single-shot mode).
+   Buttons clear the 44px touch floor; the meta pill is pointer-events:none so
+   backdrop clicks pass through it. */
+.shot-lightbox[data-lb] { padding: 3.5rem 4.5rem 5rem; }
+.shot-lightbox[data-lb] img { max-block-size: calc(100% - 1rem); cursor: default; }
+.lb-nav, .lb-close {
+  position: absolute; z-index: 2;
+  display: grid; place-items: center;
+  inline-size: 44px; block-size: 44px;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 999px;
+  background: rgb(20 16 10 / 0.55);
+  color: #F5F2EA;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.lb-nav .icon, .lb-close .icon { inline-size: 1.35rem; block-size: 1.35rem; }
+.lb-nav:hover, .lb-close:hover { background: rgb(20 16 10 / 0.8); border-color: rgb(255 255 255 / 0.45); }
+.lb-nav:active { transform: scale(0.94); }
+.lb-nav:focus-visible, .lb-close:focus-visible { outline: 2px solid #F5F2EA; outline-offset: 2px; }
+.lb-prev { inset-inline-start: 0.75rem; inset-block-start: 50%; translate: 0 -50%; }
+.lb-next { inset-inline-end: 0.75rem; inset-block-start: 50%; translate: 0 -50%; }
+.lb-close { inset-inline-end: 0.75rem; inset-block-start: 0.75rem; }
+/* chevrons point toward the READING direction's start/end — flip both in RTL */
+[dir='rtl'] .lb-prev .icon { transform: scaleX(-1); }
+[dir='rtl'] .lb-next .icon { transform: scaleX(-1); }
+.lb-meta {
+  position: absolute; z-index: 2;
+  inset-block-end: 1rem; inset-inline: 0;
+  display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0 1rem;
+  pointer-events: none;
+  color: #F5F2EA;
+  font-size: 0.8rem;
+}
+.lb-count {
+  font-variant-numeric: tabular-nums;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgb(20 16 10 / 0.55);
+  border: 1px solid rgb(255 255 255 / 0.18);
+}
+/* S60: the resolved state chip — the cards show fixed/open, browsing must not lose
+   it. Amber for open (the .shot-state family), green for fixed; brightened for the
+   dark backdrop. */
+.lb-state {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgb(217 165 92 / 0.16);
+  border: 1px solid rgb(217 165 92 / 0.5);
+  color: #E8BE85;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.lb-state.is-fixed {
+  background: rgb(143 211 169 / 0.14);
+  border-color: rgb(143 211 169 / 0.5);
+  color: #9BD8B0;
+}
+.lb-cap {
+  max-inline-size: min(60ch, 70vw);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  align-self: center;
+  color: rgb(245 242 234 / 0.85);
+}
+/* phones: nav buttons ride the bottom corners (thumbs), meta above them */
+@media (max-width: 720px) {
+  .shot-lightbox[data-lb] { padding: 2.5rem 0.5rem 6rem; }
+  .lb-prev { inset-block-start: auto; inset-block-end: 1.25rem; inset-inline-start: 0.5rem; translate: none; }
+  .lb-next { inset-block-start: auto; inset-block-end: 1.25rem; inset-inline-end: 0.5rem; translate: none; }
+  .lb-cap { max-inline-size: 82vw; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-nav, .lb-close { transition: none; }
+  .lb-nav:active { transform: none; }
+}
+
+/* S39: the note is CLICK-TO-EDIT — the whole area is the trigger (the tiny pencil
+   alone read as "you can't add a note"). Hover shows a soft edit affordance; the
+   role=button/tabindex markup lives server-side. No negative margin here — at 390px
+   it pushed the note 4px past the card into the page's horizontal scroll. */
+.shot-note[data-shot-note-edit] { cursor: text; border-radius: var(--radius-sm); padding: 0.15rem 0.3rem; }
+.shot-note[data-shot-note-edit]:hover, .shot-note[data-shot-note-edit]:focus-visible {
+  background: var(--soft, rgb(0 0 0 / 0.04)); outline: 1px dashed var(--line);
+}
+/* S39 (e2e-caught geometry bug): the actions row (state chip + date·size + buttons)
+   sums wider than a 9–11rem grid track and .row does NOT wrap — the delete button
+   bled ~32px into the NEIGHBOR card and swallowed its clicks. Wrap it. */
+.shot-actions { flex-wrap: wrap; row-gap: 0.25rem; }
+.shot-actions > .muted { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* S107 (owner: "the settings like delete edit etc can be hidden under a setting
+   '...' menu for each uploaded picture"): the four inline icon buttons collapsed
+   into ONE ⋯ kebab — the app's standard .spark-menu popover (base styles live in
+   quicknotes.css: button shell, pop, hover-reveal, touch floor). The actions row
+   now reads [state chip] … [⋯]; every action is one deliberate click deeper and
+   the tiles rest clean. */
+.shot-actions .spark-menu { flex: none; }
+.shot-actions .spark-menu .spark-menu-pop { inset-block-start: calc(100% + 0.25rem); }
+.shot-card:hover .shot-actions .spark-menu > button[data-menu-open],
+.shot-card:focus-within .shot-actions .spark-menu > button[data-menu-open],
+.shot-actions .spark-menu > button[data-menu-open][data-open] { opacity: 1; }
+/* S39: the pin line — WHICH box + item the picture is stuck to (note + picture
+   proof + how it's categorized). Amber family like the shot-state, quieter.
+   S105 (owner: "they're into each other and messed up"): a long task title made
+   the line blow past its card — flex/grid items default to min-width:auto, so
+   the text could never shrink and painted ACROSS the neighboring tiles (the
+   shot-pin-task ellipsis was already there but never had a chance to act).
+   The whole chain now yields: .shot-body (grid) → .shot-pin → .shot-pin-text →
+   .shot-pin-task, each min-inline-size:0, so the ellipsis finally engages and
+   the card keeps its geometry at any title length. */
+.shot-pin {
+  font-size: var(--fs-xs); align-items: baseline; gap: 0.35rem;
+  background: rgb(201 151 59 / 0.1); border: 1px solid rgb(201 151 59 / 0.3);
+  border-radius: var(--radius-sm); padding: 0.15rem 0.4rem;
+  min-inline-size: 0;
+}
+.shot-pin .shot-pin-text { min-inline-size: 0; overflow: hidden; }
+.shot-pin .shot-pin-task { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shot-unpin { padding: 0.05rem 0.2rem; }
+/* S39: the 📌 N badge on a progress-box task card / a Problems-tab row */
+.pd-task-shots {
+  display: inline-flex; align-items: center; gap: 0.2rem;
+  font: inherit; font-size: var(--fs-xs); font-weight: 600;
+  color: #B4762E; background: rgb(201 151 59 / 0.12);
+  border: 0; border-radius: 999px; padding: 0.02rem 0.45rem; cursor: pointer;
+}
+.pd-task-shots:hover { background: rgb(201 151 59 / 0.22); }
+.pd-task-shots .icon { block-size: 0.85em; inline-size: 0.85em; }
+
+/* --- S39: the media GALLERY (gallery.html — the WordPress-style library) ----- */
+.gallery-head { margin-block-end: 0.25rem; }
+.gallery-stats {
+  font-size: var(--fs-xs); font-weight: 600; color: var(--muted);
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 999px; padding: 0.15rem 0.7rem;
+}
+.gallery-tools { gap: 0.6rem; flex-wrap: wrap; margin-block: 0.5rem 0.25rem; }
+.gallery-project-select { max-inline-size: 18rem; }
+.gallery-states { gap: 0.3rem; flex-wrap: wrap; }
+.gallery-state { cursor: pointer; }
+.gallery-state.is-on { border-color: var(--brand); color: var(--brand); }
+.gallery-grid { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+.gal-card .shot-body { padding: 0.4rem 0.1rem 0.15rem; }
+/* S69 (perf §10-F1): lazy gallery tiles. The tile frame is FIXED (16:11, cover-crop)
+   so the grid layout is stable before any byte arrives; the button carries a shimmer
+   placeholder while the thumb variant streams in, and the image blur-up-fades once
+   decoded (.is-in). Uniform frames + cover crop also read as a proper media library
+   (the wordpress-style grid the owner asked for) instead of ragged natural heights. */
+.gal-card .shot-img-btn { aspect-ratio: 16 / 11; }
+.gal-card .shot-img-btn img {
+  width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; filter: blur(10px);
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+.gal-card .shot-img-btn img.is-in { opacity: 1; filter: blur(0); }
+.gal-card.shot-card.is-fixed .shot-img-btn img.is-in { opacity: 0.75; }
+@keyframes gal-tile-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.gal-card .shot-img-btn {
+  background: linear-gradient(100deg, var(--card, #f6f5f1) 42%, rgb(127 127 127 / 0.10) 50%, var(--card, #f6f5f1) 58%);
+  background-size: 200% 100%;
+  animation: gal-tile-shimmer 1.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gal-card .shot-img-btn { animation: none; }
+  .gal-card .shot-img-btn img { transition: none; }
+}
+/* chips row: the chips are inline-flex (nowrap+ellipsis) — without an explicit
+   min-inline-size 0 they refuse to shrink under their max-content and the whole
+   row overflows its grid track (a 4px page-wide h-scroll at 390px, RTL). */
+.gal-chips { min-inline-size: 0; align-items: baseline; }
+.gal-chips > .chip { flex: 0 1 auto; min-inline-size: 0; }
+.gal-project { max-inline-size: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.gal-project:hover { color: var(--brand); }
+.gal-pin { max-inline-size: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #B4762E; background: rgb(201 151 59 / 0.1); }
+.gal-deleted { font-style: italic; opacity: 0.7; }
+
+/* --- S79: the gallery MANAGER — note editing + select mode + bulk delete -----
+   The gallery graduates from viewer to manager; every control below follows the
+   house rules: logical properties (RTL-safe), 40px touch floor on coarse pointers,
+   reduced-motion + prefers-contrast guards, tabular numerals for live counts. */
+/* the Select toggle rides the filter row at chip scale — its active state matches
+   the .gallery-state chips so "mode" and "filter" read as one family */
+.gallery-select { cursor: pointer; }
+.gallery-select.is-on { border-color: var(--brand); color: var(--brand); }
+
+/* click-to-edit note affordance: editable text announces itself on hover/focus
+   without shouting (dotted underline + cursor), the same family as the project
+   page's shot-note. The empty state carries the affordance too — "no note" is
+   the strongest invitation to write one. */
+.gal-card .shot-note[data-gal-note] { cursor: pointer; border-radius: 4px; }
+.gal-card .shot-note[data-gal-note]:hover {
+  color: var(--text);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.gal-card .shot-note[data-gal-note]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  text-decoration: none;
+}
+
+/* the per-tile check: hidden (display:none — out of the a11y tree + tab order)
+   unless the grid is in select mode; a glassy dark disc that reads on ANY image,
+   brand-filled when picked, checkmark scales in. Coarse pointers grow it to the
+   40px touch floor. */
+.gal-card { position: relative; }
+.gal-check {
+  display: none;
+  position: absolute; top: 0.5rem; inset-inline-end: 0.5rem; z-index: 3;
+  inline-size: 30px; block-size: 30px;
+  align-items: center; justify-content: center;
+  border-radius: 999px;
+  border: 2px solid rgb(255 255 255 / 0.85);
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.gallery-grid[data-selecting] .gal-check { display: inline-flex; }
+.gal-check .icon { stroke-width: 2.6; transform: scale(0.55); opacity: 0.55; transition: transform 0.15s ease, opacity 0.15s ease; }
+.gal-check:hover { background: rgb(0 0 0 / 0.6); }
+.gal-check:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.gal-card.is-sel .gal-check { background: var(--brand); border-color: var(--brand); }
+.gal-card.is-sel .gal-check .icon { transform: scale(1); opacity: 1; }
+/* the picked tile: a brand ring on the picture frame itself (the check alone is
+   small proof; the ring is visible from across the grid at a glance) */
+.gal-card.is-sel .shot-img-btn { box-shadow: inset 0 0 0 2px var(--brand); }
+.gal-card.is-sel .shot-img-btn img.is-in { opacity: 1; } /* picked beats the fixed-dim */
+/* S120: the pick ring reaches the video tiles — a SELECTED recording showed no
+   state at all (the is-sel ring was img-button-only; a picked recording looked
+   unpicked from across the grid). Outline (not the img's inset shadow): outline
+   paints above the media frame of a replaced element, guaranteed — the same 2px
+   brand ring, offset inward to hug the frame; picked also beats the fixed-dim
+   like the img does. */
+.gal-card.is-sel .shot-video { outline: 2px solid var(--brand); outline-offset: -2px; opacity: 1; }
+/* while selecting, the whole tile is the pick target — the hover cue says so */
+.gallery-grid[data-selecting] .shot-img-btn { cursor: pointer; }
+/* S81 — the hold must stay OURS on touch: no OS callout/drag/text-selection on the
+   tiles while a range could be armed (touch-action: manipulation keeps pan+pinch
+   scroll fully alive — it only kills the double-tap zoom delay) */
+.gallery-grid[data-selecting] .gal-card {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.gallery-grid[data-selecting] {
+  touch-action: manipulation;
+}
+@media (hover: none) {
+  .gallery-grid[data-selecting] .gal-check { inline-size: 40px; block-size: 40px; }
+}
+
+/* the sticky selection bar: a floating pill pinned to the viewport bottom (safe-
+   area aware), live count with tabular numerals, Clear + a danger Delete. Slides
+   up on entry; wraps center-aligned on narrow screens; Esc / Done / any filter
+   change dismisses it. */
+.gal-selbar {
+  position: fixed; z-index: 40;
+  inset-inline: 0;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  margin-inline: auto;
+  max-inline-size: min(44rem, calc(100vw - 1.5rem));
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 0.22),
+    0 4px 12px rgb(0 0 0 / 0.12);
+  animation: gal-selbar-in 0.22s ease;
+}
+/* MOBILE: the bottom mobile-nav (fixed, z=50 — polish-ui.css) owns the edge; the
+   selection bar sits ABOVE it (nav 3.75rem + safe area + the 0.75rem gap) instead of
+   fighting it for z — both stay reachable while selecting. Desktop keeps the plain
+   bottom position (the nav is display:none there). */
+body.has-mobile-nav .gal-selbar { bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
+/* FA: the leading padding sits on the LOGICAL start side; RTL mirrors automatically
+   because the padding is physical — swap via the dir selector for symmetric feel */
+[dir="rtl"] .gal-selbar { padding: 0.5rem 1rem 0.5rem 0.5rem; }
+@keyframes gal-selbar-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+.gal-selbar-count {
+  font-size: var(--fs-sm); font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  min-inline-size: 0; flex: 1 1 auto;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gal-selbar.is-empty .gal-selbar-count { color: var(--muted); font-weight: 500; }
+.gal-selbar-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; flex: 0 0 auto; }
+.gal-selbar-btns .btn, .gal-selbar-btns .ghost { min-block-size: 40px; }
+.gal-selbar-btns .btn:disabled, .gal-selbar-btns .ghost:disabled { opacity: 0.45; cursor: not-allowed; }
+@media (max-width: 640px) {
+  .gal-selbar { flex-wrap: wrap; justify-content: center; border-radius: var(--radius); text-align: center; padding: 0.6rem; }
+  .gal-selbar-count { flex-basis: 100%; white-space: normal; }
+  .gal-selbar-btns { justify-content: center; }
+}
+
+/* the note editor modal: same shape as the project page's S46 editor (a real
+   textarea, compact actions) + the wand hint line. The textarea carries
+   [data-magic] — the wand anchors at its corner inside the dialog. */
+dialog.gal-note-modal {
+  inline-size: min(34rem, 92vw);
+  max-inline-size: min(34rem, 92vw);
+  max-block-size: min(80vh, 40rem);
+}
+.gal-note-inner { padding: 1.1rem; display: grid; gap: 0.6rem; }
+.gal-note-head h3 { margin: 0; }
+.gal-note-body { display: grid; gap: 0.6rem; }
+.gal-note-ta {
+  width: 100%; box-sizing: border-box;
+  min-block-size: 8rem; resize: vertical;
+  font: inherit; font-size: var(--fs-md); line-height: 1.55;
+  padding: 0.6rem; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--text);
+}
+.gal-note-ta:focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 1px;
+  border-color: var(--brand);
+}
+.gal-note-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem; flex-wrap: wrap;
+}
+.gal-note-hint { flex: 1 1 12rem; min-inline-size: 0; line-height: 1.4; }
+.gal-note-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.gal-note-btns .btn, .gal-note-btns .ghost { font-size: var(--fs-xs); padding: 0.2rem 0.6rem; min-block-size: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gal-selbar { animation: none; }
+  .gal-check .icon { transition: none; }
+}
+@media (prefers-contrast: more) {
+  .gal-check { border-width: 3px; }
+  .gal-card.is-sel .shot-img-btn { box-shadow: inset 0 0 0 3px var(--brand); }
+  .gal-card.is-sel .shot-video { outline-width: 3px; }
+  .gal-selbar { border-width: 2px; }
+}
+
+/* --- S80: the cleanup pass gets its power tools — sort + select-all + ranges --
+   The gallery's tools row gains the display order (newest / oldest / LARGEST /
+   smallest — the space story gets an order), the selection bar gains the master
+   toggle, and the tile footer's size becomes the leading fact when the order IS
+   the size story. Every rule follows the S79 house rules: logical properties
+   (RTL-safe), 40px touch floor on coarse pointers, reduced-motion + contrast
+   guards, tabular numerals for live counts. */
+/* the sort select rides the tools row at CHIP scale — a display control, not a text
+   field: pill radius + accent-soft fill like the state chips beside it, the base
+   select's muted chevron (RTL-flipped by base.css), and the same is-on brand cue
+   the active filter chip carries so "order" and "filter" read as one family. */
+.gallery-sort-select {
+  max-inline-size: 11rem;
+  min-block-size: 2.3rem;
+  padding-block: 0.25rem;
+  padding-inline: 0.7rem 2.1rem;
+  border-radius: 999px;
+  border-color: transparent;
+  background-color: var(--accent-soft);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+.gallery-sort-select:hover { border-color: var(--line-strong); }
+.gallery-sort-select.is-on { border-color: var(--brand); color: var(--brand); font-weight: 600; }
+.gallery-sort-select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+@media (hover: none) { .gallery-sort-select { min-block-size: 40px; } }
+@media (max-width: 640px) { .gallery-sort-select { max-inline-size: 100%; } }
+
+/* when the display order IS the size story, the per-card size stops being a muted
+   footnote: text color + weight + tabular numerals promote it to the leading fact
+   (the date stays its old muted self — only what the sort is about gets promoted). */
+.gallery-grid[data-sort-size] .shot-size {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-contrast: more) {
+  .gallery-grid[data-sort-size] .shot-size { text-decoration: underline; text-underline-offset: 3px; }
+}
+
+/* the master toggle ("Select all (n)" / "Deselect all") leads the bar's actions —
+   brand-tinted when the set is complete so the mirrored state reads at a glance. */
+.gal-selbar-all { font-weight: 600; }
+.gal-selbar.is-all .gal-selbar-all { color: var(--brand); border-color: var(--brand); }
+.gal-selbar.is-empty .gal-selbar-all { color: var(--text); } /* the empty bar's CTA is "Select all", not a disabled dim */
+
+/* the selection bar over ANY content: glassy — the card surface at 86% over a soft
+   blur + saturation lift reads as a floating layer in BOTH themes (the opaque
+   fallback paints automatically where backdrop-filter is unsupported). */
+@supports (backdrop-filter: blur(1px)) {
+  .gal-selbar {
+    background: color-mix(in srgb, var(--card) 86%, transparent);
+    backdrop-filter: blur(10px) saturate(1.2);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  }
+}
+/* the Shift+click range hint: desktop pointers get the affordance on the bar's
+   empty state (touch can't shift-click — coarse pointers never see the hint). */
+@media (hover: hover) and (pointer: fine) {
+  .gal-selbar.is-empty .gal-selbar-count::after {
+    content: attr(data-range-hint);
+    display: block;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    line-height: 1.35;
+  }
+}
+
+/* --- S81: the touch range counterpart — long-press A, tap B -------------------
+   Phones have no Shift key: a ~480ms hold ARMS the range (the anchor tile picks),
+   the next tap completes it. The anchor needs to read DIFFERENTLY from a plain
+   picked tile — "the range starts HERE" — so it wears a pulsing brand halo ring
+   plus a corner tab with the range glyph; the empty bar's hint swaps to the touch
+   phrasing for coarse/no-hover pointers. House rules: logical properties, 40px
+   floor, reduced-motion + prefers-contrast guards. */
+/* the armed anchor: the picked ring stays (it IS picked) but gains a breathing
+   double halo so the eye finds the range's start across the grid */
+.gal-card.is-range-anchor .shot-img-btn {
+  box-shadow:
+    inset 0 0 0 2px var(--brand),
+    0 0 0 3px color-mix(in srgb, var(--brand) 45%, transparent);
+  animation: gal-anchor-breathe 1.6s ease-in-out infinite;
+}
+@keyframes gal-anchor-breathe {
+  0%, 100% { box-shadow: inset 0 0 0 2px var(--brand), 0 0 0 3px color-mix(in srgb, var(--brand) 45%, transparent); }
+  50%      { box-shadow: inset 0 0 0 2px var(--brand), 0 0 0 6px color-mix(in srgb, var(--brand) 22%, transparent); }
+}
+/* the corner tab: a small brand dot at the image's start-edge bottom corner —
+   text-free (no EN/FA swap needed), readable on ANY image via the card-colored
+   ring; the halo + this mark together say "the range starts HERE". Decorative by
+   design (pointer-events none) — the semantic announcement lives in the toast. */
+.gal-card.is-range-anchor::after {
+  content: '';
+  position: absolute;
+  bottom: 0.55rem;
+  inset-inline-start: 0.55rem;
+  z-index: 3;
+  inline-size: 14px;
+  block-size: 14px;
+  border-radius: 999px;
+  background: var(--brand);
+  border: 2px solid var(--card);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gal-card.is-range-anchor .shot-img-btn { animation: none; }
+}
+@media (prefers-contrast: more) {
+  .gal-card.is-range-anchor .shot-img-btn {
+    box-shadow: inset 0 0 0 3px var(--brand), 0 0 0 4px var(--brand);
+    animation: none;
+  }
+  .gal-card.is-range-anchor::after { inline-size: 18px; block-size: 18px; border-width: 3px; }
+}
+/* the touch range hint: the SAME empty-bar affordance, touch phrasing, shown only
+   where hover is absent or the pointer is coarse (the desktop twin above gates the
+   reverse) — the two lines are mutually exclusive by media, never both at once. */
+@media (hover: none), (pointer: coarse) {
+  .gal-selbar.is-empty .gal-selbar-count::after {
+    content: attr(data-range-touch-hint);
+    display: block;
+    color: var(--muted);
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    line-height: 1.35;
+  }
+}
+/* S81 polish — scroll clearance for the floating bar: while the selbar is mounted,
+   the page flow gains bottom clearance so the LAST row of tiles can scroll clear
+   of the fixed bar (Gmail/Photos pattern: the bar floats, but content must be able
+   to escape it — otherwise the row the cleanup pass is reviewing sits under the
+   delete button). Transient by construction: the padding exists only while
+   selecting (:has gates it), and mobile extends past the mobile-nav clearance
+   the body already carries. Engines without :has keep the old behavior (the bar
+   is transient anyway). */
+body:has(.gal-selbar) .shell { padding-block-end: 5rem; }
+body.has-mobile-nav:has(.gal-selbar) {
+  padding-block-end: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* --- dashboard stats ------------------------------------------------------- */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin-block-end: 1.25rem;
+}
+.stat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 1.25rem 1rem;
+  text-align: center;
+}
+.stat .badge { font-size: var(--fs-lg); }
+
+/* Dashboard/reports stat boxes: count + label header, the project kanban below. */
+.stat-boxes { grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); } /* batch q: six lifecycle boxes */
+.stat-box { text-align: start; padding: 0.9rem 1rem; }
+
+/* S72 — topbar pending-sync badge ([data-sync-badge], injected with the nav partial).
+   Mirrors .topbar-search's pill recipe but carries the AMBER waiting identity
+   (variables.css color law: orange = waiting / attention-needed). hidden while the
+   offline queue is empty; hib-init.js paints it. The strikethrough cloud icon reads
+   as "not synced yet" without a full offline banner. */
+.topbar-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--warn, #b45309) 35%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, color-mix(in srgb, var(--warn, #b45309) 14%, var(--card)) 60%, var(--card));
+  color: var(--warn, #b45309);
+  font-size: var(--fs-sm, 0.85rem);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+/* S89: the display:inline-flex above OUTRANKS the UA stylesheet's [hidden]
+   display:none (author origin beats UA origin regardless of specificity), so the
+   idle chip rendered VISIBLE even while hidden (caught by the settings e2e —
+   latent since S72, invisible-in-practice because the badge lived in the rail's
+   bottom corner). The Settings retry chip is the badge's one home now: it must
+   stay gone while the queue is empty. */
+.topbar-sync[hidden] { display: none; }
+.topbar-sync:hover, .topbar-sync:focus-visible {
+  border-color: var(--warn, #b45309);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn, #b45309) 18%, transparent);
+  outline: none;
+}
+.topbar-sync .icon { width: 1rem; height: 1rem; flex: none; }
+/* Subtle breathing while items wait — calmer than the urgent flame (this is a state,
+   not an alarm). Guarded by prefers-reduced-motion like every animation. */
+@media (prefers-reduced-motion: no-preference) {
+  .topbar-sync .icon { animation: topbar-sync-breathe 2.4s ease-in-out infinite; }
+}
+@keyframes topbar-sync-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@media (prefers-contrast: more) {
+  .topbar-sync { border-color: var(--warn, #b45309); background: var(--card); }
+}
+
+/* S86: DOC uploads in the shot grids — PDF/CSV/XLSX/DOCX/MD/TXT ride the screenshots
+   bucket and render a FILE tile instead of an image. Same aspect-ratio frame the
+   image buttons keep (4/3 shot grids, 16/11 gallery) so mixed grids stay aligned;
+   the extension badge carries the type, the name carries the identity, and the
+   download glyph appears on hover (the <a download> does the work). */
+.shot-file {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  aspect-ratio: 4 / 3;
+  padding: 0.6rem 0.8rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  text-decoration: none;
+  color: var(--text);
+  overflow: hidden;
+}
+.gal-card .shot-file { aspect-ratio: 16 / 11; }
+.shot-file-ext {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 3.1rem;
+  block-size: 2.1rem;
+  padding-inline: 0.35rem;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--link);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.shot-file-name {
+  flex: 1;
+  min-inline-size: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shot-file-dl {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.6rem;
+  block-size: 1.6rem;
+  border-radius: 999px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.shot-file:hover .shot-file-dl,
+.shot-file:focus-visible .shot-file-dl { opacity: 1; }
+.shot-file:hover { border-color: var(--accent); background: var(--accent-soft); }
+.shot-file:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shot-card.is-fixed .shot-file { opacity: 0.8; }
+/* Phone-width grids: the badge + name row squeezes gracefully (name ellipsizes,
+   the download glyph drops out entirely below 360px). */
+@media (max-width: 360px) {
+  .shot-file-dl { display: none; }
+  .shot-file { gap: 0.4rem; padding: 0.5rem 0.6rem; }
+}

@@ -1,0 +1,1103 @@
+/* --- board page (board.html) ---------------------------------------------- */
+/* S206 (owner ask 2026-10-18): the toolbar title FLEXES and shrinks — fs-xl (18px,
+   multi-line overflow-wrap) starved the project name beside the Back link + counts
+   + the Sprints/Labels buttons; a long FA title wrapped the toolbar into a tall
+   squeeze. Now: fs-md + 600 weight (the toolbar's control register), single line,
+   ellipsized, flexing to claim the free space; the full name rides the span's title
+   attribute. The .db-title class is shared by sprint.html's #sp-title — the same
+   smaller register applies there (consistency, and it was equally cramped). */
+.db-toolbar { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.9rem; margin-block-end: 1rem; flex-wrap: wrap; }
+.db-title { margin: 0; font-size: var(--fs-md); font-weight: 600; flex: 1 1 auto; min-inline-size: 0; line-height: 1.3; }
+.db-flex-gap { flex: 1; }
+.db-loading { color: var(--muted); padding: 2rem 0; text-align: center; }
+.db-board { padding-block-end: 2rem; }
+/* S207 (owner ask 2026-10-19, items 1+2): the MOTHER CONTAINER + TRUE full width.
+   The board used to float on the gray desk as loose pieces — a white toolbar card,
+   a dashed filter strip, five pastel columns — with nothing grouping them (the
+   owner: "put them into a mother container with relatively white color. the
+   kanban needs a container"). .db-frame (board.html, wrapping the toolbar +
+   #db-loading + #db-board) is that container: ONE var(--card) surface, full-bleed
+   edge-to-edge — the shell's own padding drops to 0 on board pages
+   (main.board-shell below), the frame's padding is the breathing room, and the
+   min-block-size floor makes the white read as THE board surface (a short board
+   still fills the first screen instead of leaving a gray void under a small card).
+   The page-width cap exemption (the misc.css item-12 'standard' 1366px cap that
+   re-caged the board after S206's full-bleed — the owner asked TWICE for full
+   width) lives in misc.css beside the cap it amends. Dark themes: --card IS the
+   dark surface, the container adapts with it. */
+main.shell.board-shell { padding: 0; max-inline-size: none; }
+.db-frame {
+  background: var(--card);
+  padding: 0.9rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+/* S209 (kanban 1:1 parity): the 100dvh FLOOR is scoped to the page-owning board
+   (main.board-shell = /kanban + /board.html) — the EMBEDDED board (project.html's
+   #pd-board, which now wears .db-frame too) sits UNDER the project header inside
+   the reading measure, where a viewport-height floor would balloon a short board
+   into a huge empty card. The floor's whole point is "a short board still fills
+   the FIRST screen" — only true when the board IS the page. */
+main.board-shell .db-frame { min-block-size: calc(100dvh - 1.5rem); }
+/* the toolbar becomes the frame's HEADER ROW — its .card chrome (a white box with
+   its own ring on the now-white surface) retires inside the frame; a hairline
+   separates it from the filter bar below. Specificity (0,2,0) beats both .db-toolbar
+   (0,1,0) and .card (0,1,0) from layout.css regardless of load order. */
+.db-frame .db-toolbar {
+  background: transparent;
+  border: 0;
+  border-block-end: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 0.2rem 0.7rem;
+  margin-block-end: 0.8rem;
+}
+/* the phone rhythm: a slimmer frame inset, and the height floor respects the bottom
+   mobile-nav's body reserve (polish-ui.css 3.9rem + safe-area) so a fresh board
+   never scrolls under the bar; ≥1025px there is no bottom-nav reserve at all. */
+@media (max-width: 1024px) {
+  main.board-shell .db-frame { min-block-size: calc(100dvh - 4.5rem - env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 640px) {
+  .db-frame { padding: 0.6rem 0.65rem 0.8rem; }
+  .db-frame .db-toolbar { padding-inline: 0; }
+}
+/* S209 (kanban 1:1 parity — the owner: "the kanban in the hibana is 1:1 the same as
+   the kanban at projects.hibana.ir/kanban"): the EMBEDDED board (project.html's
+   #pd-board) wears the SAME mother-container recipe — .db-frame + the
+   toolbar-as-header-row above — scoped for its embedded context: it floats in the
+   project page's reading measure, so the CARD OUTLINE + page margin stay (only the
+   page-owning board is full-bleed edge-to-edge — that difference is the documented
+   entry-contextual exception), the internal rhythm is the frame's own
+   (0.9rem/1rem + the hairline header row), and the flex-column + the old .pd-board
+   gap (0.8rem) is restated here so the recipe is deterministic regardless of sheet
+   order (devboard.css loads after project-header.css on BOTH board pages and
+   project.html). */
+.pd-board.db-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-block-end: clamp(1.25rem, 2.5vw, 2rem);
+}
+.db-cols {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)); /* 0031: red Problems column; batch (s) ⑩: second slot */
+  gap: 0.8rem;
+  align-items: start;
+}
+@media (max-width: 1100px) { .db-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .db-cols { grid-template-columns: 1fr; } }
+/* S136 (owner report: the fullscreen board drifted from the project page's .pd-board):
+   the board renders the EXACT server anatomy of the project page's kanban now —
+   .pd-col[data-status] columns (tinted .pd-col-head strip, colored dot, dark count
+   badge) + .pd-task-wrap > .pd-task cards — so ALL column/card styling lives in
+   project-header.css + polish-batch.css and every duplicate .db-col / .db-card /
+   .db-add rule that used to mirror (and drift from) the pd recipes is RETIRED from
+   this sheet. What remains here is genuinely board-specific: the full-width .db-cols
+   grid, the toolbar/loading chrome, the editor modal, the filter bar (SHARED with the
+   project page's twin — project.html loads this sheet too), the ⋯ menu hook, and the
+   cat/sprint chips that have no pd counterpart. */
+/* Archives section (project.html) — list of archived done tasks with restore/delete */
+.pd-archives-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.pd-archive-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.7rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg-soft); }
+.pd-archive-item .pd-archive-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-archive-item .pd-archive-date { font-size: var(--fs-sm); color: var(--muted); flex: none; }
+.pd-archive-item .pd-archive-actions { display: flex; gap: 0.25rem; flex: none; }
+/* S136: the drag-over CUE rides the column (.pd-col.drag-over, project-header.css —
+   the pd recipe) and the dragged card dims via its wrap. The dashed .db-col-body
+   outline is retired with the db column styles. */
+.pd-task-wrap.dragging { opacity: 0.45; }
+/* S136: the old .db-card family (card box, main row, title, preview override, meta
+   row, add button) is RETIRED — the .pd-task / .pd-task-wrap / .pd-task-title /
+   .pd-task-preview / .pd-task-tags / .pd-task-add rules in project-header.css style
+   BOTH boards from one place. */
+.db-cat-chip, .db-sprint-badge {
+  font-size: var(--fs-xs);
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.db-sprint-badge {
+  font-size: var(--fs-xs);
+  color: var(--badge-building-fg);
+  background: var(--badge-building-bg);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  white-space: nowrap;
+}
+
+/* --- task editor modal ----------------------------------------------------- */
+.db-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgb(15 12 8 / 0.4);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+.db-modal[hidden] { display: none; }
+.db-modal-card {
+  /* Session 22 (user request): +53% (was 34rem) — the board's task editor gets the
+     same generous dimensions as the project-page composer; the title is a multi-line
+     textarea now, so it needs the room. */
+  inline-size: min(52rem, 100%);
+  max-block-size: 90vh;
+  /* S89 (owner item: the task modal's scroll fix): the card itself NEVER scrolls
+     (was overflow-y auto on the whole card — the title row and the Delete/Save
+     footer scrolled away on long content). It is an overflow:hidden flex column;
+     ONE middle region (.db-modal-body) carries the scroll; header + footer are
+     pinned. Nested isolation: code fences inside the title textarea render with
+     their own horizontal scroll at VIEW time, untouched by this. */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-dropdown);
+  padding: 1.1rem 1.2rem;
+  gap: 0.8rem;
+  animation: tab-fade 0.15s ease-out;
+}
+.db-modal-card h3 { margin: 0; }
+/* S89: the pinned chrome — hairline separators so the sticky header/footer read
+   as chrome, not content; the footer keeps the old ~1rem separation rhythm
+   (0.8 gap + 0.2 margin). */
+.db-modal-head { flex: none; padding-block-end: 0.55rem; border-block-end: 1px solid var(--line); }
+.db-modal-body {
+  flex: 1 1 auto;
+  min-block-size: 0;             /* flex may shrink it below its content */
+  overflow-y: auto;
+  overscroll-behavior: contain;  /* the wheel never chains past the modal */
+  display: grid;                 /* the old field rhythm, now inside the region */
+  gap: 0.8rem;
+  scrollbar-gutter: stable;      /* no content shift when the bar appears */
+}
+.db-modal-foot { flex: none; margin-block-start: 0.2rem; padding-block-start: 0.7rem; border-block-start: 1px solid var(--line); }
+/* S209 (kanban 1:1 parity): the FULLSCREEN WRITING mode — the project editor's
+   S46.7 focus contract on the shared modal. The card grows to the viewport (78rem
+   measure, the project editor's width), the writing row claims the height, and
+   every metadata row (status / priority / category+sprint / tags / shots) hides
+   until the user exits focus mode (the button, Esc, ✕, Cancel or the backdrop —
+   all exit fullscreen FIRST, never closing the modal). */
+.db-modal-card.db-fullscreen {
+  inline-size: min(78rem, 100%);
+  max-block-size: none;
+  block-size: calc(100dvh - 1.5rem);
+}
+.db-modal-card.db-fullscreen .db-modal-body { overflow: hidden; display: flex; flex-direction: column; }
+.db-modal-card.db-fullscreen .db-modal-body > .db-field:has(textarea[name="title"]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
+.db-modal-card.db-fullscreen textarea[name="title"] { min-block-size: 0; flex: 1 1 auto; resize: none; }
+.db-modal-card.db-fullscreen .db-modal-body > .db-field:not(:has(textarea[name="title"])),
+.db-modal-card.db-fullscreen .db-two,
+.db-modal-card.db-fullscreen .db-cat-new,
+.db-modal-card.db-fullscreen .pd-taskadd-shots { display: none; }
+.db-field { display: grid; gap: 0.3rem; }
+/* Session 22: the title field is a TEXTAREA (unlimited, multi-line) — give it a real
+   writing area + vertical resize, mirroring #pd-taskadd-textarea's rhythm. */
+.db-modal textarea[name="title"] {
+  min-block-size: 9rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+.db-field > span { font-size: var(--fs-xs); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.db-field input[type="text"], .db-field input:not([type]), .db-field select, .db-field textarea {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+}
+.db-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+@media (max-width: 540px) { .db-two { grid-template-columns: 1fr; } }
+.db-cat-new { display: grid; gap: 0.4rem; }
+.db-cat-new[hidden] { display: none; }
+.db-seg { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.db-seg button {
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.db-seg button:hover {
+  /* Session 23: green fill + light text — button:hover's leak made the editor's
+     status/priority pills green with dark ink. Selected (.is-on) pills keep their own
+     fill (later rules at ≥ equal specificity). */
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.db-seg button.is-on { background: var(--bg-soft); color: var(--text); font-weight: 600; border-color: var(--brand); }
+/* S145 (owner: "use this colors"): the is-on tints ride the owner's banner palette
+   (sage / gold / coral / crimson) — each border is a darkened sibling of its fill so
+   the selected pill reads on light AND dark.
+   S149 (owner: "Use this new colors for priority color-coding"): the tints DERIVE
+   from the canonical --color-* tokens via color-mix now — the old per-priority hex
+   pairs are gone (design-token law). The mix ratios keep the S145 read: ~16-18%
+   fill, ~55% border over --line.
+   S150 (owner: "Use this for color-coding priorities"): the FILL+INK PAIR set —
+   the pale low/medium fills ride up to 38% (their 18/27% would vanish) and their
+   borders mix the pair's INK into --line; high/urgent keep the S149 recipe
+   (saturated fills carry their own border). */
+.db-seg button.prio-low.is-on { background: color-mix(in srgb, var(--color-low) 38%, transparent); border-color: color-mix(in srgb, var(--color-low-ink) 45%, var(--line)); }
+.db-seg button.prio-medium.is-on { background: color-mix(in srgb, var(--color-medium) 38%, transparent); border-color: color-mix(in srgb, var(--color-medium-ink) 45%, var(--line)); }
+/* UI/UX R5 (2026-09-12): prio-high's tint once matched prio-urgent's — S145 gives
+   every priority its own hue again; S149 keeps the four hues distinct on the new
+   palette (steel / bronze / rust / brick). */
+.db-seg button.prio-high.is-on { background: color-mix(in srgb, var(--color-high) 32%, transparent); border-color: color-mix(in srgb, var(--color-high) 55%, var(--line)); }
+.db-seg button.prio-urgent.is-on { background: color-mix(in srgb, var(--color-urgent) 35%, transparent); border-color: color-mix(in srgb, var(--color-urgent) 55%, var(--line)); }
+.db-tags-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.db-tags-row input {
+  min-inline-size: 9rem;
+  flex: 1;
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 0.3rem 0.5rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+}
+.db-tag .ghost { padding: 0 0.2rem; }
+
+/* --- sprint page (sprint.html) — FLAT timeline (user reference 2026-08-30):
+       zero shadows, sharp container corners, hairline grid, zebra sprint columns,
+       solid pastel clips with same-hue borders, dashed boundary lines with grips. --- */
+.sp-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.2rem 0.7rem;
+  margin-block-end: 0.4rem;
+  flex-wrap: wrap;
+}
+.sp-wrap {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  min-block-size: 24rem;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--bg);
+}
+@media (max-width: 760px) {
+  /* S45/S2: the page's PURPOSE leads — the TIMELINE renders first and the categories
+     panel drops below it. (The side used to stack ~580px of chrome above the board:
+     the toolbar's wrapped rows + a 326px side panel — the crown content sat below
+     one full phone screen.) Flex order flip; the DOM (aside → scroll) is untouched. */
+  .sp-wrap { display: flex; flex-direction: column; }
+  .sp-scroll { order: 1; min-block-size: 16rem; }
+  .sp-side { order: 2; max-block-size: 40vh; overflow-y: auto; border-inline-end: none; border-block-start: 1px solid var(--line); }
+}
+@media (max-width: 640px) {
+  /* S45/S2: toolbar compaction — the title ELLIPSIZES into the back-link row instead
+     of owning a wrapping line, and the flex-gap spacer (a desktop pusher) stops
+     burning a whole row. 6 stacked rows ≈ 250px → ~4. */
+  .sp-toolbar { gap: 0.4rem; }
+  .db-flex-gap { display: none; }
+  #sp-title { flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.sp-side { border-inline-end: 1px solid var(--line); padding: 0.6rem 0.5rem; display: grid; gap: 0; align-content: start; }
+.sp-side-head { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding-block: 0.2rem 0.5rem; }
+
+/* category rows: flat, hairline-separated; name sits in a tinted badge (color = identity) */
+.sp-cat { border-block-end: 1px solid var(--line); }
+.sp-cat:last-of-type { border-block-end: none; }
+.sp-cat-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  inline-size: 100%;
+  padding: 0.42rem 0.4rem;
+  font: inherit;
+  color: var(--text);
+  user-select: none;
+}
+.sp-cat-head:hover { background: var(--bg-soft); }
+/* F13 (session 9): ≥40px real touch target — the 15×18 ▾ glyph was the worst
+   measured target on the page. Grown in place (plain centered button, no
+   surrounding layout change). */
+.sp-cat-chevron {
+  background: none; border: none; padding: 0 0.9rem; min-block-size: 2.5rem; min-inline-size: 2.5rem;
+  inline-size: auto; text-align: center;
+  color: var(--muted); font-size: var(--fs-xs); cursor: pointer; transition: transform 0.12s ease; flex: none;
+}
+.sp-cat-badge {
+  flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600; font-size: var(--fs-sm); padding: 0.1rem 0.5rem; border-radius: 4px;
+}
+.sp-cat.is-lane-hidden .sp-cat-badge { opacity: 0.5; }
+.sp-cat-tools { display: inline-flex; gap: 0.1rem; opacity: 0; transition: opacity 0.12s ease; flex: none; }
+.sp-cat-head:hover .sp-cat-tools, .sp-cat-head:focus-within .sp-cat-tools { opacity: 1; }
+.sp-cat-tools .ghost { padding: 0.05rem 0.3rem; font-size: var(--fs-xs); }
+.sp-cat-del:hover { color: #c0504f; }
+.sp-cat-tasks { list-style: none; margin: 0; padding: 0.05rem 0.3rem 0.45rem 1.35rem; display: grid; gap: 0.1rem; }
+.sp-cat-tasks.is-collapsed { display: none; }
+.sp-task {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.22rem 0.35rem; border-radius: 4px; cursor: grab; font-size: var(--fs-sm);
+}
+.sp-task:hover { background: var(--bg-soft); }
+.sp-task-title { flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-task-st { inline-size: 8px; block-size: 8px; border-radius: 999px; flex: none; }
+.sp-task-st.st-idea { background: #5B8DEF; } /* S48p: BLUE for ideas */
+.sp-task-st.st-planned { background: #F0C040; } /* S48p: YELLOW for future plans */
+.sp-task-st.st-in_progress { background: #E8A27D; } /* S48p: ORANGE for currently doing */
+.sp-task-st.st-done { background: #6FB08D; } /* S48p: GREEN for done */
+.sp-task-st.st-bug { background: #E54D4D; } /* S48p: RED for bugs */
+.sp-task-addrow input {
+  inline-size: 100%; border: none; border-block-end: 1px dashed var(--line); border-radius: 0;
+  background: none; color: var(--text); font: inherit; font-size: var(--fs-sm);
+  padding: 0.3rem 0.25rem; margin-block-start: 0.15rem;
+}
+.sp-task-addrow input:focus { outline: none; border-block-end-color: var(--brand); }
+.sp-side-foot { display: grid; gap: 0.4rem; padding: 0.6rem 0.4rem 0.2rem; position: relative; }
+.sp-cat-pop { position: static; box-shadow: none; border-style: dashed; }
+
+/* timeline scroll port + shared width */
+.sp-scroll { overflow-x: auto; overflow-y: hidden; }
+.sp-timeline { display: grid; grid-template-rows: auto 1fr; min-inline-size: 100%; }
+.sp-head, .sp-body { position: relative; inline-size: var(--sp-width, 100%); }
+.sp-head { border-block-end: 1px solid var(--line); }
+.sp-months { display: flex; }
+.sp-month {
+  display: grid; place-items: center; flex: none;
+  font-weight: 600; font-size: var(--fs-xs); color: var(--text);
+  padding-block: 0.32rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-inline-end: 1px solid var(--line);
+}
+.sp-month:last-child { border-inline-end: none; }
+.sp-cells { display: flex; }
+.sp-cell {
+  display: grid; place-items: center; flex: none;
+  font-size: var(--fs-xs); color: var(--muted);
+  padding-block: 0.22rem; white-space: nowrap; overflow: hidden;
+  border-block-end: 1px solid var(--line);
+}
+.sp-cell.is-today { color: var(--brand); font-weight: 700; }
+
+/* body: background layer (zebra bands + boundary lines + today), then lanes */
+.sp-body { position: relative; }
+.sp-bg { position: absolute; inset: 0; pointer-events: none; z-index: auto; /* NO stacking context: the z-4 boundary rails must stack above the z-1 lanes/bars */ }
+.sp-band { position: absolute; inset-block: 0; pointer-events: none; }
+.sp-band.is-alt { background: rgb(23 20 12 / 0.05); }
+.sp-band.is-open-band { background: rgb(74 159 163 / 0.05); }
+.sp-today-line { position: absolute; inset-block: 0; pointer-events: none; z-index: 2; inline-size: 0; border-inline-start: 2px solid var(--brand); }
+/* S44 (owner: "space and offset to today so you can see the actual point"): a small
+   flag chip rides the line's top — "today" reads at EVERY zoom (the is-today cell
+   highlight only exists at day zoom). Physical left + translateX(-50%) centers the
+   chip on the 0-width line in LTR AND RTL (symmetric centering is direction-blind). */
+.sp-today-flag {
+  position: absolute;
+  inset-block-start: 2px;
+  left: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--card) 82%, var(--brand));
+  border: 1px solid color-mix(in srgb, var(--brand) 45%, var(--line));
+  border-radius: 999px;
+  padding: 0.04rem 0.45rem;
+  z-index: 6;
+}
+
+/* sprint boundary lines — full-height dashed rails with a top grip, draggable (video-editor).
+   The parent .sp-bg is pointer-events:none (decoration) — the rails MUST re-enable it. */
+.sp-bound { position: absolute; inset-block: 0; inline-size: 0; z-index: 4; cursor: ew-resize; touch-action: none; pointer-events: auto; }
+.sp-bound::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: -7px; inline-size: 14px; }
+.sp-bound::after {
+  content: ""; position: absolute; inset-block: 0; inset-inline-start: -1px; inline-size: 0;
+  /* S46.11 (owner: "remove this - - - - - - lines from sprint timeline"): the dashed
+     boundary line is GONE — only the grip (the drag handle) remains. The sprint
+     boundaries are still visible via the .sp-band background + the chip positions. */
+  display: none;
+}
+.sp-bound:hover::after, .sp-bound:focus-visible::after { border-inline-start-style: solid; border-inline-start-color: var(--brand); }
+.sp-bound.is-open-bound::after { border-inline-start-color: var(--brand); }
+.sp-bound-grip {
+  position: absolute; inset-block-start: 3px; inset-inline-start: -11px; inline-size: 22px; block-size: 15px;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: #2c313b;
+  background-image: linear-gradient(currentColor 0 0), linear-gradient(currentColor 0 0), linear-gradient(currentColor 0 0);
+  background-repeat: no-repeat; background-size: 10px 2px;
+  background-position: center 3px, center 6.5px, center 10px;
+}
+.sp-bound.is-open-bound .sp-bound-grip { color: var(--brand); border-color: var(--brand); }
+
+/* sprint lane: chips live in a top strip; the band body is draggable (slide the sprint).
+   S35 (user request 2026-09, "video-editing timeline"): each sprint renders as
+   [◆ name · stats] chip + a STRIP — a start dot at started_at, the strip dragging to
+   TODAY while open (live edge) and frozen at ended_at when finished (end dot). The
+   strip carries the work: a teal fill sized by assigned-tasks done + a tick for every
+   day that closed ≥1 task.
+   S45/S4: the strip was 9px tall — the crown visualization was nearly invisible. The
+   lane grew so the strip reads at 20px and the chip at ~28px. */
+/* S206 (owner: "the sprint system is buggy" — probe-confirmed): the boundary rails
+   (z-4, children of .sp-bg) used to stack ABOVE everything inside the lanes, because
+   .sp-lane/.sp-sprint-lane carried z-index:1 — every positioned child (dots z-5,
+   chips z-3) was SCOPE-CAPPED under it. Result: a task dot sitting under a rail
+   (sprints start today, tasks are created today — the common case) could not be
+   clicked (the editor never opened — the click hit the rail) nor dragged, and the
+   sprint chip's leading edge was dead the same way. The lane z-indexes are RETIRED:
+   lane backgrounds/borders still paint under the rails (DOM order), but the dots
+   (z-5) and the chips (z-3 → z-5) now stack ABOVE the rails wherever they overlap —
+   interactive content beats the rails at the crossing points. */
+.sp-sprint-lane { position: relative; min-block-size: 4.4rem; border-block-end: 1px solid var(--line); }
+.sp-sprint { position: absolute; inset-block-start: 0.12rem; block-size: 60px; border-radius: 4px; cursor: grab; touch-action: none; }
+.sp-sprint:active { cursor: grabbing; }
+.sp-sprint.is-open { background: rgb(74 159 163 / 0.07); }
+.sp-sprint.is-target { outline: 2px solid var(--brand); outline-offset: 1px; background: rgb(74 159 163 / 0.14); }
+.sp-sprint-chip {
+  position: absolute; inset-block-start: 0; inset-inline-start: 0; z-index: 5; /* S206: above the boundary rails (z-4) — the chip's leading edge was dead under the start rail */
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  max-inline-size: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+  color: var(--text); font: inherit; font-size: var(--fs-sm); font-weight: 600;
+  /* S155: the chip's box was purely font-derived — the type-scale repoint (0.8rem
+     → 0.75rem caption register) shaved it to 26.97px, under the 27px tappable pin.
+     The floor pins the box against future type changes instead of the glyphs. */
+  min-block-size: 1.7rem;
+  padding: 0.2rem 0.55rem; cursor: pointer; box-shadow: none;
+}
+.sp-sprint-chip:hover {
+  /* Session 23: green fill + light text (was green-bg leak + dark text) */
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.sp-sprint.is-open .sp-sprint-chip { border-color: var(--brand); color: var(--color-primary-strong, var(--brand)); }
+.sp-diamond { font-size: 0.6rem; }
+/* the chip's stats tail — duration + done counts, dimmed so the name stays the hero */
+.sp-chip-stats { font-weight: 400; color: var(--muted); }
+/* S43 (mobile audit): the chip is an inline-flex button — its nowrap stats span
+   overflowed the chip by up to 87px (clipped text + spill onto the strip). Flex
+   ellipsis needs min-width 0 + overflow hidden on the ITEM, not the container. */
+.sp-sprint-chip > span { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+.sp-sprint-chip { min-inline-size: 0; }
+.sp-sprint.is-open .sp-chip-stats { color: color-mix(in srgb, var(--brand) 75%, var(--muted)); }
+
+/* --- S35: the sprint STRIP (video-editing clip) --------------------------------
+   S45/S4: strip 9px → 20px tall, dots re-anchored on the taller strip. */
+.sp-startdot {
+  position: absolute; inset-block-start: 42px; inset-inline-start: -5px;
+  inline-size: 11px; block-size: 11px; border-radius: 999px;
+  background: var(--card); border: 2.5px solid var(--brand);
+  z-index: 4; pointer-events: none;
+}
+.sp-enddot {
+  position: absolute; inset-block-start: 43px; inset-inline-end: -5px;
+  inline-size: 9px; block-size: 9px; border-radius: 999px;
+  background: var(--card); border: 2px solid #98a0ac;
+  z-index: 4; pointer-events: none;
+}
+.sp-clip {
+  position: absolute; inset-block-start: 38px; inset-inline-start: 0;
+  block-size: 20px; min-inline-size: 8px; border-radius: 3px;
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  pointer-events: none; overflow: visible;
+}
+.sp-clip-fill {
+  position: absolute; inset-block: 0; inset-inline-start: 0;
+  border-start-start-radius: 2px; border-end-start-radius: 2px;
+  background: color-mix(in srgb, var(--brand) 55%, transparent);
+}
+.sp-clip-tick {
+  position: absolute; inset-block: -3px; inline-size: 0;
+  border-inline-start: 2px solid color-mix(in srgb, var(--brand) 85%, #0b3c40);
+}
+/* the LIVE edge — an open sprint's strip keeps recording: a small pulsing dot rides
+   the trailing edge at TODAY. Still (no pulse) under prefers-reduced-motion. */
+@keyframes sp-clip-live {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(74 159 163 / 0); }
+  50% { box-shadow: 0 0 0 4px rgb(74 159 163 / 0.35); }
+}
+.sp-clip.is-open-clip::after {
+  content: ""; position: absolute; inset-inline-end: -4px; inset-block-start: 5px;
+  inline-size: 10px; block-size: 10px; border-radius: 999px;
+  background: var(--brand); border: 2px solid var(--card);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sp-clip.is-open-clip::after { animation: sp-clip-live 1.8s ease-in-out infinite; }
+}
+/* S45/S7: the no-sprints lane speaks the app's empty-state language (was a bare
+   sp-no-sprint span). A dashed card: ◆ tile, title + one-line hint, and a CTA that
+   opens the same define popover as the toolbar's ◆ button. Stacks on phones. */
+.sp-empty {
+  display: flex; align-items: center; gap: 0.8rem;
+  margin: 0.6rem; padding: 0.75rem 0.9rem;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft, var(--bg-soft));
+}
+.sp-empty-icon { flex: none; font-size: 1.25rem; color: var(--brand); line-height: 1; }
+.sp-empty-body { display: grid; gap: 0.12rem; min-inline-size: 0; }
+.sp-empty-title { font-weight: 700; color: var(--text); }
+.sp-empty-hint { color: var(--muted); font-size: var(--fs-sm); }
+.sp-empty-cta { flex: none; margin-inline-start: auto; }
+@media (max-width: 640px) {
+  .sp-empty { flex-wrap: wrap; gap: 0.5rem 0.7rem; }
+  .sp-empty-cta { margin-inline-start: 0; }
+}
+
+/* S45/S3: FINISH reads as a control, not an error banner — outlined danger (was a
+   264px solid-red block, full-width on phones); the running sprint's NAME rides its
+   own ellipsized span so the label stays short. Full context: tooltip + aria-label. */
+.sp-finish-btn { max-inline-size: 15rem; overflow: hidden; }
+.sp-finish-name {
+  min-inline-size: 0; max-inline-size: 6.5rem; flex: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8;
+}
+
+/* S45/S5: the sprint chip + popover buttons clear the 40px touch floor (the audit's
+   last standing TAP flag: 74×22, 198×22). The lane grows WITH the chip so the strip
+   geometry never collides. Coarse pointers only — desktop visuals untouched. */
+@media (pointer: coarse) {
+  .sp-sprint-chip { min-block-size: 40px; }
+  .sp-sprint { block-size: 72px; }
+  .sp-sprint-lane { min-block-size: 84px; }
+  .sp-clip { inset-block-start: 48px; }
+  .sp-startdot { inset-block-start: 52px; }
+  .sp-enddot { inset-block-start: 53px; }
+  .sp-sprint-pop button { min-block-size: 40px; }
+  .sp-cat-tools .ghost { min-inline-size: 40px; min-block-size: 40px; }
+  /* S45/S5: the toolbar's own buttons (back link 37px, board/new-sprint) clear the
+     floor too — the audit flagged the back link at 99×37. */
+  .sp-toolbar .btn { min-block-size: 40px; }
+}
+
+/* category lanes + task clips */
+.sp-lane { position: relative; border-block-end: 1px solid var(--line); min-block-size: 2rem; }
+.sp-lane.is-target { background: rgb(74 159 163 / 0.06); }
+.sp-bar {
+  position: absolute; block-size: 22px; border-radius: 4px;
+  display: flex; align-items: center; gap: 0.35rem; padding-inline: 0.5rem;
+  font-size: var(--fs-xs); line-height: 1;
+  background: var(--bar-c, #C9CDD2);
+  border: 1px solid color-mix(in srgb, var(--bar-c, #C9CDD2) 60%, #3a3f4b);
+  overflow: visible; cursor: grab; z-index: 1;
+}
+.sp-bar:active { cursor: grabbing; }
+.sp-bar:hover { border-color: color-mix(in srgb, var(--bar-c, #C9CDD2) 40%, #22262e); z-index: 10; }
+.sp-bar.st-idea { background: color-mix(in srgb, var(--bar-c, #C9CDD2) 40%, transparent); border-style: dashed; }
+.sp-bar.st-planned { background: color-mix(in srgb, var(--bar-c, #C9CDD2) 72%, transparent); }
+.sp-bar.st-done { background: color-mix(in srgb, var(--bar-c, #C9CDD2) 52%, transparent); }
+.sp-bar.st-bug { background: color-mix(in srgb, var(--bar-c, #E59AA5) 62%, transparent); } /* 0031 */
+
+/* Title hidden by default — the timeline is a visual graph, not a text list.
+   The title reveals on hover via a floating tooltip (CSS attr() + ::after).
+   On click, the existing task editor modal opens (sprint.html JS handles that). */
+.sp-bar-title { display: none; }
+.sp-bar:hover .sp-bar-title,
+.sp-bar:focus-within .sp-bar-title {
+  display: inline;
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  background: var(--card, #242019);
+  color: var(--text, #EDE8DE);
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  white-space: normal;
+  inline-size: max-content;
+  max-inline-size: 280px;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.3);
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+/* --- sprint timeline circles (user request 2026-09) ------------------------ */
+/* Tasks are shown as colored circles (dots) instead of text-heavy bars.
+   Only in_progress + done tasks appear. On hover, the native title tooltip
+   shows the task name. On click, the task editor modal opens. */
+.sp-dot {
+  position: absolute;
+  inline-size: 20px;
+  block-size: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 5;
+  border: 2px solid var(--bar-c, #4A9FA3);
+  /* S48k: 3D without shadow — a radial gradient gives a sphere/marble look.
+     The highlight at 30% 30% + the darker edge creates depth without a
+     drop-shadow. Was: box-shadow: 0 2px 6px rgb(0 0 0 / 0.2). */
+  /* S48m: translateX(-50%) centers the dot on its inset-inline-start position
+     (was: the LEFT edge of the dot was at the position → the 20px dot extended
+     to the right, reading as "past the today line" for tasks created today). */
+  background: radial-gradient(circle at 30% 30%,
+    color-mix(in srgb, var(--bar-c, #4A9FA3) 85%, white),
+    var(--bar-c, #4A9FA3) 60%,
+    color-mix(in srgb, var(--bar-c, #4A9FA3) 70%, black));
+  transform: translateX(-50%);
+  transition: transform 0.12s ease;
+  flex: none;
+}
+.sp-dot:hover {
+  transform: translateX(-50%) scale(1.3);
+  z-index: 20;
+}
+.sp-dot:active { cursor: grabbing; }
+.sp-dot.st-active {
+  /* S48p: ORANGE for currently doing (was: teal — inconsistent with project box) */
+  --bar-c: #E8A27D;
+  border-color: #E8A27D;
+}
+.sp-dot.st-done {
+  /* S48p: GREEN for done */
+  --bar-c: #6FB08D;
+  border-color: #6FB08D;
+  opacity: 0.7;
+}
+.sp-dot.st-done:hover { opacity: 1; }
+/* S48p: planned/idea/bug tasks — colored by status (BLUE for ideas, YELLOW for
+   planned, RED for bugs). Semi-transparent so active/done tasks stand out more. */
+.sp-dot.st-planned {
+  --bar-c: #F0C040; /* YELLOW for future plans */
+  border-color: #F0C040;
+  opacity: 0.6;
+}
+.sp-dot.st-planned:hover { opacity: 0.9; }
+.sp-dot-prio {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 999px;
+  position: absolute;
+  inset-block-start: -3px;
+  inset-inline-end: -3px;
+  border: 1.5px solid var(--card, #fff);
+}
+/* S149: the sprint dots ride the canonical --color-* tokens (were hardcoded S145
+   hexes — the last of the old pastel family). */
+.sp-dot-prio.prio-low { background: var(--color-low); }
+.sp-dot-prio.prio-medium { background: var(--color-medium); }
+/* S150: the pale low/medium fills get the same ink hairline as the 9px prio-dots
+   (the sp-dot's --card cutout ring alone would ghost them on light tiles). */
+.sp-dot-prio.prio-low { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-low-ink) 55%, transparent); }
+.sp-dot-prio.prio-medium { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-medium-ink) 55%, transparent); }
+/* UI/UX R5 (2026-09-12): prio-high pink #E59AA5 → red (shared the prio-urgent hue).
+   S145 (owner: "use this colors"): the dots ride the owner's banner palette — high
+   and urgent are distinct hues again. */
+.sp-dot-prio.prio-high { background: var(--color-high); }
+.sp-dot-prio.prio-urgent { background: var(--color-urgent); }
+.sp-dot-check {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+/* Dark mode adjustments */
+
+/* clip trim handles (video-footage edges): invisible rails that reveal on hover */
+.sp-cat.dragging, .sp-task.dragging, .sp-bar.dragging { opacity: 0.4; }
+
+/* popovers (rename/finish/delete + category edit) + zoom + drag tooltip */
+/* S48k: converted from a small floating popover (15.5rem) to a centered modal
+   (30rem) — the old popover didn't have enough space for stats + buttons. */
+.sp-sprint-pop {
+  position: fixed; z-index: 100; display: grid; gap: 0.6rem;
+  inline-size: min(30rem, 92vw); padding: 1.2rem;
+  border: 1px solid var(--line); border-radius: var(--radius, 8px); background: var(--card);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.25);
+  inset-block-start: 50%; inset-inline-start: 50%;
+  transform: translate(-50%, -50%);
+}
+.sp-sprint-pop input {
+  font: inherit; font-size: var(--fs-sm); padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--text);
+}
+/* S35: the strip's numbers — dates + duration + done works + doc-checked */
+.sp-pop-stats {
+  display: flex; flex-wrap: wrap; gap: 0.1rem 0.6rem;
+  font-size: var(--fs-xs); color: var(--muted);
+  border-block-end: 1px solid var(--line); padding-block-end: 0.45rem;
+}
+.sp-pop-stats .sp-pop-dates { flex-basis: 100%; font-weight: 600; color: var(--text); }
+.sp-pop-plan { justify-self: start; text-decoration: none; }
+/* S48p: sprint log — task count + category breakdown */
+.sp-pop-log { display: grid; gap: 0.3rem; border-block-start: 1px solid var(--line); padding-block-start: 0.5rem; }
+.sp-pop-log-row { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--muted); }
+.sp-pop-log-row span:last-child { font-weight: 600; color: var(--text); }
+.sp-cat-edit-pop { max-inline-size: 16rem; }
+.sp-pop-lab { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+/* S48n: sprint define popover date inputs + presets */
+.sp-define-dates { display: flex; gap: 0.6rem; }
+.sp-date-label { display: flex; flex-direction: column; gap: 0.2rem; font-size: var(--fs-xs); color: var(--muted); flex: 1; }
+.sp-date-label input { font: inherit; font-size: var(--fs-sm); padding: 0.3rem 0.5rem; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--text); }
+.sp-define-presets { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.sp-define-presets .chip { font-size: var(--fs-xs); padding: 0.2rem 0.5rem; cursor: pointer; }
+/* S48o: warning shown when a sprint is already active (creating a new one will end it) */
+.sp-define-warn { font-size: var(--fs-xs); color: var(--err, #b42318); background: color-mix(in srgb, var(--err, #b42318) 8%, transparent); padding: 0.4rem 0.6rem; border-radius: 4px; border-inline-start: 3px solid var(--err, #b42318); }
+.sp-zoom select {
+  font: inherit; font-size: var(--fs-sm); padding: 0.25rem 0.45rem;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--text);
+}
+.sp-drag-tip {
+  position: fixed; z-index: 100; pointer-events: none;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+  color: var(--text); font-size: var(--fs-xs); padding: 0.12rem 0.5rem;
+  box-shadow: 0 2px 8px rgb(20 16 8 / 0.12); white-space: nowrap;
+}
+body.sp-dragging { user-select: none; }
+body.sp-dragging .sp-scroll { cursor: ew-resize; }
+
+/* dark mode: neutralize zebra/bound colors, lift open-sprint tint */
+/* S35 strip: dark mode keeps the teal system, lifts the tints a notch */
+
+/* full-bleed sprint board (sprint.html only): spans the viewport width, nav kept;
+   every other page keeps the 64rem .shell — this override only matches main.sp-shell */
+main.shell.sp-shell { max-inline-size: none; }
+body.zen-mode main.shell.sp-shell { max-inline-size: none; }
+main.shell.sp-shell .sp-wrap { min-block-size: min(64vh, 30rem); }
+
+/* ===========================================================================
+   404 / not-found (batch r) — standalone centered page, RTL-first, bilingual.
+   Every selector is namespaced .nf-* (no collisions). Only existing tokens are
+   referenced, so html[data-theme] and the OS media query re-skin the page for
+   free in light AND dark. Motion (drifting embers + the ember-in-the-zero pulse)
+   is gated by prefers-reduced-motion.
+   =========================================================================== */
+.nf-page {
+  min-block-size: 100dvh;
+  display: grid;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.nf-card {
+  margin-block: auto;          /* overflow-safe vertical centering */
+  justify-self: center;
+  width: min(34rem, 100%);
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 0.9rem;
+  padding: clamp(2rem, 6vw, 3.25rem) clamp(1.25rem, 5vw, 3rem);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+/* Wordmark rides the existing .brand-logo theme swap (content: var(--brand-logo));
+   .nf-logo just enlarges it from the header's 1.4rem (appended after, so it wins). */
+.nf-logo { height: clamp(1.7rem, 6vw, 2.2rem); }
+
+
+/* ==========================================================================
+   S30 batch 2 (user request 2026-09-12): the filter bar + the clickable prio-dot
+   ==========================================================================
+   The FILTER BAR (.db-filter — board.html render, .pd-filter twin on the project page,
+   same classes): priority toggles + label toggles. Empty selection = show everything;
+   each group is an OR within itself, the two groups AND. The toggles are .chip buttons
+   (aria-pressed driven); active state = .is-on tint.
+   S32 (user request 2026-09-13 — "decrease the size of this chips, they are a little
+   too big"): compact chips — min-block-size 40px → 26px, fs-sm → fs-xs text, tighter
+   padding/gap and a 7px dot inside the filter (the cards keep the 9px dot). Visual
+   compactness wins over the 40px touch floor per the explicit request; the focus ring
+   stays the full-chip outline, so keyboard users keep an honest target. */
+
+.db-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin-block-end: 0.7rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+.db-filter-label { flex: none; }
+.db-filter .chip {
+  min-block-size: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.16em 0.55em;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  border-color: var(--line);
+  background: var(--card);
+  color: var(--text);
+  /* S31 (user request 2026-09-13): "unbold this text chips" — the global button
+     rule (base.css, fw 600) was bolding every filter toggle; text now reads at the
+     same weight as the labels around it. */
+  font-weight: 400;
+}
+/* S32: the filter's own dot shrinks with the chip (cards keep the 9px dot + beep). */
+.db-filter .chip .prio-dot { flex: none; inline-size: 7px; block-size: 7px; }
+.db-filter .chip.is-on,
+.db-filter .chip[aria-pressed="true"] {
+  border-style: solid;
+  border-color: var(--brand);
+  background: var(--brand-soft, rgb(42 132 96 / 0.12));
+}
+.db-filter-clear { flex: none; }
+/* S78: the free-text task search — the filter bar's third dimension. A compact
+   search input that matches the S32 chip scale (26px) while keeping a real
+   text-field feel. Bounded below so it never crowds the label chips on narrow
+   boards; flexes to fill leftover row space up to a sane cap. RTL-safe via logical
+   properties; the native ✕ clear (type=search) rides the UA chrome. */
+.db-filter-search {
+  flex: 1 1 10rem;
+  min-inline-size: 7.5rem;
+  max-inline-size: 22rem;
+  min-block-size: 26px;
+  padding: 0.16em 0.6em;
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.db-filter-search::placeholder { color: var(--muted); }
+.db-filter-search:hover { border-color: var(--line-strong); }
+.db-filter-search:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent);
+}
+.db-filter-search:focus-visible {
+  outline: 2px solid transparent; /* the box-shadow ring above is the focus signal */
+}
+/* The miss state under the bar (S78) — the S76 .pg-filter-empty polish already
+   applies via shared classes; this tucks it against the bar + compacts the base
+   empty-state padding (3.5rem is list-scale; a filter miss is a strip, not a
+   page) so a miss never pushes the board far down. */
+.db-filter-empty { margin-block: 0.35rem 0.2rem; padding-block: 1.4rem; }
+.db-filter-empty .empty-state-icon { width: 2.4rem; height: 2.4rem; }
+.db-filter-empty[hidden] { display: none !important; }
+@media (max-width: 640px) {
+  .db-filter-search { flex: 1 1 100%; max-inline-size: none; } /* own row on phones */
+}
+@media (prefers-contrast: more) {
+  .db-filter-search { border-color: var(--line-strong); }
+  .db-filter-search:focus-visible { outline: 2px solid var(--accent, currentColor); }
+}
+/* S48j: .chip's display:inline-flex overrides the UA [hidden]{display:none} rule
+   (author > UA specificity), so a <button class="chip" hidden> is VISIBLE. This
+   forces [hidden] to win for the filter-clear chip (only shows when a filter is on). */
+.db-filter-clear[hidden] { display: none !important; }
+.db-filter-shown { flex: none; margin-inline-start: auto; }
+@media (max-width: 640px) {
+  .db-filter-shown { margin-inline-start: 0; }
+}
+
+/* S144: the prio-dot-btn (the 24px click-to-cycle hit area around the card dot) is
+   RETIRED with the dot itself — the PRIORITY BANNER (polish-batch.css) is the cycle
+   affordance now. Filter chips keep their plain .prio-dot spans (no button). */
+
+/* Label chips are FILTER toggles now (GitHub behavior) — keep the pointer honest.
+   S136: the chips are the project page's .pd-tag spans on BOTH surfaces. */
+.pd-task .pd-tag { cursor: pointer; }
+
+/* ---- S30 batch 4: the label-manager dialog (board toolbar → Labels) ------------ */
+.db-labels-card { max-inline-size: 46rem; }
+.db-labels-list { display: grid; gap: 0.4rem; margin-block: 0.6rem; max-block-size: 24rem; overflow-y: auto; }
+.db-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.db-label-swatch { inline-size: 14px; block-size: 14px; border-radius: 999px; flex: none; }
+.db-label-name {
+  flex: 1 1 10rem;
+  min-inline-size: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset, var(--bg));
+  color: var(--text);
+}
+.db-label-name:focus { border-style: solid; border-color: var(--brand); outline: none; }
+.db-label-usage { flex: none; font-variant-numeric: tabular-nums; }
+.db-label-actions { display: inline-flex; align-items: center; gap: 0.3rem; flex: none; }
+.db-label-actions .db-label-merge { max-inline-size: 11rem; }
+.db-label-palette { flex-basis: 100%; justify-content: flex-start; }
+.db-label-palette .pd-swatch { inline-size: 24px; block-size: 24px; border-radius: 999px; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.db-label-palette .pd-swatch:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .db-label-name { flex-basis: 100%; }
+  .db-label-usage { margin-inline-start: auto; }
+}
+
+/* S46.10 (owner: "see the sprints in a list — Sprint A, Sprint B. Create this section
+   below the sprint timeline as a separate section.") — the sprints list section. */
+.sp-sprints-list-section {
+  padding: 1rem 1.5rem;
+  border-block-start: 1px solid var(--line);
+}
+.sp-sprints-list-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  margin: 0 0 0.6rem;
+}
+.sp-sprints-list { display: grid; gap: 0.3rem; }
+.sp-list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  flex-wrap: wrap;
+}
+.sp-list-row:hover { background: var(--card); box-shadow: 0 1px 4px rgb(0 0 0 / 0.08); }
+.sp-list-name { font-weight: 600; flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-list-badge {
+  font-size: var(--fs-xs);
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.sp-list-badge.is-running { background: var(--accent-soft); color: var(--accent-ink); } /* S204: accent-as-text → ink */
+.sp-list-badge.is-done { background: color-mix(in srgb, var(--success, #4a9fa3) 15%, transparent); color: var(--success, #4a9fa3); }
+.sp-list-badge.is-draft { background: color-mix(in srgb, var(--muted) 12%, transparent); color: var(--muted); }
+.sp-list-dates { white-space: nowrap; }
+.sp-list-items { white-space: nowrap; }
+
+/* --- S205: the project switcher (spec §3.2 — board-page.js + board.html) --------
+   The board title IS the switcher: the current project's name + a chevron open a
+   searchable popover listing every accessible project. Anchored under the button
+   (direction-aware inline positioning set by JS), max-height list with the app's
+   scrollable-list convention, logical properties throughout for RTL. Reuses the
+   .badge.badge-<status> chip system (variables.css) for stage badges. */
+.db-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: inherit;
+  /* S206: the switcher speaks the toolbar's CONTROL register now (fs-md + 600 — was
+     fs-xl, the card-title register): the project name reads as a control label, not
+     a page heading, and a long name ELLIPSIZES on one line instead of wrapping the
+     toolbar into a squeeze. The h2.db-title flexes, so the button claims the free
+     toolbar width. */
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink-primary, inherit);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 8px);
+  padding: 0.1rem 0.45rem;
+  margin-inline-start: -0.45rem; /* optically aligns the title text with the row above */
+  max-inline-size: 100%;
+  cursor: pointer;
+  min-height: 44px;            /* touch floor (the repo's a11y convention) */
+  overflow: hidden;            /* the ellipsis needs a clipping box */
+}
+#db-title {
+  min-inline-size: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.db-switch:hover { background: var(--bg-soft, rgb(0 0 0 / 4%)); border-color: var(--line); }
+.db-switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.db-switch-chev { flex: none; inline-size: 1rem; block-size: 1rem; color: var(--muted); transition: transform 0.15s ease; }
+.db-switch[aria-expanded="true"] .db-switch-chev { transform: rotate(180deg); }
+
+.db-switch-pop {
+  position: absolute;
+  z-index: 80; /* above the rail panel (z 60-70) and card menus */
+  inline-size: min(22rem, calc(100vw - 1.6rem));
+  background: var(--card);
+  color: var(--ink-primary, inherit);
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.16), 0 2px 8px rgb(0 0 0 / 0.10);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* the list scrolls, the pop clips */
+}
+.db-switch-head { padding: 0.5rem; border-block-end: 1px solid var(--line); }
+.db-switch-search {
+  inline-size: 100%;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg-soft, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-md);
+  min-height: 40px;
+}
+.db-switch-search:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.db-switch-list { max-height: 24rem; overflow-y: auto; padding: 0.3rem; display: grid; gap: 0.15rem; }
+.db-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  inline-size: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: start;
+  cursor: pointer;
+  min-height: 44px;
+}
+.db-switch-row:hover { background: var(--bg-soft, rgb(0 0 0 / 5%)); }
+.db-switch-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.db-switch-row.current { background: var(--accent-soft); }
+.db-switch-name { flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-switch-cur { flex: none; font-size: var(--fs-xs); }
+.db-switch-empty { margin: 0; padding: 0.75rem 0.6rem; }
+.db-switch-all {
+  display: block;
+  padding: 0.55rem 0.75rem;
+  border-block-start: 1px solid var(--line);
+  font-size: var(--fs-sm);
+  color: var(--accent-ink); /* S204 doctrine: accent-as-TEXT uses the 5.74:1 ink */
+  text-decoration: none;
+}
+.db-switch-all:hover { text-decoration: underline; }
+.db-switch-all:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+/* the board rows' badges reuse .badge .badge-<status> (variables.css tokens) — sized
+   down for the popover rows: */
+.db-switch-row .badge { font-size: var(--fs-xs); padding: 0.12rem 0.45rem; flex: none; }
+
+/* S205: the no-projects empty state (rendered into #db-board) centers like every
+   Hibana empty state. */
+.db-noprojects { max-inline-size: 34rem; margin: 3rem auto 0; text-align: center; }
+
+@media (max-width: 640px) {
+  /* the toolbar wraps on phones already (flex-wrap); the popover stays viewport-fit */
+  .db-switch-pop { inline-size: min(20rem, calc(100vw - 1.2rem)); }
+}

@@ -1,0 +1,1067 @@
+/* --- R4.3: Styling polish --------------------------------------------------- */
+/* Dark-mode card border refinement — in dark mode the flat --line border can make cards
+   blend into the bg. Add a slightly stronger top border so cards read as separate units.
+   Only applies when the user is actually in dark mode (not the default light). */
+@media (prefers-color-scheme: dark) {
+}
+
+/* Tooltip component — a lightweight CSS-only tooltip via [data-tooltip] + ::after.
+   Usage: <button data-tooltip="Helpful text">…</button>. Appears on hover/focus,
+   positioned above by default. No JS, no library. */
+[data-tooltip] { position: relative; }
+[data-tooltip]::before,
+[data-tooltip]::after {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 100;
+}
+[data-tooltip]::before {
+  content: attr(data-tooltip);
+  inset-block-end: calc(100% + 0.5rem);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  padding: 0.3rem 0.6rem;
+  background: var(--text);
+  color: var(--bg);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
+  max-inline-size: 16rem;
+  white-space: normal;
+  text-align: center;
+}
+[data-tooltip]::after {
+  content: '';
+  inset-block-end: 100%;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-block-end-color: var(--text);
+  margin-block-end: -2px;
+}
+[data-tooltip]:hover::before,
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::before,
+[data-tooltip]:focus-visible::after {
+  opacity: 1;
+}
+/* Phase 6 item 5: elements pinned to the TOP of the viewport (the topbar's theme
+   toggle) clipped their tooltip ABOVE the viewing frame — unreadable. In the topbar
+   the tooltip flips to BELOW the element (arrow down). */
+.topbar [data-tooltip]::before { inset-block-end: auto; inset-block-start: calc(100% + 0.5rem); }
+.topbar [data-tooltip]::after {
+  inset-block-end: auto; inset-block-start: 100%;
+  border-block-end-color: transparent; border-block-start-color: var(--text);
+  margin-block-end: 0; margin-block-start: -2px;
+}
+/* Mobile: tooltips are awkward on touch; hide unless hover is available */
+@media (hover: none) {
+  [data-tooltip]::before, [data-tooltip]::after { display: none; }
+}
+
+/* ===========================================================================
+   Round 5 — Onboarding tour, counter animation, styling polish
+   =========================================================================== */
+
+/* --- R5.1: Onboarding tour -------------------------------------------------- */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgb(0 0 0 / 0.62); /* Session 19: was .45 — background content was readable through it, distracting from the coachmark */
+  backdrop-filter: blur(3px);
+  animation: tour-fade-in 0.2s ease-out;
+}
+@keyframes tour-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.tour-card {
+  position: absolute;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.25rem 1rem;
+  box-shadow: 0 20px 50px -12px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.1);
+  max-inline-size: 320px;
+  animation: tour-card-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes tour-card-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tour-title { margin: 0 0 0.5rem; font-size: var(--fs-xl); font-weight: 700; }
+.tour-body { margin: 0 0 0.85rem; color: var(--text); line-height: 1.55; font-size: var(--fs-md); opacity: 0.92; }
+.tour-progress { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-block-end: 0.85rem; }
+/* 2026-09-12: dots are real buttons now — 8px visual, 24px hit area via padding +
+   background-clip (border-box would swallow the padding into the size). Inactive
+   dots brighten on hover; focus-visible gets the app-standard accent ring. */
+.tour-dot {
+  box-sizing: content-box;
+  inline-size: 8px;
+  block-size: 8px;
+  padding: 8px; /* 8 visual + 2×8 hit padding = 24px target */
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.25); /* Session 19: was --line-strong which was near-invisible on the card surface */
+  background-clip: content-box;
+  cursor: pointer;
+  transition: background-color 0.15s ease, inline-size 0.15s ease;
+}
+.tour-dot:hover { background-color: rgb(0 0 0 / 0.45); }
+.tour-dot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+.tour-dot.active { background-color: var(--brand); inline-size: 20px; border-radius: 99px; cursor: default; }
+.tour-actions { display: flex; align-items: center; gap: 0.4rem; }
+.tour-spacer { flex: 1; }
+.tour-next {
+  background: var(--cta, var(--accent));
+  color: var(--btn-text);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.tour-next:hover { background: var(--cta-hover, var(--accent-hover)); }
+/* The highlighted target element gets a ring + slight scale */
+.tour-target {
+  position: relative;
+  z-index: 81;
+  box-shadow: 0 0 0 4px var(--card), 0 0 0 6px var(--brand), 0 8px 24px rgb(0 0 0 / 0.3) !important;
+  border-radius: var(--radius-sm) !important;
+  animation: tour-target-pulse 1.8s ease-in-out infinite;
+}
+@keyframes tour-target-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px var(--card), 0 0 0 6px var(--brand), 0 8px 24px rgb(0 0 0 / 0.3); }
+  50% { box-shadow: 0 0 0 4px var(--card), 0 0 0 8px color-mix(in srgb, var(--brand) 60%, transparent), 0 8px 24px rgb(0 0 0 / 0.3); }
+}
+/* Session 23 (user report: "the + CTA button is vanished") — ROOT CAUSE: .tour-target's
+   z-index:81 is trapped inside its ancestor's stacking context (.fab-stack z-index:40,
+   .topbar z-index:30), both BELOW the overlay's 80 — so during the tour the highlighted
+   FAB / theme toggle rendered UNDER the 62% black + blur veil: invisible + unclickable,
+   the coachmark pointing at a dark void. Lift the WHOLE stacking context above the
+   overlay whenever it contains the current tour target — the ring + pulse then show. */
+.fab-stack:has(.tour-target) { z-index: 82; }
+.topbar:has(.tour-target) { z-index: 82; }
+/* S89: the RAIL joins the lift — every tour target inside it (the search button,
+   the section icons, the avatar, the theme toggle) lives in the rail's z-38
+   stacking context, UNDER the z-80 overlay: the highlighted icon rendered
+   invisible beneath the 62% black veil. The :has() twin covers targets INSIDE
+   the rail; the .tour-target twin covers the rail itself (step 2 highlights the
+   whole rail). */
+.rail:has(.tour-target), .rail.tour-target { z-index: 82; }
+@media (prefers-reduced-motion: reduce) {
+  .tour-overlay, .tour-card, .tour-target { animation: none; }
+}
+
+/* --- R5.2: Counter animation ------------------------------------------------ */
+.stat-count.counting { color: var(--brand); transition: color 0.3s ease; }
+
+/* --- R5.3: Styling polish --------------------------------------------------- */
+/* Sadhana board dark-mode refinement — the quadrant cards use --bg-soft in light mode;
+   in dark mode that can flatten. Give them a subtle gradient + stronger border so the
+   2×2 grid reads as four distinct quadrants. */
+@media (prefers-color-scheme: dark) {
+}
+
+/* Focus-glow on interactive cards — a soft brand halo when a project-card or kanban-card
+   or notif-item receives keyboard focus (or focus-within). Pairs with the focus-visible
+   ring from R1; this is the "card is active" ambient signal. */
+.project-card:focus-within,
+.kanban-card:focus-within,
+.notif-item:focus-within,
+.feed-item:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent), 0 4px 12px -4px rgb(0 0 0 / 0.12);
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+/* Consistent letter-spacing on uppercase labels (badges, kind labels) for
+   a more refined typographic rhythm. (S155: .cmdk-group-label left the list —
+   group labels are the EYEBROW rung now: sentence case, +0.03em, in polish-ui.) */
+.badge, .notif-kind, .cal-dow, .dash-today-chip {
+  letter-spacing: 0.02em;
+}
+
+/* ===========================================================================
+   Round 6 — Voice quick-add, show-tour button, styling polish
+   =========================================================================== */
+
+/* --- R6.1: Voice quick-add mic button -------------------------------------- */
+.qa-title-row { gap: 0.4rem; align-items: center; }
+.qa-title-row input { flex: 1; }
+
+/* --- R6.3: Sticky table header for projects list view ---------------------- */
+/* The projects table is long; the header row (Title/Status/Tags/Updated/Progress) should
+   stick to the top of the scroll container so users always know which column is which. */
+.projects-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--card);
+  border-block-end: 2px solid var(--line-strong);
+}
+/* When the page has the sticky settings-tabs (only on settings.html), bump the table
+   header down so they don't overlap. The projects page has no sticky bars, so 0 offset. */
+.projects-table thead th { top: 0; }
+
+/* --- R6.3: Reports page dark-mode refinement ------------------------------- */
+/* The reports page cards (snapshot, heatmap, activity) can flatten in dark mode. Give them
+   the same subtle gradient treatment as the sadhana quadrants from R5.3 for consistency.
+   Review-round 2 (2026-09-12): these two @media (prefers-color-scheme: dark) blocks were
+   left EMPTY (rule bodies never written) — and the mechanism was wrong anyway: the app
+   themes manually via html[data-theme], not the OS media query. The working rules live in
+   themes.css (#report-body .card gradient + .heatmap-l4 softening, data-theme-scoped).
+   Stubs removed to stop implying dark coverage that never applied. */
+
+/* --- R6.3: Settings "Help" subsection visual rhythm ------------------------ */
+/* S155: the subsection head joins the EYEBROW rung — 12px/500/0.03em, sentence
+   case (was fs-md/uppercase/0.04em — group labels are eyebrows per the spec). */
+#settings-account h4 {
+  font-size: var(--text-eyebrow-size);
+  font-weight: var(--text-eyebrow-weight);
+  text-transform: none;
+  letter-spacing: var(--text-eyebrow-tracking);
+  color: var(--muted);
+  margin-block-end: 0.5rem;
+}
+#show-tour-btn { gap: 0.4rem; }
+
+/* ===========================================================================
+   Round 7 — Vim go-to shortcuts, PWA install prompt, styling polish
+   =========================================================================== */
+
+/* --- R7.1: Go-to hint pill ------------------------------------------------- */
+.goto-hint {
+  position: fixed;
+  inset-block-end: 1.5rem;
+  inset-inline-start: 50%;
+  transform: translateX(-50%) translateY(0.5rem);
+  z-index: 60;
+  padding: 0.4rem 0.9rem;
+  background: var(--text);
+  color: var(--bg);
+  border-radius: 999px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  box-shadow: 0 8px 24px -6px rgb(0 0 0 / 0.3);
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  pointer-events: none;
+}
+.goto-hint.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .goto-hint { transition: none; }
+}
+
+/* --- R7.3: Dashboard today strip -------------------------------------------- */
+/* The today-ring (R7.3/R8.1) was removed on user request 2026-08-29 — the strip keeps
+   only the outlier chips (overdue / pinned / solved this week), rendered by the server
+   only when at least one exists. */
+
+/* --- R7.3: Tooltip wiring on FAB items + view-switcher --------------------- */
+/* The [data-tooltip] component is already defined (R4.3); these just add the attribute
+   to the elements. The CSS here ensures the tooltip clears the FAB's high z-index. */
+.fab-item[data-tooltip]::before { z-index: 100; }
+.fab-item[data-tooltip]::after { z-index: 100; }
+.seg-btn[data-tooltip]::before { z-index: 100; }
+
+/* ===========================================================================
+   Round 8 — Today-ring wiring, fuzzy scoring, bar-chart animation, tooltip wiring
+   =========================================================================== */
+
+/* --- R8.1: done chip variant ------------------------------------------------- */
+.dash-today-done {
+  background: var(--badge-working-bg);
+  color: var(--badge-working-fg);
+  border-color: color-mix(in srgb, var(--badge-working-fg) 30%, transparent);
+}
+.dash-today-done .icon { color: var(--badge-working-fg); }
+
+/* --- R8.3: Reports bar-chart animation ------------------------------------- */
+/* The bar-chart bars (.bar / .bar-2) get a grow-up animation on first paint. */
+.bar-chart .bar,
+.bar-chart .bar-2 {
+  transform-origin: bottom;
+  animation: bar-grow 0.5s ease-out;
+}
+@keyframes bar-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-chart .bar, .bar-chart .bar-2 { animation: none; }
+}
+
+/* --- R8.3: Tooltip-ready elements (the [data-tooltip] component is from R4.3) --- */
+/* These elements get tooltips wired in JS; the CSS just ensures they're positioned. */
+.seg-btn, .saved-filter-add, #save-filter-btn {
+  position: relative;
+}
+
+/* ===========================================================================
+   Round 9 — Iranian holidays, weekend marking, calendar legend, green Shamsi aesthetic
+   =========================================================================== */
+
+/* --- R9.1: Weekend (Friday) + holiday cell styling ------------------------- */
+/* 22-a #5: Fridays are the WEEKEND — a whisper of red plus subtle diagonal stripes
+   (repeating-linear-gradient), far softer than the full holiday treatment they used
+   to get (jalali-holidays.js tags every Friday as a 'holiday', so they rendered with an
+   8% danger fill, a 30% danger border and a solid-red number). Real named holidays
+   (نوروز، عاشورا، …) keep the stronger red styling below. */
+.cal-cell.cal-weekend {
+  color: var(--muted);
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--danger) 5%, transparent) 0 5px, transparent 5px 11px),
+    color-mix(in srgb, var(--danger) 3%, var(--card));
+}
+.cal-cell.cal-weekend .cal-day-num { color: var(--danger); font-weight: 600; }
+.cal-cell.cal-holiday {
+  background: color-mix(in srgb, var(--danger) 8%, var(--card));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--line));
+}
+.cal-cell.cal-holiday .cal-day-num { color: var(--danger); font-weight: 700; }
+/* Real holiday falling on a Friday: keep the stripes, soften the old 12% red fill. */
+.cal-cell.cal-weekend.cal-holiday {
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--danger) 7%, transparent) 0 5px, transparent 5px 11px),
+    color-mix(in srgb, var(--danger) 7%, var(--card));
+}
+/* Holiday badge inside the cell — small, truncates long names */
+.cal-hol-badge {
+  display: block;
+  font-size: 0.58rem;
+  line-height: 1.15;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+  margin-block-start: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.cal-cell.cal-holiday .cal-hol-badge { display: block; }
+.cal-cell:not(.cal-holiday) .cal-hol-badge { display: none; }
+/* The Friday column header (جمعه) gets a muted weekend tint */
+.cal-dow-weekend { color: var(--muted); font-weight: 700; }
+
+/* --- R9.3: Calendar legend -------------------------------------------------- */
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-block: 0.85rem 0.5rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+}
+.cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+.cal-legend-item .cal-dot { inline-size: 24px; block-size: 24px; } /* match the 24px day pins (22-a) */
+.cal-weekend-swatch, .cal-holiday-swatch {
+  display: inline-block;
+  inline-size: 14px;
+  block-size: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+/* Weekend swatch mirrors the striped Friday cells (22-a #5) */
+.cal-weekend-swatch {
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--danger) 9%, transparent) 0 2px, transparent 2px 5px),
+    color-mix(in srgb, var(--danger) 4%, var(--card));
+}
+.cal-holiday-swatch { background: color-mix(in srgb, var(--danger) 8%, var(--card)); border-color: color-mix(in srgb, var(--danger) 30%, var(--line)); }
+
+/* --- Day detail holiday row + add-task link -------------------------------- */
+.cal-day-holiday { list-style: none; margin: 0 0 0.5rem; padding: 0; }
+.cal-day-holiday .cal-hol-badge {
+  display: inline-block;
+  font-size: var(--fs-sm);
+  padding: 0.2rem 0.6rem;
+}
+#cal-add-task { margin-inline-end: auto; gap: 0.35rem; }
+
+/* --- R9.2: Shamsi "today" emphasis (Jalali mode) ---------------------------- */
+/* 2026-09-02 (user request): the calendar colors now comply with the Hibana design
+   system — the identity accent is the brand TEAL (--brand), not the ad-hoc green the
+   first cut used (the "تقویم" heading showed an off-system green). The h1 keeps the
+   standard heading color; only the today cell + month label carry the identity mark. */
+@media (max-width: 560px) {
+  .cal-legend { font-size: var(--fs-xs); gap: 0.5rem; padding: 0.4rem 0.6rem; }
+  .cal-hol-badge { font-size: 0.5rem; }
+}
+
+/* sparks shelf indicator moved outside the swap target (Task 24) — keep it out of
+   the flow until a request is actually running (default htmx CSS is opacity-only). */
+#shelf-loading { display: none; }
+#shelf-loading.htmx-request { display: block; }
+
+/* --- Task 24 (2026-09-05): month-as-heading, Jalali⇄Gregorian switch, selected day,
+       dynamic pin rescale, legend drag-to-day --------------------------------- */
+.cal-title { margin: 0; min-inline-size: 10rem; text-align: center; }
+.cal-title-nav { gap: 0.25rem; }
+.cal-sys {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--card);
+}
+.cal-sys button {
+  border: 0;
+  background: transparent;
+  padding: 0.32rem 0.8rem;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.cal-sys button + button { border-inline-start: 1px solid var(--line); }
+.cal-sys button.on { background: var(--cta); color: #fff; } /* Session 20 (AA): white on --brand #4A9FA3 was 3.1:1 (light) / 2.4:1 (dark, --accent-hover) — --cta is 4.93:1 in both themes */
+.cal-sys button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* the focused day (jumps/clicks) — a brand inset ring, distinct from today's border */
+.cal-cell.selected { border-color: var(--brand); box-shadow: inset 0 0 0 2px var(--brand); }
+.cal-cell.selected .cal-day-num { color: var(--link); } /* Session 20 (AA): --brand as text was 2.7:1 — --link is the text-safe teal (matches the .today rule above) */
+/* drop target while dragging a legend dot onto a day */
+.cal-cell.cal-drop {
+  outline: 2px dashed var(--brand);
+  outline-offset: -3px;
+  background: var(--accent-soft);
+}
+/* draggable legend dots */
+.cal-legend-item.cal-drag { cursor: grab; user-select: none; -webkit-user-select: none; }
+.cal-legend-item.cal-drag:active { cursor: grabbing; }
+.cal-legend-item.cal-drag.dragging { opacity: 0.4; }
+.cal-legend-hint { display: inline-flex; align-items: center; gap: 0.3rem; font-style: italic; }
+/* pins rescale as a day fills up — every pin stays visible, no “+N” (Task 24 #2) */
+.cal-dots.many { gap: 3px; }
+.cal-dots.many .cal-dot { inline-size: 16px; block-size: 16px; border-width: 2px; }
+.cal-dots.lots { gap: 2px; }
+.cal-dots.lots .cal-dot {
+  inline-size: 11px;
+  block-size: 11px;
+  border-width: 1.5px;
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / 0.4), 0 1px 2px rgb(30 20 10 / 0.3);
+}
+@media (max-width: 640px) {
+  .cal-title { min-inline-size: 7rem; font-size: var(--fs-lg); }
+  .cal-sys button { padding: 0.28rem 0.6rem; }
+  .cal-controls { flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (max-width: 480px) {
+  .cal-title { min-inline-size: 0; }
+  .cal-head { flex-direction: column; align-items: stretch; }
+  .cal-title-nav { justify-content: center; }
+  .cal-controls { justify-content: center; }
+}
+
+/* ==========================================================================
+   Dev-board + sprint roadmap + redesigned project header (0029, user sketch
+   2026-08-29). Pastel palette, physical-pin accents, full RTL/LTR + dark support.
+   ========================================================================== */
+
+/* priority pastels — one family, AA-checked as accents (not text fills).
+   S31 (user request 2026-09-13): display:inline-block added — transforms (the
+   urgent dot's beep pulse below) never apply to raw inline spans, and the 9x9
+   box was already being blockified by every flex parent anyway. */
+.prio-dot {
+  display: inline-block;
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: 999px;
+  flex: none;
+  background: var(--neutral-400, #c5c8cc);
+}
+/* Priority recolor (user request 2026-09-03): low/medium/high must differ at a glance —
+   grey / amber / red-ish pastels (medium used to be the pastel BLUE, so the sea of
+   default-priority tasks read "all blue"). urgent stays the hottest of the family.
+   UI/UX R5 (2026-09-12): prio-high was PINK #E59AA5 — pink has no semantic role in the
+   app's palette. Reassigned to RED #D96C63 (the prio-urgent hue) so both high + urgent
+   share the "urgent/overdue" semantic per the variables.css color-system comment.
+   S31 (user request 2026-09-13 — ROOT-CAUSE FIX for the "solid red rows/chips"): these
+   four rules were UNscoped (.prio-urgent { background: … }) so they also painted every
+   NON-dot element that carried the class — the dashboard fire-strip rows
+   (li.dash-urgent-row.prio-urgent → SOLID RED blocks) and the task-card meta text chips
+   (span.pd-meta-prio.prio-* → solid red/orange pills behind the text). Scoped to
+   .prio-dot now: the color lives on the 9px dots only. Urgent distinguishes itself
+   from high via the beep pulse below, not via painted backgrounds.
+   S145 (owner: "use this colors"): the dots ride the owner's banner palette — sage /
+   gold / coral / crimson — so every priority indicator (banner, dot, chip, segment)
+   speaks the SAME hue; high + urgent are distinct colors again (the beep pulse stays
+   as the motion cue on top).
+   S149 (owner: "Use this new colors for priority color-coding"): the WHOLE family
+   reads the canonical --color-* tokens now (steel / bronze / rust / brick) — the
+   last hardcoded priority hexes are gone (design-token law: hex lives in
+   variables.css only). */
+.prio-dot.prio-low { background: var(--color-low); }
+.prio-dot.prio-medium { background: var(--color-medium); }
+.prio-dot.prio-high { background: var(--color-high); }
+.prio-dot.prio-urgent { background: var(--color-urgent); }
+/* S150: the low/medium fills are PALE now (pale slate / pale gold) — as bare 9px
+   dots on a light card they would wash out to ghosts. A hairline inset ring in the
+   pair's ink keeps the at-a-glance presence; the saturated high/urgent fills need
+   no ring. Token-driven, so dark rides free. */
+.prio-dot.prio-low { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-low-ink) 55%, transparent); }
+.prio-dot.prio-medium { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-medium-ink) 55%, transparent); }
+
+/* S32 (user request 2026-09-13 — "GENERAL LAW: show RTL text RTL (when typing
+   Farsi), show LTR text LTR (when writing Latin or AI translates it to Latin)").
+   S31b fixed the four board/report surfaces as a point patch; this is the same
+   fix promoted to a LAW over EVERY user-text surface in the app (this file is
+   loaded by all 19 authed shells). unicode-bidi: plaintext resolves EACH bidi
+   paragraph's base direction from its OWN first strong character: an English
+   line reads LTR (left-aligned, punctuation at the sentence end), a Farsi line
+   stays RTL — mixed content follows its own text, never the page language, and
+   multi-line bodies (white-space: pre-line / markdown blocks = one paragraph
+   per line) mix correctly line by line. text-align stays `start` everywhere
+   (inherited default — no explicit left/right rule exists on these surfaces),
+   which resolves per-paragraph under plaintext. Code blocks stay LTR islands
+   (see the pre rule at the end — code is Latin by convention, .t-code twin).
+   The canvas boards are the one surface CSS can't reach (fabric draws to
+   <canvas>) — their fix lives in canvas.js/whiteboard.js wireTextDir, which
+   now also sets the fabric object's direction from the first strong char. */
+
+/* — project / idea cards, list view, kanban, sticky board, folders
+     (projects + sparks + archive pages, server-rendered) — */
+.pc-title,
+.project-title,
+.pc-desc,
+.projects-table td a,
+.sticky-note strong,
+.sticky-note .muted.small,
+.kanban-card strong,
+.kanban-col[data-spark-folder] h4 span,
+.sf-label,
+.spark-folder-name,
+.pd-tag,
+.pd-tag-chip,
+
+/* — quick notes: card text, list items, attach chips, reader modal — */
+.note-render,
+.note-render :is(p, h1, h2, h3, h4, h5, h6, li, blockquote, dd, dt),
+.note-reader-body,
+.note-reader-body :is(p, h1, h2, h3, h4, h5, h6, li, blockquote, dd, dt),
+.hurdle > span,
+.attach-chip,
+.attach-option,
+.qn-attach-option,
+
+/* — project detail: title, plan documents, links, history, related notes,
+     archived tasks — */
+#pd-title,
+.bl-doc-title,
+.bl-doc-body,
+a.related-note,
+.links li a,
+.history li,
+.pd-archive-title,
+
+/* — board: card titles, header title, category/label/sprint chips, filter
+     toggles — (S31b's .pd-task-title/.db-card-title/.cmdk-label/.hurdle-text
+     now live inside the law — kept verbatim below) — */
+.pd-task-title,
+.db-card-title,
+.cmdk-label,
+.hurdle-text,
+.db-title,
+.db-cat-chip,
+.db-mini-chip,
+.db-sprint-badge,
+.db-tag,
+.db-filter-tag,
+
+/* — sprint roadmap: categories, task titles, sprint chips, timeline bars — */
+.sp-cat-badge,
+.sp-task-title,
+.sp-sprint-chip,
+.sp-bar-title,
+
+/* — sadhana / to-do board: tasks, notes, quadrants, zen overlay, archive — */
+.task-txt,
+.task-note-preview,
+.upd-text,
+.q-title,
+.q-sub,
+.zen-title,
+.zen-sub,
+.arch-task b,
+.arch-ritem b,
+
+/* — dashboard: todo rows, quadrant names, stage kanban, activity feed,
+     resume card, fire-strip project, task-note rows + hover bubble — */
+.dash-todo-check span[data-task-title],
+.dash-todo-qcol strong,
+.dash-todo-qsub,
+.skc-title,
+.activity-main a,
+.activity-sub,
+.resume-hero-title,
+.resume-chip-title,
+.dash-urgent-project,
+.task-note-text,
+.dash-note-bubble,
+
+/* — notifications, search palette + htmx results, AI output (magic wand),
+     calendar day items, reports labels/velocity/on-this-day/feed, toasts — */
+.notif-detail,
+.cmdk-sublabel,
+.search-results a,
+.magic-pane-body,
+.cal-day-sticky-text,
+.cal-day-note-text,
+.cal-day-item a,
+.rep-label-chip,
+.rep-vel-name,
+.otd-item a,
+.feed-title,
+
+/* — S33 (user request 2026-09-13): the sprint plan editor's live preview — every
+     rendered block resolves per its own first strong char, code islands excluded.
+     S34 additions: table cells (th/td) and the private-comment anchor + popover
+     (==…== %%…%%) — a Latin rationale note inside a Farsi doc reads LTR. — */
+.pd-sd-preview,
+.pd-sd-preview :is(p, h1, h2, h3, h4, h5, h6, li, blockquote, dd, dt, th, td, .sd-note, .sd-note-pop, .sd-note-txt),
+.toast-msg { unicode-bidi: plaintext; }
+
+/* — the TYPING side of the law (composers + editors + inline edits): the
+     GitHub textarea recipe — per-paragraph direction while typing, the
+     element's dir attribute stays the FA default (rtl) so an empty caret
+     still starts Farsi-side; a Latin line flips its own paragraph mid-field.
+     Fields that already carry dir="auto" keep it (whole-field first-strong);
+     plaintext refines multi-line ones per line — harmless on inputs. */
+
+/* S46.8 (owner: "The bullet point is not tied to text items. fix it"): bullet
+   lists (<ul><li>) inside task titles now have list-style:disc + padding-inline-start
+   so the bullet dots sit NEXT to the text (not detached on the far edge). The
+   parent's white-space:pre-line is overridden to normal inside <ul> so list items
+   don't get extra blank lines between them.
+   S46.9 (owner insight: "texts were originally Farsi, translated to English via the
+   AI tool — the bullets stayed RTL"): list markers (list-style:disc) are positioned
+   by the `direction` property (inherited RTL from the FA page), so the bullet dot sits
+   on the RIGHT while English text is LTR (left) → detached. Fix: list-style:NONE +
+   li::before content "•  " (INLINE content at the paragraph start) + unicode-bidi:
+   plaintext on each <li> → the bullet is inline content whose position follows the
+   paragraph direction (resolved per-<li> from the first strong char: English → LTR →
+   bullet on LEFT; Farsi → RTL → bullet on RIGHT). The bullet is now TIED to the text. */
+.pd-task-title ul, .db-card-title ul, .sp-task-title ul, .sp-bar-title ul, .bl-plan-title ul {
+  list-style: none;
+  padding-inline-start: 0;
+  margin: 0.15rem 0;
+  white-space: normal;
+}
+/* S48d: ordered lists use native decimal numbering (list-style: decimal). The
+   S46.9 bullet ::before is scoped to <ul> items only so <ol> shows real numbers. */
+.pd-task-title ol, .db-card-title ol, .sp-task-title ol, .sp-bar-title ol, .bl-plan-title ol {
+  list-style: decimal;
+  padding-inline-start: 1.5rem;
+  margin: 0.15rem 0;
+  white-space: normal;
+}
+.pd-task-title li, .db-card-title li, .sp-task-title li, .sp-bar-title li, .bl-plan-title li {
+  margin: 0.1rem 0;
+  white-space: normal;
+  unicode-bidi: plaintext;
+}
+/* the inline bullet is scoped to <ul> items only (not <ol> which has native numbers) */
+.pd-task-title ul > li::before, .db-card-title ul > li::before, .sp-task-title ul > li::before, .sp-bar-title ul > li::before, .bl-plan-title ul > li::before {
+  content: "\2022\00a0\00a0";
+}
+#pd-taskadd-textarea,
+#pde-input,
+#pd-desc,
+#pd-note-textarea,
+#pd-editor-subtitle,
+#pd-editor-textarea,
+
+/* — S33: the «اسپرینت جدید» modal (name / version / description) + the full-screen
+     sprint plan editor — same recipe: FA dir=rtl typing default, per-line plaintext — */
+#pd-sprintnew-name,
+#pd-sprintnew-version,
+#pd-sprintnew-desc,
+#pd-sd-text,
+
+.note-compose-text,
+.note-text,
+.note-title,
+.note-add input,
+.bl-doc-form input,
+.bl-doc-form textarea,
+.db-modal-card textarea[name="title"],
+textarea.ai,
+.edit-input,
+.upd-inp,
+input.qe-name,
+.dash-todo-rename-form input,
+.dash-todo-edit input[name="title"],
+.dash-quickadd input,
+.task-note-editbox textarea,
+.dash-note-pop textarea,
+#cmdk-input,
+#note-compose-box,
+#ne-title,
+#ne-content,
+#qa-title,
+#qa-description,
+#pa-title,
+#pa-description,
+#taskadd-title,
+#quicknote-text { unicode-bidi: plaintext; }
+
+/* Code blocks inside markdown renders stay LTR islands — the law is for
+   prose, not code (mirrors .t-code in project-header.css). */
+.note-render pre,
+.note-reader-body pre {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+}
+
+/* S31 (user request 2026-09-13): "instead add a beeping pulsating red light" — the
+   urgent DOT is the alarm now. Double-beep rhythm (two quick flashes, then dark —
+   reads like a beeping LED), a soft expanding ring carries the eye from across the
+   page. Runs ONLY under prefers-reduced-motion: no-preference; done tasks opt out
+   (a completed urgent task is not an alarm). Applies wherever an urgent dot renders:
+   board + project cards, filter chips, the dashboard fire strip, sprint circles
+   (.sp-dot-prio), the command palette, the reports velocity heads. */
+@keyframes prio-beep {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgb(217 108 99 / 0); }
+  6% { transform: scale(1.5); box-shadow: 0 0 0 4px rgb(217 108 99 / 0.4); }
+  14% { transform: scale(1); box-shadow: 0 0 0 9px rgb(217 108 99 / 0); }
+  22% { transform: scale(1.5); box-shadow: 0 0 0 4px rgb(217 108 99 / 0.4); }
+  32% { transform: scale(1); box-shadow: 0 0 0 0 rgb(217 108 99 / 0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .prio-dot.prio-urgent,
+  .sp-dot-prio.prio-urgent { animation: prio-beep 1.6s ease-out infinite; }
+  .pd-task.st-done .prio-dot.prio-urgent,
+  .db-card.st-done .prio-dot.prio-urgent { animation: none; }
+}
+
+/* S144 (owner: "I want the priority of the tasks to be shown like the given
+   screenshot"): the left-border priority accents + the in-card cycling dot + the meta
+   priority label are RETIRED — the priority now lives on a PRIORITY BANNER, a colored
+   strip fused across the card's top carrying the label (the banner is the cycle
+   affordance, keeping the old dot's data-db-cycle-prio / data-pd-cycle-prio contract).
+   The card-scoped .pd-task .prio-dot rules are gone with the dot. The .prio-dot base
+   colors above STAY — filter chips, the dashboard fire strip, sprint circles and the
+   reports segments still speak dot (S145: now in the owner's banner palette, so every
+   priority indicator shares one hue family).
+   S153 (owner report: "a stray vertical border on the left edge of the card, near the
+   LOW PRIORITY card"): the wrap's 3px inline-start border — a Session 19 leftover that
+   S144 had returned to the COLUMN color for EVERY card — is REMOVED entirely. It was
+   the only rule painting a line at the card's own edge (the card itself carries just
+   the symmetric 1px --line border), and because it sat on the WRAPPER it rendered just
+   outside the card's rounded edge. The column's own identity strip (.pd-col
+   border-inline-start in project-header.css) is deliberately untouched — that line
+   belongs to the column at the column's edge, not to the cards. */
+
+/* ─── S144: the PRIORITY BANNER ─────────────────────────────────────────────
+   A colored strip across the card's top with the UPPERCASE label centered — the
+   owner's screenshot anatomy. Colors from the ONE --prio-banner-* token set
+   (variables.css). S145 (owner: "use this colors"): the fills were the owner's exact
+   pastel legend and the INK flipped per priority (the three light pastels carried a
+   dark self-contained ink; white failed AA there).
+   S149 (owner: "Use this new colors for priority color-coding"): the fills were the
+   AA-with-white set (steel / bronze / rust / brick), so the ink was WHITE on every
+   priority and the base rule's var(--prio-banner-ink) (#ffffff) covered all four.
+   S150 (owner: "Use this for color-coding priorities"): the fills are the FILL+INK
+   PAIR set (pale slate / pale gold / burnt orange / saturated red) — the two PALE
+   fills carry a DARK ink again (the S145 flip returns for low/medium), high/urgent
+   keep white. Still self-contained (label sits ON the fill), so dark needs no
+   mirrors. The banner IS
+   the priority cycle button (the old dot's contract: title/aria hint + click =
+   low → medium → high → urgent). The wrap goes column-flex so banner + card stack;
+   the ⋯ hover menu is absolutely positioned and unaffected. Radii are logical
+   (border-start-*) — RTL-safe; the banner's own top radii are symmetric physicals. */
+.pd-task-wrap:has(> .prio-banner):not([hidden]) { display: flex; flex-direction: column; } /* :not([hidden]) — the filter bar hides wraps via the hidden attribute; an author display would defeat it */
+.prio-banner {
+  display: flex; align-items: center; justify-content: center; gap: 0.3rem;
+  inline-size: 100%; border: none; cursor: pointer;
+  padding: 0.28rem 0.6rem;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-family: inherit; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase; line-height: 1.25;
+  color: var(--prio-banner-ink); background: var(--prio-banner-medium);
+  transition: filter 0.12s ease;
+}
+.prio-banner:hover { filter: brightness(1.1); }
+.prio-banner:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.prio-banner .prio-banner-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 100%; }
+/* S150: per-priority ink rides the fill — white stays the base (urgent/high),
+   the pale slate/gold fills carry their dark ink (AA against the fill, owner-checked). */
+.prio-banner.prio-urgent { background: var(--prio-banner-urgent); color: var(--prio-banner-ink-urgent); }
+.prio-banner.prio-high { background: var(--prio-banner-high); color: var(--prio-banner-ink-high); }
+.prio-banner.prio-medium { background: var(--prio-banner-medium); color: var(--prio-banner-ink-medium); }
+.prio-banner.prio-low { background: var(--prio-banner-low); color: var(--prio-banner-ink-low); }
+/* the card under a banner loses its START corners so the strip reads fused (the screenshot) */
+.prio-banner + .pd-task { border-start-start-radius: 0; border-start-end-radius: 0; }
+/* S175 (owner round): DONE items lose their priority coding — the banner turns pale
+   and faded ("they're done — no point showing the priority color coding"). Scope:
+   the DONE box's own list container (.pd-tasks[data-pd-tasks="done"]) — covers the
+   project page's board AND the fullscreen board (same container attr, one rule), and
+   stays correct as cards MOVE without any per-card state to sync (every move path
+   re-parents the wrap; drag-into-done fades on arrival, drag-out restores). The pale
+   fill is a color-mix of the medium token into the card surface — priority-agnostic
+   by design, both themes keep their own tokens. Hover restores full presence: the
+   banner is still the priority-cycle button. Specificity (0,3,0) out-ranks the
+   per-priority fills (0,2,0) — no !important needed. */
+.pd-tasks[data-pd-tasks='done'] .prio-banner {
+  background: color-mix(in srgb, var(--prio-banner-medium) 18%, var(--card));
+  color: var(--muted);
+  opacity: 0.7;
+}
+.pd-tasks[data-pd-tasks='done'] .prio-banner:hover { opacity: 1; }
+/* S136: the .db-card mirror of this block is RETIRED — board.html renders the exact
+   .pd-task-wrap / .pd-task anatomy now, so the recipes above style BOTH boards and
+   the duplicate (which had already drifted once — see its Session 22 note) is gone. */
+
+
+/* ==========================================================================
+   S29 responsive audit (2026-09-12) — the ONE real page-level bug + touch floors
+   ==========================================================================
+   Calendar @768 EN scrolled 69px horizontally: .cal-controls (prev/today/next) never
+   wrapped because the wrap was gated ≤640px. Unconditional wrap + .cal-head wraps
+   ≤1024px (was ≤480px, calendar.css). The Jalali/Gregorian segmented toggle measured
+   27px tall — lifted to the 40px touch floor (segmented pairs read as ONE affordance;
+   40px is the documented compromise, matching the sadhana ftag precedent). */
+.cal-controls { flex-wrap: wrap; }
+@media (max-width: 1024px) {
+  .cal-head { flex-wrap: wrap; gap: 0.5rem; }
+}
+.cal-sys button { min-block-size: 40px; }
+
+
+/* ==========================================================================
+   S75 — the FULL stale view (projects.html?stale=1) + the dashboard nudge's
+   "View all" link. The banner rides the dashboard's .dash-stale-row amber language
+   (waiting, not an alarm); the pieces below deepen it into a proper page surface:
+   a hairline gradient, a breathing clock, a tabular count, and a quiet exit hatch.
+   ========================================================================== */
+.pg-stale-banner {
+  margin-block: 0.35rem 0.8rem;
+  padding: 0.55rem 0.8rem;
+  /* The 4px amber start-edge from .dash-stale-row, refined into a soft gradient so
+     the banner reads as a surface, not a highlighter stroke. Gradients take PHYSICAL
+     directions only — the [dir='rtl'] rule below flips it. */
+  border-inline-start: 4px solid var(--warn, #b45309);
+  background:
+    linear-gradient(to right, color-mix(in srgb, color-mix(in srgb, var(--warn, #b45309) 14%, var(--card)) 42%, transparent), transparent 62%),
+    color-mix(in srgb, color-mix(in srgb, var(--warn, #b45309) 14%, var(--card)) 55%, var(--card));
+}
+[dir='rtl'] .pg-stale-banner {
+  background:
+    linear-gradient(to left, color-mix(in srgb, color-mix(in srgb, var(--warn, #b45309) 14%, var(--card)) 42%, transparent), transparent 62%),
+    color-mix(in srgb, color-mix(in srgb, var(--warn, #b45309) 14%, var(--card)) 55%, var(--card));
+}
+/* The clock breathes — 2.4s ease, guarded for reduced motion (the S71 icon-motion
+   recipe). Attention without alarm; the dashboard nudge's icon stays static (a nudge
+   is quieter than the full view's flag). */
+.pg-stale-banner .dash-stale-flag svg { animation: pg-stale-breathe 2.4s ease-in-out infinite; transform-origin: 50% 50%; }
+@keyframes pg-stale-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.72; transform: scale(0.94); }
+}
+.pg-stale-count {
+  font-size: var(--fs-xs, 0.78rem);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums; /* FA digits stay monospaced-stable on count flips */
+  white-space: nowrap;
+}
+/* The exit hatch: a quiet ghost pill — danger-red ONLY on interaction (the S71
+   trash-purge recipe; leaving a view is not a destructive act, but the hover/active
+   states acknowledge the click). Double-ring keyboard focus matches the S72 chip set. */
+.pg-stale-clear {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  margin-inline-start: auto;
+  padding: 0.3rem 0.7rem;
+  font-size: var(--fs-xs, 0.78rem); font-weight: 600;
+  color: var(--warn, #b45309);
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--warn, #b45309) 22%, var(--line));
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease, color .16s ease;
+}
+.pg-stale-clear svg { inline-size: 0.85rem; block-size: 0.85rem; flex: none; }
+.pg-stale-clear:hover, .pg-stale-clear:focus-visible {
+  border-color: color-mix(in srgb, var(--warn, #b45309) 55%, var(--line));
+  box-shadow: 0 2px 8px -3px rgb(0 0 0 / 0.14);
+  transform: translateY(-1px);
+}
+.pg-stale-clear:active { transform: translateY(0); }
+.pg-stale-clear:focus-visible {
+  outline: 2px solid var(--warn, #b45309);
+  outline-offset: 2px;
+}
+/* Mobile: the banner stacks; the exit hatch goes full-width (44px touch floor). */
+@media (max-width: 640px) {
+  .pg-stale-banner { flex-direction: column; align-items: stretch; gap: 0.45rem; }
+  .pg-stale-count { white-space: normal; }
+  .pg-stale-clear { margin-inline-start: 0; justify-content: center; min-block-size: 44px; }
+}
+/* The nudge's View-all link (dashboard): sits at the row's end, same quiet-arrow
+   pattern as the stat-box / urgent-strip links it joins. */
+.dash-stale-more {
+  margin-inline-start: auto;
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: var(--fs-xs, 0.78rem); font-weight: 600;
+  color: var(--warn, #b45309);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-sm, 6px);
+  transition: color .16s ease, background .16s ease;
+}
+.dash-stale-more svg { inline-size: 0.85rem; block-size: 0.85rem; }
+.dash-stale-more:hover, .dash-stale-more:focus-visible {
+  color: color-mix(in srgb, var(--warn, #b45309) 78%, var(--foreground));
+  background: color-mix(in srgb, var(--warn, #b45309) 10%, transparent);
+  outline: none;
+}
+.dash-stale-more:focus-visible {
+  outline: 2px solid var(--warn, #b45309);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .dash-stale-more { margin-inline-start: 0; }
+}
+/* RTL: the gradient flips (the rule above); the exit hatch and View-all margins
+   follow inline-start automatically via margin-inline. */
+/* Reduced motion: the breathing clock stops; the lifts flatten (the S72 recipe). */
+@media (prefers-reduced-motion: reduce) {
+  .pg-stale-banner .dash-stale-flag svg { animation: none; }
+  .pg-stale-clear, .pg-stale-clear:hover, .pg-stale-clear:focus-visible,
+  .dash-stale-more, .dash-stale-more:hover { transition: none; transform: none; }
+}
+/* High contrast: the ghost pill gains a real border + the count goes foreground. */
+@media (prefers-contrast: more) {
+  .pg-stale-clear { border-color: var(--warn, #b45309); color: var(--foreground); }
+  .pg-stale-count { color: var(--foreground); }
+}
+
+
+/* ==========================================================================
+   S76 — the honest filtered-miss empty state (projects search/tag miss). A search
+   that finds nothing is a RECOVERABLE state, not an absence: the icon dims, the
+   title balances, and the Clear-filters CTA carries a hover-lift + double-ring
+   focus so the way back reads as the primary affordance. The search icon itself
+   gets a slow "scan" drift on hover of the card (reduced-motion guarded).
+   ========================================================================== */
+.pg-filter-empty .empty-state-icon {
+  color: var(--muted);
+  opacity: 0.75;
+}
+.pg-filter-empty .empty-state-icon svg {
+  inline-size: 2.4rem;
+  block-size: 2.4rem;
+  stroke-width: 1.5;
+}
+.pg-filter-empty .empty-state-title {
+  text-wrap: balance;
+}
+.pg-filter-empty .empty-state-cta {
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.pg-filter-empty .empty-state-cta:hover,
+.pg-filter-empty .empty-state-cta:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px -4px rgb(0 0 0 / 0.18);
+}
+.pg-filter-empty .empty-state-cta:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+}
+.pg-filter-empty:hover .empty-state-icon svg {
+  animation: pg-scan-drift 1.6s ease-in-out infinite;
+}
+@keyframes pg-scan-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(0.35rem); }
+}
+[dir='rtl'] .pg-filter-empty:hover .empty-state-icon svg {
+  animation-name: pg-scan-drift-rtl;
+}
+@keyframes pg-scan-drift-rtl {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-0.35rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pg-filter-empty:hover .empty-state-icon svg { animation: none; }
+  .pg-filter-empty .empty-state-cta,
+  .pg-filter-empty .empty-state-cta:hover,
+  .pg-filter-empty .empty-state-cta:focus-visible { transition: none; transform: none; }
+}
+@media (prefers-contrast: more) {
+  .pg-filter-empty .empty-state-icon { opacity: 1; color: var(--text); }
+}
+
+/* --- S112: branded sketch-attach chip (quick-add) -----------------------------
+   The native <input type="file"> rendered as a bare UA "Choose File" button — the one
+   unstyled control in the capture sheet (mobile share-sheet QA, S112). The input is
+   now visually hidden inside a full-width chip label: paperclip glyph, idle hint,
+   filename once picked (has-file). The input STAYS in the layout (opacity 0, full
+   chip hit area) so clicks, keyboard focus and screen readers all reach it natively. */
+.qa-sketch-label { display: block; font-size: var(--fs-md); color: var(--muted); }
+.modal .qa-sketch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  border: 1.5px dashed var(--line-strong, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--card) 88%, var(--bg));
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.modal .qa-sketch:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--card)); }
+.modal .qa-sketch:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-style: solid;
+}
+.qa-sketch-icon { inline-size: 1.15rem; block-size: 1.15rem; flex: 0 0 auto; color: var(--accent); }
+.qa-sketch-text { font-size: var(--fs-md); color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qa-sketch-name {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal .qa-sketch.has-file { border-style: solid; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+.qa-sketch.has-file .qa-sketch-icon { color: var(--text); }
+.qa-sketch input[type="file"] {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0; /* kills the UA control's intrinsic size */
+}
+@media (prefers-reduced-motion: reduce) {
+  .qa-sketch { transition: none; }
+}

@@ -1,0 +1,1580 @@
+/* --- shadcn-style polish layer (2026-08-26 UI pass) -------------------------
+   One consistent interaction layer over every control, in pure tokens: quiet
+   placeholders, disabled field states, micro-transitions, thin scrollbars and
+   a branded text selection. No new dependencies, both themes, RTL-safe. */
+::placeholder { color: var(--muted); opacity: 1; }
+::selection { background: var(--pastel-tool); }
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--bg-soft);
+}
+button,
+.chip,
+.seg-btn,
+a,
+input,
+textarea,
+select {
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease, opacity 0.15s ease;
+}
+/* Thin, quiet scrollbars everywhere (shadcn-like chrome).
+   (o) 2026-09-07: Chrome 121+ makes the STANDARD scrollbar-width/scrollbar-color
+   properties TAKE PRECEDENCE over ::-webkit-scrollbar pseudo styling — the old
+   solid `scrollbar-color: var(--muted)` painted a near-black thumb in LIGHT mode
+   too (Ali: "the scroll is black"). Both engines now resolve to the same soft
+   translucent token tone; the webkit rules below stay as the legacy fallback. */
+:root { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 80%, transparent); border: 3px solid transparent; background-clip: padding-box; }
+
+/* --- Command Palette (Ctrl+K) — Phase B2.1 ----------------------------------- */
+/* Notion/Raycast-style command overlay. Dark backdrop, centered panel, keyboard-first.
+   Reuses existing design tokens (--bg, --card, --line, --text, --muted, --radius, --shadow-dropdown,
+   status badge classes). Theme-aware via the token system; no hard-coded colors. */
+dialog.cmdk {
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  padding: 0;
+  max-width: 640px;
+  width: calc(100vw - 2rem);
+  margin: 12vh auto auto;
+  box-shadow: var(--shadow-dropdown);
+  color: var(--text);
+}
+dialog.cmdk::backdrop {
+  background: rgb(0 0 0 / 0.4);
+  backdrop-filter: blur(4px);
+}
+.cmdk-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-dropdown);
+}
+.cmdk-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.cmdk-search-icon {
+  width: 1.2em;
+  height: 1.2em;
+  color: var(--muted);
+  flex: none;
+}
+.cmdk-input {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-lg);
+  outline: none;
+  padding: 0;
+}
+.cmdk-input::placeholder { color: var(--muted); }
+.cmdk-esc {
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: var(--bg-soft);
+  flex: none;
+}
+.cmdk-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* S70: the panel-foot hints bar — teaches the folder-chip modifier (Ctrl+Enter) that
+   role=option rows can't carry as a nested button. Muted, one line, never wraps into
+   two on 390px (gap collapses to 0.6rem there). */
+.cmdk-hints {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding: 0.45rem 0.75rem 0.5rem;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.cmdk-hints kbd {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  padding: 0.05rem 0.32rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg-soft);
+  color: var(--muted);
+}
+@media (max-width: 480px) {
+  .cmdk-hints { gap: 0.25rem 0.6rem; }
+}
+.cmdk-group {
+  padding: 0.35rem 0.6rem 0.15rem;
+  pointer-events: none;
+}
+/* S155: the command palette's group labels join the EYEBROW rung — 12px/500,
+   +0.03em, sentence case (was fs-xs/600/uppercase/0.04em). */
+.cmdk-group-label {
+  font-size: var(--text-eyebrow-size);
+  font-weight: var(--text-eyebrow-weight);
+  text-transform: none;
+  letter-spacing: var(--text-eyebrow-tracking);
+  color: var(--muted);
+}
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--fs-lg);
+  color: var(--text);
+  transition: background 0.08s ease;
+}
+.cmdk-item.is-selected,
+.cmdk-item:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+.cmdk-item.is-selected {
+  background: color-mix(in srgb, var(--brand) 22%, var(--card)); /* Session 19 (cron round 6): was 14% — too subtle (VLM-flagged). 22% reads as a clear selection. */
+  box-shadow: inset 3px 0 0 var(--brand); /* a left accent bar so the selected row is unmistakable */
+}
+.cmdk-icon {
+  flex: none;
+  width: 1.6em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.cmdk-item.is-selected .cmdk-icon { color: var(--brand); }
+.cmdk-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 0040 search depth: backlog + sadhana results show a secondary line (project name /
+   quadrant) so the source surface is identifiable. The label stays one line; the
+   sublabel is an inline muted suffix that wraps to a second line when space is tight. */
+.cmdk-label .cmdk-sublabel {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--muted);
+  white-space: normal;
+}
+.cmdk-hint {
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--bg-soft);
+  flex: none;
+}
+.cmdk-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+}
+/* Status badges in palette results — reuse existing badge classes, just size down */
+.cmdk-item .badge { font-size: var(--fs-xs); padding: 0.15rem 0.4rem; }
+
+/* S62: search-term highlight — the eye sees WHY a row matched. The mark inherits the
+   row's font (Persian renders identically); a soft brand-tinted underlay keeps AA
+   contrast on BOTH themes (selected rows invert text color, so color: currentColor
+   + a background wash works everywhere). Radius matches the app's chip language. */
+.cmdk-label mark.cmdk-mark {
+  color: inherit;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 4px;
+  padding: 0 0.08em;
+  font-weight: 600;
+}
+/* Selected rows already carry the accent wash — the mark deepens there so it stays
+   visible on the highlight (not washed out by it). */
+.cmdk-item.is-selected .cmdk-label mark.cmdk-mark {
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+}
+/* S62: starred-note chip in vault results — amber #e0a92e (same as the vault list's
+   hover star) with a hairline ring so it reads on both light and dark. */
+.cmdk-star {
+  color: #e0a92e;
+  font-size: var(--fs-sm);
+  margin-inline-end: 0.25rem;
+  text-shadow: 0 0 2px color-mix(in srgb, #e0a92e 35%, transparent);
+}
+/* S67: the vault row's FOLDER CHIP — clickable (→ /notes.html?view=folder&folder=<id>).
+   Reads as a chip, not text: hairline ring, folder glyph, soft bg. Hover/selected
+   states keep AA contrast on both themes (selected rows invert text color, so the
+   chip inherits currentColor and deepens its wash there — same recipe as cmdk-mark).
+   Cursor pointer + a subtle lift tell the mouse user it's a separate affordance. */
+.cmdk-folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  margin-inline-start: 0.45rem;
+  padding: 0.02rem 0.45rem 0.06rem;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 80%, transparent);
+  border-radius: 5px;
+  background: var(--bg-soft);
+  color: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  vertical-align: 1px;
+  cursor: pointer;
+  max-inline-size: 9rem;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, border-color 0.12s ease, translate 0.12s ease;
+}
+.cmdk-folder-chip .icon { width: 0.72rem; height: 0.72rem; flex: none; opacity: 0.7; }
+.cmdk-folder-chip .cmdk-folder-name { overflow: hidden; text-overflow: ellipsis; }
+.cmdk-item .cmdk-folder-chip:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-soft));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+  translate: 0 -1px;
+}
+.cmdk-item.is-selected .cmdk-folder-chip {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.cmdk-item.is-selected .cmdk-folder-chip:hover {
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmdk-folder-chip { transition: none; }
+  .cmdk-item .cmdk-folder-chip:hover { translate: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmdk-item { transition: none; }
+  dialog.cmdk::backdrop { backdrop-filter: none; }
+}
+
+/* --- Skeleton shimmer loaders (Phase B2.3) ----------------------------------- */
+/* Animated placeholder bars that match the shape of incoming content, replacing
+   plain "Loading…" text. The shimmer sweeps left-to-right; respects reduced-motion. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  min-height: 1em;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 8%, transparent), transparent);
+  animation: skel-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skel-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.skeleton-line { height: 0.85rem; margin-block-end: 0.5rem; }
+.skeleton-line.w-60 { width: 60%; }
+.skeleton-line.w-40 { width: 40%; }
+.skeleton-box {
+  height: 5rem;
+  border-radius: var(--radius);
+  margin-block-end: 0.75rem;
+}
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; opacity: 0.5; }
+}
+/* The htmx-indicator class hides skeletons until htmx fires the request; htmx adds
+   the .htmx-request class to the trigger element while loading, which we use to show
+   the skeleton. But our skeletons ARE the indicators, so they start visible and hide
+   on swap. The existing .loading.htmx-indicator pattern already handles this. */
+.skeleton-loading { padding: 1rem 0; }
+
+/* --- toast upgrade (Phase B2.4) ---------------------------------------------- */
+/* Action-button support: .toast-msg takes the flex space; buttons stay compact. */
+.toast-msg { flex: 1; min-inline-size: 0; }
+/* Error toasts get a subtle slide-in + a retry-friendly look */
+.toast.err { animation: toast-in 0.25s ease-out; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% - 0.5rem)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast.err { animation: none; }
+}
+
+/* ===========================================================================
+   Phase B2.5 — Empty states (consistent, illustrated)
+   Reusable empty-state component: icon + headline + helper text + optional CTA.
+   The old .empty is kept for backward compat; .empty-state is the new pattern.
+   =========================================================================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: transparent; /* 2026-09-02 user request: no fill behind empty states — minimal */
+  /* S46 (user request 2026-09-14): when an empty-state is the sole child of a CSS
+     grid (e.g. .shot-grid — repeat(auto-fill, minmax(9rem,1fr))), it was squeezed
+     into ONE 9rem cell and read as "compacted on the right" in Farsi. Spanning all
+     columns gives it full width so its centered content actually centers. No-op in
+     non-grid contexts (grid-column is ignored outside a grid container). */
+  grid-column: 1 / -1;
+  width: 100%;
+  box-sizing: border-box;
+}
+/* Session 19: empty-state was too faint (icon opacity .7 + near-invisible dashed border
+   read as a broken/empty box). Stronger icon + a visible-but-quiet border. */
+.empty-state-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--accent);
+  opacity: 0.9;
+}
+.empty-state-icon .icon { width: 100%; height: 100%; }
+.empty-state-title {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+.empty-state-text { margin: 0; max-width: 32ch; line-height: 1.6; margin-inline: auto; }
+.empty-state-cta {
+  margin-block-start: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+/* Override the old .empty when paired with .empty-state (the new one wins by specificity) */
+.empty-state.empty { padding: 3.5rem 1.5rem; }
+
+/* ===========================================================================
+   Phase B2.6 — Mobile responsiveness pass
+   44px touch targets, sticky footer with safe-area insets, mobile bottom-tab nav.
+   The bottom-tab nav appears ≤1024px (the header-less chrome cut) and is hidden
+   by default; it's shown via .has-mobile-nav on <body> (set by JS only when
+   the nav partial is present, so login/signup don't get a bottom bar).
+   =========================================================================== */
+.mobile-nav {
+  position: fixed;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: 50;
+  display: none;
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-block-start: 1px solid var(--line);
+  /* Fit flush to the bottom edge (user request 2026-08-29: "the sticky menu isn't
+     fully fit on the bottom"): block padding carries the gesture-bar safe area —
+     the old rule leaked safe-area-inset-bottom into the INLINE padding too, which
+     squeezed the tabs sideways on inset screens. S190: the block padding rises
+     0.3rem → 0.375rem so the active tab's filled shape sits ~6px off the bar's
+     outer edges — the S189 rail's 6–8px inset band, one shape language (the tile
+     still clears the 48px touch floor: 48 + 2×6 + 1px hairline = 61px bar). */
+  padding: 0.375rem 0.5rem calc(0.375rem + env(safe-area-inset-bottom, 0px));
+  justify-content: space-around;
+  align-items: stretch;
+}
+body.has-mobile-nav .mobile-nav { display: flex; }
+/* Room for the bar itself (3.5rem) + its safe-area inset, so page content can
+   never be trapped underneath (the old flat 3.5rem left the last row hidden on
+   inset screens — the other half of the "not fully fit" bug). S190: 3.75rem → 3.9rem
+   tracks the bar's taller block padding (61px bar vs 62.4px reserve — the invariant
+   holds with margin). */
+body.has-mobile-nav { padding-block-end: calc(3.9rem + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 1025px) {
+  .mobile-nav { display: none !important; }
+  body.has-mobile-nav { padding-block-end: 0; }
+}
+.mobile-nav a,
+.mobile-nav .mobile-nav-more {
+  flex: 1;
+  min-inline-size: 0; /* let long FA labels ellipsize instead of blowing out the row */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-block-size: 48px; /* touch target — S71: 44→48 (Material bottom-bar standard; WCAG floor was met, comfort wasn't) */
+  padding: 0.35rem 0.15rem;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: var(--fs-xs);
+  border-radius: var(--radius-sm);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+/* The "More" tab is a <button> (opens the sheet) — reset UA button chrome. */
+.mobile-nav .mobile-nav-more {
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.mobile-nav a:active { background: var(--nav-hover-bg); }
+.mobile-nav .mobile-nav-more:active { background: var(--nav-hover-bg); }
+/* S190 (the S189 follow-through): the bottom bar joins the rail's active SHAPE —
+   ONE active grammar app-wide. The active tab paints the SAME soft filled teal
+   (the --nav-active-* family: rgba(47,123,127,.14) light / rgba(143,204,207,.20)
+   dark — alpha on the background COLOR only, never the opacity property), the
+   ICON keeps the full teal (--nav-active-icon) and the LABEL steps one rung
+   further (--nav-active-label, 4.5:1+ on the blended tint — the bar's 92%-card
+   translucent surface bounded worst-case in qa/s190-mobile-active.mjs, both
+   themes). The tile IS the tab's own rounded box (--radius-sm 14px — geometry
+   unchanged, the tint is the change; the bar's 0.375rem block padding keeps the
+   shape ~6px off the bar's outer edges, the S189 rail's 6–8px inset band);
+   pressing an INACTIVE tab speaks the same teal at the hover whisper
+   (--nav-hover-bg 7%/10% — one hue family down the whole bar, --accent-soft
+   retires from it), pressing the ACTIVE tab deepens one notch
+   (--nav-active-bg-hover) so the shape never washes out under the finger. The
+   More tab when the current page lives in its sheet (S59: secondary pages keep
+   their position feedback) gets the SAME shape. The More-EXPANDED teal ink
+   RETIRES — one active pattern (the S188/S189 doctrine: the open sheet + its
+   backdrop is the indicator, aria-expanded keeps the semantics). */
+.mobile-nav a[aria-current="page"],
+.mobile-nav .mobile-nav-more[aria-current="page"] {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-icon);
+}
+.mobile-nav a[aria-current="page"]:active,
+.mobile-nav .mobile-nav-more[aria-current="page"]:active {
+  background: var(--nav-active-bg-hover);
+}
+.mobile-nav a[aria-current="page"] .mobile-nav-label,
+.mobile-nav .mobile-nav-more[aria-current="page"] .mobile-nav-label {
+  color: var(--nav-active-label);
+  font-weight: 600;
+}
+/* S190 a11y gap fix: keyboard focus rings for the BAR tabs — the More sheet's rows
+   had rings since S61, but the bar's own tabs had NONE (Tab-only users at mobile
+   widths got zero position feedback on the primary navigation). The ring is its
+   OWN separate 2px signal OUTSIDE the shape (offset 2px) — the tint never doubles
+   as focus, the S189 recipe. */
+.mobile-nav a:focus-visible,
+.mobile-nav .mobile-nav-more:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--brand));
+  outline-offset: 2px;
+}
+.mobile-nav a .icon,
+.mobile-nav .mobile-nav-more .icon { width: 1.35em; height: 1.35em; }
+/* Long FA labels (e.g. «لیست کارها») must never blow out the row. */
+.mobile-nav-label { line-height: 1; max-inline-size: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* P4.12 (F-L25): at 390px the FA 'لیست کارها' label ellipsized — allow 2-line wrap + smaller font. */
+@media (max-width: 430px) {
+  .mobile-nav-label { white-space: normal; font-size: 0.625rem; line-height: 1.1; }
+}
+
+/* Touch-target sizing for interactive elements on mobile (WCAG 2.5.5: ≥44px) */
+@media (max-width: 720px) {
+  .ghost, .btn { min-block-size: 44px; min-inline-size: 44px; }
+  .btn:not(.fab):not(.fab-item) { padding-block: 0.6rem; }
+  .ghost[aria-label] { padding: 0.5rem; }
+}
+
+/* S59 micro-interaction: tactile press feedback — primary controls answer the press
+   with a 3% squeeze so every click/tap has physical confirmation, matching the FAB's
+   existing 0.92 recipe. Guards: reduced-motion users get none of it; the FAB family
+   keeps its own richer scale; inputs/selects/textareas never scale (they aren't
+   momentary actions); large surfaces (cards) squeeze half as much — a big jump reads
+   as layout shift, not feedback. Applies instantly on :active (no transition needed —
+   the snap-back rides the existing background/color transitions). */
+@media (prefers-reduced-motion: no-preference) {
+  button:not(.fab):not(.fab-item):not(.fab-menu):active,
+  a.ghost:active,
+  .vault-quick:active,
+  .mobile-more-row:active {
+    transform: scale(0.97);
+  }
+  .vault-card:active { transform: scale(0.985); }
+}
+
+/* Sticky footer (existing pages already use main.shell; this makes the layout column
+   hold the footer to the bottom on short pages, per the UI rule). Hibana has no global
+   footer today, so this is a no-op until a footer is added — documented for the future. */
+/* Sticky-footer base (existing pages already use main.shell): the column keeps short
+   pages from collapsing. The old `.shell > :last-child { margin-block-start: auto }`
+   was removed (2026-08-29): no shell page ends in a footer, and the auto-margin shoved
+   short last blocks (e.g. the projects empty-state) to the bottom of the viewport —
+   a 160px dead zone between the filter bar and the "No projects yet" box. */
+.shell { min-block-size: calc(100vh - 4rem); display: flex; flex-direction: column; }
+
+/* ===========================================================================
+   Phase B2.7 — Subtle motion
+   FAB spring on open, card hover lift, drag ghost preview. All gated by
+   prefers-reduced-motion (the global guard at the top of this section already
+   zero-durations everything when the user opts out).
+   =========================================================================== */
+/* FAB: spring on click + expand */
+.fab { transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, box-shadow 0.18s ease; }
+.fab:active { transform: scale(0.92); }
+.fab-stack[data-fab] .fab-menu { transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.18s ease; transform-origin: bottom right; }
+.fab-stack[data-fab] .fab-menu[hidden] { transform: scale(0.85) translateY(0.5rem); opacity: 0; }
+
+/* Card hover lift — only on devices with hover (touchscreens skip it).
+   S105 (owner: "the projects boxes are too visually noisy"): the dashboard's
+   .stat-kanban-card is EXEMPT from the lift — it keeps only the quiet bg-soft
+   tint + border (dashboard.css); the lift stays for the projects/sparks cards. */
+@media (hover: hover) {
+  .project-card, .kanban-card, .dash-todo-quadrant {
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  }
+  .project-card:hover, .kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.12);
+    border-color: var(--line-strong);
+  }
+  /* the exemption itself (stat-kanban-card also carries .kanban-card) */
+  .stat-kanban-card, .stat-kanban-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+/* Drag ghost preview — the dragged card gets a slight tilt + reduced opacity */
+[draggable="true"]:global(.dragging),
+.dragging {
+  opacity: 0.6;
+  transform: scale(0.98) rotate(-1deg);
+  cursor: grabbing !important;
+}
+.drag-over {
+  outline: 2px dashed var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Toast slide-in (info too, not just err) */
+.toast { animation: toast-slide-in 0.22s ease-out; }
+@keyframes toast-slide-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% - 0.5rem)); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+  .fab:active { transform: none; }
+  .project-card:hover, .kanban-card:hover, .stat-kanban-card:hover { transform: none; box-shadow: none; }
+  .dragging { transform: none; }
+}
+
+/* --- Dashboard "today" summary strip (Phase B3.1) --------------------------- */
+.dash-today-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-inline-start: auto;
+  margin-inline-end: 0.75rem;
+}
+.dash-today-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  border: 1px solid var(--line);
+}
+.dash-today-chip .icon { width: 1em; height: 1em; color: var(--muted); }
+/* S85 (instruction #3): the Today chips join the fixed pastel role palette —
+   pinned = the unreviewed-blue role, solved-this-week = the working-green role
+   (polish-batch.css), overdue = the STATUS-orange register.
+   S179 (advisor block 13 — one color, one meaning): the overdue chip LEFT the red
+   danger register (red is now reserved for destructive actions + problem status
+   ONLY); overdue is a task's TIME status, so it wears the orange --warn pair
+   (orange = status-only). Icon + label still pair the hue (never color alone). */
+.dash-today-overdue {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: color-mix(in srgb, var(--warn) 78%, var(--text));
+  border-color: color-mix(in srgb, var(--warn) 32%, transparent);
+}
+.dash-today-overdue .icon { color: color-mix(in srgb, var(--warn) 78%, var(--text)); }
+.dash-today-pinned {
+  background: var(--badge-unreviewed-bg);
+  color: var(--badge-unreviewed-fg);
+  border-color: color-mix(in srgb, var(--badge-unreviewed-fg) 26%, transparent);
+}
+.dash-today-pinned .icon { color: var(--badge-unreviewed-fg); }
+@media (max-width: 560px) {
+  .dash-today-strip { margin-inline-start: 0; width: 100%; }
+}
+
+/* --- Project detail tabs (Phase B3.3) ---------------------------------------- */
+.detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-block-end: 1rem;
+  border-block-end: 1px solid var(--line);
+  padding-block-end: 0.5rem;
+}
+.detail-tab {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--text); /* Session 19: was --muted (too faint vs the bold active tab — VLM-flagged). Inactive tabs now use full text color at normal weight; the active one is distinguished by the bold weight + the brand underline. */
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  position: relative;
+  transition: color 0.12s ease, background 0.12s ease, font-weight 0.12s ease;
+  opacity: 0.72;
+}
+.detail-tab:hover { color: var(--text); background: var(--accent-soft); opacity: 1; }
+.detail-tab.is-active {
+  color: var(--text);
+  font-weight: 700;
+  opacity: 1;
+}
+.detail-tab.is-active::after {
+  content: '';
+  position: absolute;
+  inset-block-end: -0.5rem;
+  inset-inline: 0.5rem;
+  height: 2px;
+  background: var(--brand);
+  border-radius: 2px;
+}
+.detail-tab-count {
+  font-size: var(--fs-xs);
+  background: var(--accent-soft);
+  color: var(--muted);
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-weight: 500;
+}
+.detail-tab.is-active .detail-tab-count { background: var(--cta); color: var(--btn-text); } /* Session 20 (AA): white count on --brand fill was 3.1:1 — --cta is the white-text fill */
+.detail-panel { animation: tab-fade 0.18s ease-out; }
+.detail-panel[hidden] { display: none; }
+@keyframes tab-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail-panel { animation: none; }
+}
+@media (max-width: 560px) {
+  .detail-tab { font-size: var(--fs-md); padding: 0.45rem 0.6rem; }
+}
+
+/* --- Sadhana focus-mode animation polish (Phase B3.4) ------------------------ */
+/* The focus overlay fades + slides in instead of snapping. Backdrop gets a soft blur.
+   Gated by prefers-reduced-motion. */
+.sadhana-focus {
+  animation: focus-slide-in 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes focus-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes focus-slide-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sadhana-focus { animation: none; }
+}
+
+/* --- Settings tabs (Phase B3.5) --------------------------------------------- */
+/* The settings page is a long single scroll. These tabs let users jump between sections.
+   The JS is a tiny progressive enhancement: tabs scroll to + highlight the section, keeping
+   all existing forms/htmx wiring untouched (no panel hiding — the page stays accessible
+   without JS). */
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-block-end: 1px solid var(--line);
+  padding-block-end: 0.5rem;
+  margin-block-end: 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  padding-block: 0.5rem 0.5rem;
+}
+.settings-tab {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-lg);
+  padding: 0.45rem 0.85rem;
+  min-block-size: 2.5rem; /* F13 (session 9): ≥40px target — tabs are adjacent, so a real size (not a padded pseudo that would overlap the neighbors) */
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.settings-tab:hover { color: var(--text); background: var(--accent-soft); }
+.settings-tab.is-active { color: var(--text); font-weight: 600; background: var(--accent-soft); border-block-end: 3px solid var(--brand); }
+.settings-section { scroll-margin-block-start: 4rem; } /* room for the sticky tabs */
+/* Settings audit fixes (2026-09): consistent label-input alignment + readable helper text */
+.settings-section label { display: grid; gap: 0.3rem; align-items: start; }
+.settings-section label > span:not(.muted) { font-weight: 500; font-size: var(--fs-sm); }
+.settings-section label > .muted.small { color: var(--muted); font-size: var(--fs-xs); line-height: 1.4; opacity: 0.9; }
+.settings-section select, .settings-section input[type="text"], .settings-section input:not([type]) {
+  font: inherit; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--card); color: var(--text); inline-size: 100%;
+}
+.settings-section select:hover, .settings-section input:hover { border-color: var(--line-strong); }
+/* S89: the offline-sync row in Settings → Preferences — the badge's ONE home now
+   (it left the rail + brand bar). Same label/hint rhythm as the section's <label>
+   rows, but a flex row so the amber retry chip (hidden while the queue is empty —
+   hib-init.js paints it) sits opposite the copy. The status line carries an amber
+   tint while captures wait (.is-waiting) so the row reads at a glance. */
+.settings-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+}
+.settings-sync-copy { display: grid; gap: 0.25rem; align-items: start; min-inline-size: 0; }
+.settings-sync-copy > span:first-child { font-weight: 500; font-size: var(--fs-sm); }
+.settings-sync-copy .muted.small { color: var(--muted); font-size: var(--fs-xs); line-height: 1.4; opacity: 0.9; }
+.settings-sync-copy .muted.small.is-waiting {
+  color: var(--warn, #b45309);
+  font-weight: 600;
+  opacity: 1;
+}
+.settings-sync-retry { flex: none; } /* keeps the amber pill from squeezing on narrow cards */
+@media (max-width: 560px) {
+  .settings-tab { font-size: var(--fs-md); padding: 0.4rem 0.6rem; }
+}
+
+/* --- Reports calendar heatmap (Phase B3.6) ----------------------------------- */
+/* GitHub-style contribution grid: 13 weeks × 7 days, color-graded by activity level. */
+.heatmap {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+.heatmap-col {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+  position: relative;
+}
+/* S55: month label above a column (GitHub-style) — a week that starts a month gets
+   its name; FA shows the Jalali month. Sits in the row of padding the .heatmap
+   container now reserves above the grid. */
+.heatmap { padding-block-start: 1.05rem; }
+.hm-month {
+  position: absolute;
+  inset-block-start: -1.05rem;
+  inset-inline-start: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  white-space: nowrap;
+  line-height: 1;
+  pointer-events: none;
+}
+.heatmap-cell {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  transition: transform 0.1s ease;
+}
+.heatmap-cell:hover { transform: scale(1.25); }
+.heatmap-l0 { background: var(--accent-soft); }
+.heatmap-l1 { background: color-mix(in srgb, var(--color-success) 35%, var(--accent-soft)); }
+.heatmap-l2 { background: color-mix(in srgb, var(--color-success) 60%, var(--accent-soft)); }
+.heatmap-l3 { background: color-mix(in srgb, var(--color-success) 85%, transparent); }
+.heatmap-l4 { background: var(--color-success); }
+
+/* S55: rich heatmap tooltip — the 4-source breakdown card, shown on hover and
+   :focus-visible (tabindex rides every real cell). Anchored above the cell and
+   horizontally centered; edge columns clamp so the card never leaves the card
+   body. RTL needs no flip — centered is symmetric — but the rows' icon/count
+   order follows direction automatically via flex + logical gap. */
+.heatmap-cell { position: relative; outline: none; }
+.heatmap-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hm-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  min-width: 11.5rem;
+  padding: 0.55rem 0.7rem 0.5rem;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 10px 28px rgba(38, 33, 24, 0.16), 0 2px 6px rgba(38, 33, 24, 0.08);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ink);
+  text-align: start;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  z-index: 40;
+}
+.heatmap-cell:hover .hm-tip,
+.heatmap-cell:focus-visible .hm-tip,
+.heatmap-cell:focus .hm-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+/* caret pointing back at the cell */
+.hm-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--line-strong);
+}
+.hm-tip-date {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px dashed var(--line);
+}
+.hm-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-block: 1.5px;
+  color: var(--ink);
+}
+.hm-tip-row b { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.hm-tip-row.is-zero { color: var(--muted); opacity: 0.62; }
+.hm-tip-row.is-zero b { color: var(--muted); }
+.hm-tip-ico {
+  display: inline-flex;
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: none;
+  color: var(--accent);
+}
+.hm-tip-ico svg { width: 100%; height: 100%; }
+.hm-tip-total {
+  display: block;
+  margin-top: 0.35rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.72rem;
+  color: var(--color-success);
+}
+/* edge columns: pull the card inward so it never overflows the card body */
+.heatmap-col:first-child .hm-tip { left: 0; transform: translateX(0) translateY(3px); }
+.heatmap-col:first-child .heatmap-cell:hover .hm-tip,
+.heatmap-col:first-child .heatmap-cell:focus-visible .hm-tip,
+.heatmap-col:first-child .heatmap-cell:focus .hm-tip { transform: translateX(0) translateY(0); }
+.heatmap-col:first-child .hm-tip::after { left: 10px; }
+.heatmap-col:last-child .hm-tip { left: auto; right: 0; transform: translateX(0) translateY(3px); }
+.heatmap-col:last-child .heatmap-cell:hover .hm-tip,
+.heatmap-col:last-child .heatmap-cell:focus-visible .hm-tip,
+.heatmap-col:last-child .heatmap-cell:focus .hm-tip { transform: translateX(0) translateY(0); }
+.heatmap-col:last-child .hm-tip::after { left: auto; right: 10px; }
+/* top row of a column: the card has no room above on the first weeks — flip below */
+.heatmap-col .heatmap-cell:nth-child(-n+2) .hm-tip {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+.heatmap-col .heatmap-cell:nth-child(-n+2) .hm-tip::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: var(--line-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hm-tip { transition: none; }
+}
+
+.heatmap-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-block-start: 0.5rem;
+  /* Session 19: separate the Less/More labels from the swatch ramp so they read as
+     caption + scale, not a continuous run. */
+  gap: 0.4rem;
+}
+.heatmap-legend [data-i18n="reports.less"],
+.heatmap-legend [data-i18n="reports.more"] { margin-inline: 0.25rem; font-weight: 500; }
+.heatmap-legend .heatmap-cell { width: 11px; height: 11px; }
+/* Session 19: weekday hint under the heatmap — a tiny Sat-row tick so the 7-row grid
+   reads as a calendar week, not abstract squares. Added by reports.html render.
+   Review-round 2 (2026-09-12): was 0.55rem + opacity .7 — VLM audit flagged the labels
+   as nearly invisible in dark mode (8.8px text at ~4.6:1 effective reads as noise).
+   Size up to 0.62rem and drop the stacked opacity — var(--muted) is already the soft
+   tone; stacking two reductions double-dimmed it. */
+.heatmap-weekdays { display: flex; gap: 3px; margin-block-start: 0.15rem; font-size: 0.62rem; color: var(--muted); font-weight: 500; }
+.heatmap-weekdays span { width: 13px; text-align: center; }
+@media (prefers-reduced-motion: reduce) {
+  .heatmap-cell:hover { transform: none; }
+}
+@media (max-width: 560px) {
+  .heatmap-cell { width: 10px; height: 10px; }
+}
+
+
+/* --- Review-round 2 feature: reports digest export row ---------------------- */
+/* Two ghost buttons under the page h1. Icon + label inline (the base .row handles the
+   gap); on narrow screens the row wraps instead of overflowing. The icons inherit the
+   button's --link color and dim slightly on the disabled (data-still-loading) state. */
+.export-actions { flex-wrap: wrap; }
+.export-actions .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.export-actions button:disabled { opacity: 0.55; cursor: default; }
+
+
+/* --- S50: the Trash panel (Settings → Data) ---------------------------------- */
+/* The user-facing view of the 7-day soft-delete window: one row per recoverable
+   item, icon + title + (kind · purge countdown) + Restore. Rows use the card
+   surface + logical properties so RTL mirrors for free; the urgent tint marks
+   items the next cron purge will destroy (days_left ≤ 1). Restore animates the
+   row away (opacity + slide toward the inline start) under no-reduced-motion. */
+.trash-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.trash-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.trash-ico {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--bg);
+}
+.trash-ico .icon { inline-size: 1rem; block-size: 1rem; }
+.trash-body { flex: 1 1 auto; min-inline-size: 0; }
+.trash-title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trash-meta { margin-block-start: 0.1rem; }
+/* days_left ≤ 1: the next purge run destroys it — amber per the semantic scale.
+   (S52 fix: this rule originally referenced var(--warn), which was NOT a defined
+   token anywhere — the declaration silently fell back to the inherited muted
+   color and the urgency tint never rendered. It then rode --badge-queued-fg as
+   the amber semantic; S137 re-hued that token to the Up Next slate-teal, so the
+   warning amber lives on --warn (defined, AA in both themes) again.) */
+.trash-meta.is-urgent { color: var(--warn); font-weight: 500; }
+.trash-restore { flex: 0 0 auto; }
+.trash-empty { padding: 0.4rem 0 0.2rem; }
+.trash-item.is-restoring {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trash-item.is-restoring { transition: none; }
+}
+@media (max-width: 560px) {
+  .trash-item { padding: 0.55rem 0.6rem; gap: 0.5rem; }
+  .trash-ico { inline-size: 1.75rem; block-size: 1.75rem; }
+}
+
+/* S71: trash purge actions — "Delete forever" per row + "Empty trash" in the header.
+   The danger recipe follows the app's semantic scale (a red tint the moment the
+   button is ARMED — the two-click confirm makes the state change unmistakable). */
+.trash-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.trash-head-row h3 { margin: 0; }
+.trash-actions { display: inline-flex; align-items: center; gap: 0.4rem; flex: 0 0 auto; flex-wrap: wrap; }
+.trash-purge { color: var(--err); }
+.trash-purge:hover, .trash-purge:focus-visible { border-color: var(--err); }
+.trash-purge.is-armed, .trash-empty-btn.is-armed {
+  background: #A33B3B;
+  border-color: #8A2F2F;
+  color: #fff;
+}
+.trash-empty-btn { color: var(--muted); }
+.trash-empty-btn:hover:not(:disabled) { border-color: var(--err); color: var(--err); }
+@media (max-width: 560px) {
+  .trash-actions { flex-direction: column; align-items: stretch; }
+}
+/* --- S52: streak trio (Reports — above the heatmap) -------------------------
+   Three compact cards: current streak (flame, warms up while alive), longest
+   streak (trophy), active days (calendar-check, "n / 91"). Logical properties
+   throughout so RTL mirrors for free; the value + unit sit on one line with the
+   label as a muted suffix that wraps under on narrow screens. */
+.streak-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-block-end: 0.4rem;
+}
+.streak-card {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  min-inline-size: 0;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+.streak-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: 999px;
+  flex: none;
+  color: var(--muted);
+  background: var(--bg);
+}
+.streak-ico .icon { inline-size: 1.1rem; block-size: 1.1rem; }
+.streak-nums {
+  font-size: var(--fs-md);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.streak-nums b { font-size: 1.2em; font-weight: 700; }
+.streak-unit { color: var(--muted); font-size: var(--fs-xs); }
+.streak-of { color: var(--muted); font-size: 0.9em; font-weight: 400; }
+.streak-label {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* Alive flame — the orange semantic hue tints icon + card so the eye finds the
+   streak first. Dormant (current = 0) stays neutral: no false urgency. */
+.streak-fire.is-alive {
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
+  background: color-mix(in srgb, var(--warn) 9%, var(--accent-soft));
+}
+.streak-fire.is-alive .streak-ico { color: var(--warn); }
+/* S55: milestone micro-celebration — the flame flickers and a chip pops in.
+   Milestone days are 3/7/14/30/60/100/365; a milestone streak earns a warm halo
+   (soft radial glow behind the card), the flame gets a subtle 3-step flicker,
+   and the chip scales in with a spring-y overshoot. Reduced-motion flattens. */
+.streak-fire.is-milestone {
+  border-color: color-mix(in srgb, var(--warn) 62%, var(--line));
+  background:
+    radial-gradient(120% 140% at 18% 0%,
+      color-mix(in srgb, var(--warn) 16%, transparent) 0%,
+      transparent 62%),
+    color-mix(in srgb, var(--warn) 9%, var(--accent-soft));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--warn) 18%, transparent);
+}
+.streak-fire.is-milestone .streak-ico {
+  background: color-mix(in srgb, var(--warn) 14%, var(--bg));
+  animation: hm-flame 1.6s ease-in-out infinite;
+}
+.streak-fire.is-milestone .streak-nums b { color: var(--warn); }
+.streak-mile {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  animation: hm-chip-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes hm-flame {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.12) rotate(-3deg); }
+  60% { transform: scale(0.96) rotate(2deg); }
+  80% { transform: scale(1.06) rotate(-1deg); }
+}
+@keyframes hm-chip-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.streak-hint { margin-block-end: 0.75rem; }
+@media (max-width: 560px) {
+  .streak-card { padding: 0.45rem 0.7rem; gap: 0.45rem; flex: 1 1 46%; justify-content: center; }
+  .streak-fire { flex-basis: 100%; }
+  .streak-label { display: none; }  /* value + icon carry the meaning at phone width */
+}
+@media (prefers-reduced-motion: reduce) {
+  .streak-card { transition: none; }
+  .streak-fire.is-milestone .streak-ico { animation: none; }
+  .streak-mile { animation: none; }
+}
+
+
+/* --- S52: whiteboard skeleton (ghost sticky notes on the paper) --------------
+   The notebook page was the last surface booting on a spinner+text pill. Four
+   ghost sticky notes — varied widths, a touch of rotation so they read as notes
+   scattered on a desk rather than a loading grid — shimmer on the same .skeleton
+   base every other list page uses. The wrapper keeps data-board-loading (the
+   whiteboard.js removal + e2e detach contract); the sr-only line keeps the
+   localized "Loading sheet…" for screen readers. */
+.nb-sk {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem 1.5rem;
+  padding: 2rem;
+}
+.nb-sk-note {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  inline-size: 168px;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--accent-soft);
+  box-shadow: 3px 8px 18px rgba(0, 0, 0, 0.09);
+}
+.nb-sk-note:nth-child(2) { inline-size: 138px; rotate: 1.5deg; }
+.nb-sk-note:nth-child(3) { inline-size: 152px; rotate: -2deg; }
+.nb-sk-note:nth-child(4) { inline-size: 126px; rotate: 2.5deg; }
+.nb-sk-line { block-size: 0.7rem; }
+@media (max-width: 560px) {
+  .nb-sk { gap: 0.9rem 1.1rem; padding: 1.25rem; }
+  .nb-sk-note { inline-size: 132px; }
+  .nb-sk-note:nth-child(4) { display: none; } /* 2×2 fits a phone; the 4th wraps alone */
+}
+@media (prefers-reduced-motion: reduce) {
+  .nb-sk-note { rotate: none; } /* the tilt is decoration — flat under reduced motion */
+}
+
+
+/* --- S50: skeleton widening (sparks shelf + reports summary/feed) -------------
+   The sparks shelf's spinner row and the reports page's «Loading…» lines adopt
+   the projects-page skeleton pattern (same .skeleton shimmer base) so every
+   list surface reads as "content is coming". The sparks cards mimic the shelf's
+   idea-card grid; the reports shapes mimic the stat-strip + the two snapshot
+   stat-boxes + the activity feed rows. All aria-hidden — an sr-only sibling
+   carries the status text for screen readers. */
+.sk-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface, var(--accent-soft));
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-block-size: 6.5rem;
+}
+.sk-card-ico { inline-size: 2rem; block-size: 2rem; border-radius: 999px; margin-block-end: 0.2rem; }
+/* reports: the summary snapshot — a row of stat pills, then the two boxes */
+.sk-stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+.sk-stat-pill { inline-size: 6.2rem; block-size: 1.7rem; border-radius: 999px; }
+.sk-stat-boxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  padding: 0.35rem 0 0.5rem;
+}
+.sk-stat-box {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface, var(--accent-soft));
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+/* reports: the activity feed — three item rows (icon + two lines) */
+.sk-feed-rows { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.sk-feed-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.sk-feed-ico { inline-size: 2rem; block-size: 2rem; border-radius: 999px; flex: none; }
+.sk-feed-lines { flex: 1 1 auto; min-inline-size: 0; }
+.sk-feed-lines .skeleton-line { margin-block-end: 0.45rem; }
+
+/* landmark-ghost (S51-A): a <main> wrapper that exists ONLY as an accessibility
+   landmark. display:contents removes its box entirely, so the flex-column layout
+   of body.canvas-page (canvas + notebook pages) is byte-identical — the toolbar
+   and the board remain direct flex items of <body>. Modern browsers keep the
+   element's role/landmark in the a11y tree despite the missing box. */
+.landmark-ghost { display: contents; }
+
+/* ---- S51-B: shortcuts help v2 — section headers ----------------------------------
+   The ? overlay is now grouped (General / Navigate / Notes & to-dos / In the
+   palette) instead of one flat list. Section headers are non-interactive list
+   items: small caps, muted, spaced — they group, they don't compete with rows. */
+.cmdk-help-sec {
+  padding: 0.7rem 0.9rem 0.25rem;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  user-select: none;
+}
+.cmdk-help-sec:first-child { padding-top: 0.4rem; }
+/* Help rows are presentation-only (role=presentation) — no pointer cursor, the
+   default .cmdk-item affordance is for the interactive palette list. */
+.cmdk-help-panel .cmdk-item { cursor: default; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   S85 — "Continue where you left off" (merged component, job #2: never lose
+   your place). The ONE resume surface: the server "Resume work" card was removed
+   (two components, one project, two different timestamps, no explanation — a
+   Nielsen #6 break). Renders inside main.shell-dash on the dashboard only;
+   entries come from localStorage (js/resume.js — last OPENED, the single
+   "last touched" definition used everywhere). Structure: SECTION (the head row
+   ABOVE the card) → CARD (hero entry — the newest, banner-grade: glyph +
+   kind·stage·timeAgo + title + Open CTA → the S181 summary line + progress bar →
+   up to 3 smaller chips).
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* S97 (the flat-card system, B): the strip is a PLAIN card — the old 5%-accent
+   gradient top veil + the soft drop shadow retired with the app-wide flat round
+   (the gradient was already cascade-dead in light: notifications.css's .card
+   painted over it at equal specificity from a later sheet; now it's honestly
+   solid). Hover feedback lives on the hero rows (border-deepening only).
+   S183 (the depth audit — L2 realized): the head rides INSIDE the card as the
+   header strip (dashboard.css's .card > .dash-sec-head — full-bleed + hairline,
+   the one grammar every dashboard section now speaks); the card's padding
+   retires to 0 (the strip + the body blocks pad themselves), and the radius
+   joins the section-card language (--radius — the notebook/todo panel register). */
+.resume-strip.card {
+  padding: 0;
+  margin-block-end: 0; /* S184: the main flex gap owns the card's outside beat */
+  display: flex; flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+/* S184 (the layout audit, item 2 — the Continue card's foot): ONE 1rem inset on
+   the strip + body blocks (matching every other panel), and the chips row gets a
+   REAL foot — the old 0.15rem clobber (from the scrollbar-clearance rule further
+   down this sheet) left the tiles ~2px off the card's bottom edge, and the hero
+   sat directly on the chips row. Now: hero → 0.75rem (12px) → chips → 1rem (16px,
+   equal to the side inset). No fixed heights anywhere on the card (natural flow). */
+.resume-strip > .dash-sec-head { padding-inline: 1rem; }
+.resume-strip > *:not(.dash-sec-head) { padding-inline: 1rem; }
+.resume-body { padding-block-start: 0.75rem; }
+.resume-row { padding-block: 0.75rem 1rem; }
+/* S183: the LAST-section foot — the row's block-end padding gives the chips'
+   breathing room; when the row is absent (single entry), the body carries it. */
+.resume-strip > .resume-body:not(:last-child) { padding-block-end: 0; }
+.resume-strip > .resume-body:last-child { padding-block-end: 1rem; }
+/* S181 (opening block 2) → S183: the head now rides INSIDE the card (see above —
+   the S181 above-card placement retired with the S179 pattern). This sheet styles
+   only the hint riding the head's actions row. */
+.resume-hint { font-size: 0.78rem; }
+
+/* S183 (owner request — "remove this progress bar"): the hero's "{n} of {m} tasks
+   done" line + the 6px meter RETIRE with their markup (resume.js) + the
+   resume.progress i18n key. No .resume-progress* rules ship anymore. */
+
+/* S85: the HERO entry — the newest item, banner-grade. Inherits the deleted
+   "Resume work" card's visual DNA (accent-edged panel, glyph tile, prominent
+   title, explicit Open CTA) but sourced from the ONE shared last-opened store.
+   Desktop: one full-width row; phone: same, CTA stays reachable (≥44px). */
+/* S85: the HERO entry — the newest item, banner-grade. S97 (the flat-card system,
+   B): the hero's priority fill was a SOLID 8% accent veil + the 4px lead bar.
+   S179 (advisor block 6 — surface tokens): the TINT RETIRES — the hero row rides
+   the plain CARD surface like every other row (three surfaces total; the sticky
+   yellows are the only tinted ones). The 4px accent lead bar STAYS (a bar is an
+   accent, not a surface — and block 16 explicitly keeps border-inline-start bars);
+   the border goes neutral. Hover still deepens the border only; the focus ring stays. */
+.resume-hero {
+  display: flex; align-items: center; gap: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--surface-card, var(--card));
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--accent);
+  border-radius: 12px;
+  text-decoration: none; color: inherit;
+  transition: border-color .16s ease;
+}
+.resume-hero:hover, .resume-hero:focus-visible {
+  border-color: var(--line-strong);
+  outline: none;
+}
+.resume-hero:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--card),
+    0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.resume-hero-body { flex: 1 1 auto; min-inline-size: 0; display: flex; flex-direction: column; gap: 0.18rem; }
+.resume-hero-kicker { font-size: 0.72rem; color: var(--muted); display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.resume-hero-time { font-variant-numeric: tabular-nums; }
+.resume-hero-title {
+  font-size: 1.02rem; font-weight: 650; line-height: 1.25; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.resume-hero-cta {
+  flex: none;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  min-block-size: 2.75rem; /* ≥44px touch target (the 42px computed at 2.4rem missed the bar) */
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem; font-weight: 600;
+  background: var(--cta); color: var(--btn-text);
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+.resume-hero-cta .icon { inline-size: 1rem; block-size: 1rem; transition: translate .15s ease; }
+.resume-hero:hover .resume-hero-cta .icon { translate: 2px 0; }
+[dir='rtl'] .resume-hero:hover .resume-hero-cta .icon { translate: -2px 0; }
+
+/* S85: the hero's stage badge — the fixed pastel role chip (the same
+   --badge-*-bg/-fg contract every badge/board pill speaks; dark text on the
+   pastel fill, light fg in dark theme via the theme token flip). */
+.resume-stage-badge {
+  display: inline-flex; align-items: center; gap: 0.28rem;
+  padding: 0.06rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem; font-weight: 600; line-height: 1.5;
+  background: var(--badge-bg, var(--bg-soft));
+  color: var(--badge-fg, var(--muted));
+  border: 1px solid color-mix(in srgb, var(--badge-fg, var(--muted)) 24%, transparent);
+}
+.resume-stage-badge svg { inline-size: 0.8rem; block-size: 0.8rem; flex: none; }
+.resume-stage-badge.badge-spark        { --badge-bg: var(--badge-spark-bg);         --badge-fg: var(--badge-spark-fg); }
+.resume-stage-badge.badge-planning { --badge-bg: var(--badge-planning-bg); --badge-fg: var(--badge-planning-fg); }
+.resume-stage-badge.badge-queued      { --badge-bg: var(--badge-queued-bg);      --badge-fg: var(--badge-queued-fg); }
+.resume-stage-badge.badge-developing         { --badge-bg: var(--badge-developing-bg);         --badge-fg: var(--badge-developing-fg); }
+.resume-stage-badge.badge-awaiting_dev        { --badge-bg: var(--badge-awaiting_dev-bg);        --badge-fg: var(--badge-awaiting_dev-fg); }
+.resume-stage-badge.badge-operational   { --badge-bg: var(--badge-operational-bg);   --badge-fg: var(--badge-operational-fg); }
+
+.resume-row { display: flex; gap: 0.65rem; overflow-x: auto; scrollbar-width: thin; } /* S184: the 0.15rem foot clobber is RETIRED — the 0.75rem 1rem block padding above owns the beat (the thin scrollbar rides inside the 1rem foot) */
+
+.resume-chip {
+  flex: 0 1 15rem; min-inline-size: 11.5rem; max-inline-size: 16.5rem;
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  /* S127 (owner): the chip fill was var(--bg) — the PAGE gray (#E7E7E7) — which
+     on the white strip card read heavier than the hero veil right above it.
+     Now the hero's own recipe at HALF strength: 4% accent over card (hero rests
+     at 8%), border in the same family at 14% (hero 30%) — the resting ladder
+     chip < hero holds in BOTH themes (in dark the old var(--bg) rendered the
+     chips DARKER than the card they sat on; the mix lifts them onto it). */
+  background: color-mix(in srgb, var(--accent) 4%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--line));
+  border-radius: 12px;
+  text-decoration: none; color: inherit;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease, background-color .16s ease;
+}
+.resume-chip:hover, .resume-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: 0 3px 10px rgba(38, 33, 24, 0.08);
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card)); /* deepen the tint, never whiten — the resting base is tinted now */
+  outline: none;
+}
+.resume-chip:active { transform: translateY(0); box-shadow: 0 1px 3px rgba(38, 33, 24, 0.07); }
+
+.resume-chip-ico {
+  inline-size: 2.3rem; block-size: 2.3rem; flex: none;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.resume-chip-ico svg { inline-size: 1.2rem; block-size: 1.2rem; }
+.resume-chip-ico.is-note { background: color-mix(in srgb, #8B5CF6 10%, transparent); color: #7C4DD8; }
+/* S119: the spark kind — the brand spark dot's yellow family (amber ink for
+   contrast on light; the 16% mix keeps the dark ground honest, the is-note pattern). */
+.resume-chip-ico.is-spark { background: color-mix(in srgb, #FDE047 16%, transparent); color: #D97706; }
+
+.resume-chip-body { flex: 1 1 auto; min-inline-size: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.resume-chip-title {
+  font-size: 0.88rem; font-weight: 600; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.resume-chip-meta { font-size: 0.73rem; color: var(--muted); white-space: nowrap; }
+
+/* Phone: hero wraps its CTA under the text; chips go full-width, snap scroll.
+   S183: the card padding is 0 now — the head strip + body blocks pad themselves;
+   the mobile register just narrows their inline padding. */
+@media (max-width: 720px) {
+  .resume-strip > .dash-sec-head { padding-inline: 1rem; }
+  .resume-strip > *:not(.dash-sec-head) { padding-inline: 1rem; }
+  .resume-hero { gap: 0.6rem; padding: 0.7rem 0.75rem; }
+  .resume-hero-title { font-size: 0.95rem; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .resume-hero-cta { min-block-size: 2.4rem; padding-inline: 0.7rem; }
+  .resume-row { scroll-snap-type: x proximity; gap: 0.55rem; }
+  .resume-chip { flex: 0 0 78%; scroll-snap-align: start; }
+  .resume-chip-title { font-size: 0.85rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resume-chip, .resume-hero { transition: none; }
+  .resume-chip:hover, .resume-chip:focus-visible,
+  .resume-hero:hover, .resume-hero:focus-visible { transform: none; }
+  .resume-hero-cta .icon, .resume-hero:hover .resume-hero-cta .icon { transition: none; translate: 0 0; }
+}
+
+/* S72 — Resume strip "Clear" button (completes the S71 feature: history was
+   record-only with no way to reset). Quiet ghost pill at the header's far end;
+   danger red only ON INTERACTION (the S71 trash-purge recipe — destructive
+   affordance without painting the resting state). */
+.resume-clear {
+  margin-inline-start: auto;
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem; font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color .16s ease, border-color .16s ease, background-color .16s ease;
+}
+.resume-clear svg { inline-size: 0.85rem; block-size: 0.85rem; flex: none; }
+.resume-clear:hover, .resume-clear:focus-visible {
+  color: var(--err, #c0392b);
+  border-color: color-mix(in srgb, var(--err, #c0392b) 35%, transparent);
+  background: color-mix(in srgb, var(--err, #c0392b) 7%, transparent);
+  outline: none;
+}
+.resume-clear:active { transform: translateY(1px); }
+@media (prefers-reduced-motion: reduce) { .resume-clear { transition: none; } }
+
+/* S72 styling batch — keyboard focus + scroll affordance + forced-contrast. */
+
+/* Keyboard focus ring on resume chips: the S71 hover-lift alone was hard to SEE as
+   a focus indicator (lift + border only). Double-ring: card-colored gap + accent
+   ring — visible on any background, WCAG 2.2 focus-appearance friendly. */
+.resume-chip:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--card),
+    0 0 0 4px color-mix(in srgb, var(--accent) 55%, transparent),
+    0 3px 10px rgba(38, 33, 24, 0.08);
+}
+.resume-clear:focus-visible {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px color-mix(in srgb, var(--err, #c0392b) 40%, transparent);
+}
+
+/* Scroll-edge fades for the horizontal chip rows (resume strip on phones). Pure
+   CSS scroll-driven animation — the fade appears ONLY on the side that actually
+   has more content. @supports-guarded: browsers without animation-timeline get
+   the plain row (no fade, no harm). The keyframes sweep a two-stop mask from
+   "left edge faded" (scroll start) through "no fade" (middle) to "right edge
+   faded" (scroll end). */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .resume-row.is-scrollable, .dash-stale-chips.is-scrollable {
+      animation: resume-edge-fade linear both;
+      animation-timeline: scroll(inline nearest);
+    }
+  }
+}
+@keyframes resume-edge-fade {
+  0%   { -webkit-mask-image: linear-gradient(to right, transparent, #000 7%); mask-image: linear-gradient(to right, transparent, #000 7%); }
+  15%  { -webkit-mask-image: linear-gradient(to right, #000, #000); mask-image: linear-gradient(to right, #000, #000); }
+  85%  { -webkit-mask-image: linear-gradient(to right, #000, #000); mask-image: linear-gradient(to right, #000, #000); }
+  100% { -webkit-mask-image: linear-gradient(to right, #000, transparent 93%); mask-image: linear-gradient(to right, #000, transparent 93%); }
+}
+/* RTL: "to right" flips meaning — the SAME keyframes are direction-correct because
+   the mask is geometric (right edge = inline-end in LTR, but inline-START in RTL).
+   Flip explicitly for [dir="rtl"] so the fade follows the reading direction. */
+[dir="rtl"] .resume-row.is-scrollable, [dir="rtl"] .dash-stale-chips.is-scrollable {
+  animation-name: resume-edge-fade-rtl;
+}
+@keyframes resume-edge-fade-rtl {
+  0%   { -webkit-mask-image: linear-gradient(to left, transparent, #000 7%); mask-image: linear-gradient(to left, transparent, #000 7%); }
+  15%  { -webkit-mask-image: linear-gradient(to left, #000, #000); mask-image: linear-gradient(to left, #000, #000); }
+  85%  { -webkit-mask-image: linear-gradient(to left, #000, #000); mask-image: linear-gradient(to left, #000, #000); }
+  100% { -webkit-mask-image: linear-gradient(to left, #000, transparent 93%); mask-image: linear-gradient(to left, #000, transparent 93%); }
+}
+
+/* Multi-line headings wrap evenly (Chromium 114+; harmless no-op elsewhere).
+   S181: the resume head joined the one-section pattern — its title rides the
+   shared .dash-sec-title now (the S179 selector family below covers it). */
+.dash-stale-flag, .dash-projects-head h2, .dash-sec-title { text-wrap: balance; }
+
+/* Forced-contrast mode: hairline borders become solid ink so the chip rows stay
+   perceivable without the soft shadows. */
+@media (prefers-contrast: more) {
+  .resume-chip, .dash-stale-chip { border-color: var(--text); box-shadow: none; }
+  .dash-stale-row { border-color: var(--warn, #b45309); background: var(--card); }
+  .resume-clear { border-color: currentColor; }
+}

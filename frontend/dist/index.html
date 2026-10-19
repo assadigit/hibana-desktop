@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Progress board — Hibana</title>
+  <link rel="preload" as="font" type="font/woff2" href="/vendor/general-sans/GeneralSans-400.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/vendor/general-sans/GeneralSans-500.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/vendor/general-sans/GeneralSans-600.woff2" crossorigin>
+  <link rel="stylesheet" href="/css/variables.css?v=27">
+  <link rel="stylesheet" href="/css/base.css?v=14">
+  <link rel="stylesheet" href="/css/layout.css?v=67">
+  <link rel="stylesheet" href="/css/dashboard.css?v=43">
+  <link rel="stylesheet" href="/css/dashboard-todo.css?v=25">
+  <link rel="stylesheet" href="/css/components.css?v=9">
+  <link rel="stylesheet" href="/css/canvas.css?v=11">
+  <link rel="stylesheet" href="/css/quicknotes.css?v=50">
+  <link rel="stylesheet" href="/css/to-do-list.css?v=13">
+  <link rel="stylesheet" href="/css/polish-ui.css?v=39">
+  <link rel="stylesheet" href="/css/calendar.css?v=10">
+  <link rel="stylesheet" href="/css/notifications.css?v=12">
+  <link rel="stylesheet" href="/css/polish-batch.css?v=29">
+  <link rel="stylesheet" href="/css/project-header.css?v=50">
+  <link rel="stylesheet" href="/css/devboard.css?v=34">
+  <link rel="stylesheet" href="/css/misc.css?v=24">
+  <link rel="stylesheet" href="/css/themes.css?v=9">
+  <link rel="stylesheet" href="/css/claude-dark-theme.css?v=31">
+  <link rel="stylesheet" href="/css/rtl.css?v=5">
+  <link rel="stylesheet" href="/vendor/manrope/font-face.css">
+  <script src="/js/i18n-en.js?v=100" defer></script>
+  <script src="/js/i18n.js?v=154" defer></script>
+  <script src="/vendor/jalaali.min.js" defer></script>
+    <script src="/js/chip-render.js?v=12" defer></script>
+<script src="/js/desktop-shim.js"></script>
+<script src="/js/devboard.js?v=28" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-i18n="a11y.skipToMain">Skip to content</a>
+
+  <!-- shell-flush (batch p): the board page goes FULL-WIDTH (user request 2026-09-06) —
+       the five columns take the whole viewport instead of the 64rem reading measure. -->
+  <!-- S206 (owner ask): shell-flush + board-shell — the board pages are TRULY
+       full-bleed (layout.css rail-edge drops the body gutter; misc.css exempts
+       board-shell from the shared page-width cap). S207 (owner ask 2026-10-19):
+       the MOTHER CONTAINER — .db-frame wraps toolbar + filter + columns in one
+       var(--card) surface (devboard.css) instead of loose cards floating on the
+       gray desk. -->
+  <main class="shell shell-flush board-shell" id="main" tabindex="-1">
+    <!-- a11y (S51-A): sr-only h1 — the board page's visible title (#db-title) is an h2
+         filled by JS; the static page needs a level-one heading (axe
+         page-has-heading-one). Inside <main> so it sits in a landmark (axe region);
+         devboard.js renders into #db-board, never main's children wholesale.
+         Visually hidden; localized by i18n.js. -->
+    <h1 class="sr-only" data-i18n="db.board">Board</h1>
+    <div class="db-frame">
+    <div class="db-toolbar card" id="db-toolbar">
+      <a class="btn ghost small" href="/" data-back-link>← <span data-i18n="db.backToProject">Back to project</span></a>
+      <!-- S205 (spec §3.2): the title IS the project switcher — the current project's
+           name + chevron opens the searchable project list popover (board-page.js).
+           Keyboard: Enter/Space opens, ↑/↓ navigate, Enter switches, Esc closes. -->
+      <h2 class="db-title">
+        <button type="button" id="db-project-switch" class="db-switch" aria-haspopup="dialog" aria-expanded="false" data-i18n-title="db.switchProject" title="Switch project">
+          <span id="db-title">…</span>
+          <svg class="icon db-switch-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </h2>
+      <span class="muted small" id="db-counts"></span>
+      <span class="db-flex-gap"></span>
+      <a class="btn ghost small" id="db-sprint-link" href="#"><span data-i18n="db.sprints">Sprints</span></a>
+      <!-- S30 batch 4: the label manager — rename/merge/recolor/delete-unused tags. -->
+      <button type="button" class="btn ghost small" id="db-labels-btn"><span data-i18n="db.labelsTitle">Labels</span></button>
+    </div>
+    <div class="db-loading" id="db-loading" role="status"><span class="hibana-spinner" aria-hidden="true"></span><span data-i18n="db.loading">Loading board…</span></div>
+    <div class="db-board" id="db-board" hidden></div>
+    </div>
+  </main>
+  <script src="/js/board-page.js?v=21" defer></script>
+</body>
+</html>

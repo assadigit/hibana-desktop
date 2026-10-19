@@ -1,0 +1,1881 @@
+/* --- project logo (0047) ----------------------------------------------------- */
+/* No border, no background, no fixed container shape — logos are often transparent
+   rectangles, so we let them breathe. Only constrain the MAX size (128px) and let
+   the browser scale proportionally (object-fit: contain). The min is 64px so tiny
+   logos don't look lost. */
+.pd-logo {
+  /* S77 (owner: "the project logo is too small — make it 100% bigger in PC view"):
+     desktop default is now 112px max (2× the old 56px); ≤768px keeps the compact
+     56px so phone headers stay one line. */
+  max-inline-size: 112px;
+  max-block-size: 112px;
+  min-inline-size: 40px;
+  min-block-size: 40px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  flex: none;
+  border: none;
+  background: transparent;
+  border-radius: 12px; /* Session 24f: compacted header — logo shrunk from 64/128px to 40/56px */
+}
+/* S77: phones/tablets keep the Session-24f compact logo. */
+@media (max-width: 768px) {
+  .pd-logo {
+    max-inline-size: 56px;
+    max-block-size: 56px;
+  }
+  .pd-logo-placeholder {
+    inline-size: 56px;
+    block-size: 56px;
+  }
+}
+/* Session 19 (user request): logo edit/delete. The wrap holds the <img> + a small trash
+   button overlaid at the top-end corner. Hovering the logo reveals the button. */
+.pd-logo-wrap { position: relative; display: inline-block; flex: none; }
+.pd-logo-wrap .pd-logo-remove {
+  position: absolute;
+  inset-block-start: -0.35rem;
+  inset-inline-end: -0.35rem;
+  inline-size: 1.6rem;
+  block-size: 1.6rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  color: var(--danger);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  z-index: 2;
+}
+.pd-logo-wrap:hover .pd-logo-remove,
+.pd-logo-wrap:focus-within .pd-logo-remove { opacity: 1; }
+.pd-logo-wrap .pd-logo-remove:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+.pd-logo-placeholder {
+  inline-size: 72px; /* S77: desktop affordance scaled to the 112px logo footprint (was 64px→40px through the 24f compaction) */
+  block-size: 72px;
+  border-radius: var(--radius-sm);
+  border: 2px dashed var(--line-strong);
+  display: inline-grid;
+  place-items: center;
+  color: var(--muted);
+  cursor: pointer;
+  flex: none;
+  position: relative;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+/* Session 19: a tiny hint label appears under the icon so the empty placeholder
+   reads as an affordance, not a broken box. */
+.pd-logo-placeholder::after {
+  content: attr(data-hint);
+  position: absolute;
+  inset-block-end: -1.4rem;
+  inset-inline: 0;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.8;
+}
+.pd-logo-placeholder:hover { border-color: var(--brand); color: var(--brand); background: var(--accent-soft); }
+
+/* --- redesigned project header ------------------------------------------- */
+.pd-head { display: grid; gap: 0.4rem; /* Session 24f: compacted — was 0.7rem */ }
+/* Session 24f: main row = logo + badge + title (left) | stage select + save + delete (right).
+   Merged the old 2-row layout (logo+actions row AND badge+title row) into ONE row. */
+.pd-head-main { align-items: center; flex-wrap: wrap; row-gap: 0.4rem; }
+.pd-head-left { align-items: center; gap: 0.5rem; flex: 1; min-inline-size: 0; }
+.pd-head-actions { gap: 0.4rem; flex-wrap: wrap; }
+.pd-head-bottom { align-items: center; flex-wrap: wrap; row-gap: 0.3rem; gap: 0.5rem; }
+.pd-head-bottom .pd-tags { flex: 1; min-inline-size: 0; }
+.pd-head-bottom .pd-meta { gap: 0.75rem; flex: none; }
+/* Session 24f: mobile — the main row wraps (logo+title on one line, actions wrap below).
+   The stage select clamps so it doesn't push off-canvas. */
+@media (max-width: 480px) {
+  .pd-head-main { flex-wrap: wrap; }
+  .pd-head-actions { flex-wrap: wrap; row-gap: 0.4rem; }
+  .pd-stage-select { max-inline-size: 11rem; }
+}
+.pd-stage-select {
+  font-size: var(--fs-xs);
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+}
+#pd-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: text;
+  overflow-wrap: anywhere;
+  margin-block: 0;
+  flex: 0 1 auto; /* Session 24g: was flex:1 — let the badge sit right after the title, not pushed to the far end */
+  min-inline-size: 0;
+}
+#pd-title input {
+  font: inherit;
+  font-weight: 600;
+  inline-size: 100%;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+}
+.pd-title-pen {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  flex: none;
+  position: relative; /* F13 (session 9): padded hit zone → ~42×47px (was 34×39) */
+}
+.pd-title-pen::after { content: ""; position: absolute; inset: -0.25rem; }
+#pd-title:hover .pd-title-pen, .pd-title-pen:focus-visible { opacity: 1; }
+.pd-title-pen:hover { color: var(--brand); background: var(--bg-soft); }
+#pd-title input { min-inline-size: 0; }
+#pd-desc {
+  resize: vertical;
+  min-block-size: 2.2rem; /* Session 24f: compacted — was 2.6rem; rows=1 now (was 2) */
+  font: inherit;
+  color: var(--text);
+  background: var(--card);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.6rem; /* Session 24f: tighter padding — was 0.5rem 0.6rem */
+}
+#pd-desc:focus { border-style: solid; border-color: var(--brand); outline: none; }
+#pd-desc-status { min-block-size: 0.8rem; /* Session 24f: was 1rem — tighter */ }
+.pd-tags { flex-wrap: wrap; position: relative; align-items: center; }
+.pd-tag-chip { display: inline-flex; align-items: center; gap: 0.3rem; }
+.pd-tag-x { padding: 0 0.15rem; font-size: var(--fs-xs); }
+.pd-tag-add { cursor: pointer; border-style: dashed; }
+.pd-tag-add:hover {
+  /* Session 23: green fill + light text (the .chip base's soft bg lost to the leak) */
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.pd-tag-pop {
+  position: absolute;
+  inset-block-start: calc(100% + 0.4rem);
+  inset-inline-start: 0;
+  z-index: 40;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  min-inline-size: 15rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
+}
+/* the display:grid above beats the UA [hidden] rule — restore it (the tag popover
+   was permanently visible and uncloseable without this) */
+.pd-tag-pop[hidden] { display: none; }
+.pd-tag-colors { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.pd-swatch { cursor: pointer; position: relative; }
+.pd-swatch input { position: absolute; opacity: 0; inset: 0; }
+.pd-swatch span {
+  display: inline-block;
+  inline-size: 1.35rem;
+  block-size: 1.35rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+.pd-swatch input:checked + span { border-color: var(--text); transform: scale(1.12); }
+.pd-meta { flex-wrap: wrap; }
+
+/* --- inline board preview ------------------------------------------------ */
+.pd-board { display: grid; gap: 0.8rem; }
+/* S95 (the rail tree's deep links): anchor landings clear the sticky topbar —
+   the same scroll-margin contract notes.css (.note) and settings use. */
+.pd-board, .detail-panel { scroll-margin-block-start: 4.5rem; }
+/* S95 r2 (owner item 1 — the tree deep-links every box): each board COLUMN carries
+   its own anchor (#pd-col-<status> — the rail tree's leaf rows land on the exact
+   box); same 4.5rem topbar-clearing scroll-margin contract as the board itself. */
+.pd-col { scroll-margin-block-start: 4.5rem; }
+.pd-board-head h3 { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0; }
+.pd-board-head .icon { color: var(--brand); }
+.pd-sprint-count {
+  font-size: var(--fs-xs);
+  background: var(--badge-building-bg);
+  color: var(--badge-building-fg);
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+}
+/* S156 (owner report): the empty board's contents sat hard-start and could escape
+   their column. justify-items:center + text-align:center center the icon/title/text
+   as a block — direction-neutral, no RTL mirror needed. */
+.pd-board-empty { display: grid; gap: 0.6rem; justify-items: center; text-align: center; padding: 0.5rem 0.6rem; }
+/* Session 19 (cron round 6): the empty-board hint was a faint muted <p> that read as
+   placeholder/broken (VLM-flagged). Style it as an intentional empty-state: an icon +
+   the hint, with a quiet dashed border so the column reads as "intentionally empty". */
+.pd-board-empty p { color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; margin: 0; }
+.pd-board-grid {
+  /* S175 (owner round): the board row is a FLEX track now (was a fixed 5×1fr grid)
+     — a folded box shrinks to fit-content and the remaining boxes GROW into the
+     freed width (flex-basis 0 + grow 1 keeps the equal-share default the grid had,
+     so an all-open board renders pixel-identical to the old layout). 0031: the red
+     Problems column keeps its second slot. */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: stretch; /* grid lines stretched — flex lines stretch too (equal-height boxes) */
+}
+.pd-board-grid > .pd-col { flex: 1 1 0; min-inline-size: 0; } /* S175: the 1fr twin — zero basis, equal share */
+@media (max-width: 900px) { .pd-board-grid > .pd-col { flex: 1 1 calc(50% - 0.3rem); } } /* S175: the 2-up row (was repeat(2, …)) */
+/* min-inline-size: 0 — a bare 1fr track took min-content of long FA titles and overflowed
+   the card on 390px (RTL bleeds left); zero minimum lets the title wrap instead */
+@media (max-width: 540px) { .pd-board-grid > .pd-col { flex: 1 1 100%; } } /* S175: the phone stack (was minmax(0,1fr)) */
+.pd-col {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  padding: 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent; /* pastel stage coding lives on the edge/header, not a fill */
+}
+/* S175 (owner round): the FOLDED box — collapses to its header chip (chevron + title
+   + count). The card list and the Add button hide entirely; the action cluster folds
+   away too (nothing to copy/export while folded). inline-size: fit-content lets the
+   flex row shrink the box below its equal share and hand the freed width to the
+   remaining boxes — the whole point of folding. Deliberately AFTER the phone-stack
+   media query above: equal specificity, source order wins — a folded box stays a
+   narrow chip on phones too (folding saves vertical scroll there, not width). */
+.pd-col[data-collapsed] {
+  flex: 0 1 auto;
+  inline-size: -moz-fit-content;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+}
+.pd-col[data-collapsed] > .pd-tasks,
+.pd-col[data-collapsed] > .pd-task-add { display: none; }
+.pd-col[data-collapsed] .pd-col-actions { display: none; }
+/* S176 (owner round, from the owner's sketch): the folded box is a VERTICAL RAIL on
+   wide screens — the de-collapse chevron docks at the top, the title ROTATES to read
+   bottom→top (writing-mode vertical-rl + the 180° flip), and the count pins to the
+   rail's foot. The rail is 2.5rem (~40px) wide — less than a QUARTER of the old
+   fit-content chip (~150-180px), so the owner's "use 50% of current space" is beaten:
+   the remaining boxes get nearly the whole freed track back. The stage coding rides
+   the colored border edge (the dot hides — the sketch's minimal rail). Scoped to
+   >540px: on the phone stack the folded box keeps the S175 horizontal chip (there
+   folding saves VERTICAL space, and a 9rem-tall rail would waste it). */
+@media (min-width: 541px) {
+  .pd-col[data-collapsed] {
+    inline-size: 2.5rem;
+    min-block-size: 9rem;
+    display: flex;
+    flex-direction: column;
+    padding: 0; /* the tinted head IS the rail face — cancel the column's ring */
+  }
+  .pd-col[data-collapsed] .pd-col-head {
+    flex: 1 1 auto; /* fill the stretched rail (the row's align-items:stretch) */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.4rem 0 0.45rem;
+    border-radius: calc(var(--radius-sm) - 1px); /* hugs the column's own box */
+  }
+  .pd-col[data-collapsed] .pd-col-title {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg); /* bottom→top reading — the owner's sketch */
+    white-space: nowrap;
+    margin-block: auto; /* centers the title in the rail's leftover space */
+    overflow: hidden;
+    max-block-size: 100%;
+    letter-spacing: 0.04em;
+  }
+  .pd-col[data-collapsed] .pd-col-title::before { display: none; }
+}
+/* the coarse-pointer rail widens to host the 44px chevron (the house touch contract) */
+@media (min-width: 541px) and (pointer: coarse) {
+  .pd-col[data-collapsed] { inline-size: 3.25rem; }
+}
+/* S175: the collapse chevron — a quiet icon button leading the header strip; ▼ marks
+   the open box, the 180° flip (▲) the folded one (direction-neutral — no RTL branch).
+   padding:0 — the global button padding would inflate the fixed square (the S174
+   ellipse lesson); the hover spell carries BOTH background + color because global
+   button:hover (0,1,1) leaks its green fill + white ink under quiet icon buttons. */
+.pd-col-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--pd-ink, var(--muted));
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.pd-col-collapse .icon { inline-size: 1rem; block-size: 1rem; transition: transform 0.15s ease; }
+.pd-col-collapse:hover { background: rgb(var(--pd-c) / 0.2); color: var(--pd-ink, var(--muted)); }
+.pd-col-collapse:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.pd-col[data-collapsed] .pd-col-collapse .icon { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .pd-col-collapse .icon { transition: none; } }
+/* the house touch contract — 44px on coarse pointers (the header strip grows to host it) */
+@media (pointer: coarse) { .pd-col-collapse { inline-size: 44px; min-block-size: 44px; } }
+/* S99 (the column arrival cue): a #pd-col-<status> landing (the rail tree's leaf
+   rows) marks the EXACT column — the accent frame + the 3px inline-start lead
+   edge joining the accent + a 1.6s ring flash (the same treatment the S97 board
+   quadrants get); reduced-motion collapses to the frame alone. Once per
+   navigation (project-page.js's pdConsumeColHash). */
+.pd-col.q-arrived {
+  border-color: var(--accent);
+  border-inline-start-color: var(--accent);
+  animation: pdArrived 1.6s ease;
+}
+@keyframes pdArrived {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pd-col.q-arrived { animation: none; }
+}
+/* S100 (the tab arrival flash): landing #detail-<tab> (the rail tree's Problems
+   leaf) pins the TAB BUTTON itself — inset 1px accent ring + accent-soft fill +
+   the shared pdArrived flash; the tab strip answers "which section is this?" the
+   same way the column mark answers "which box?". The is-active styles stay
+   untouched (the mark layers on top, once per navigation). */
+.detail-tab.q-arrived {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+  animation: pdArrived 1.6s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail-tab.q-arrived { animation: none; }
+}
+/* .pd-col-head moved below (S88: the tinted header strip) */
+/* Project detail meta line — the user's "all project metadata 50% smaller" pass
+   (2026-08-30 checklist) covered the card meta (.pc-updated 0.68rem) but left this
+   line at .small; match the task-meta treatment. */
+.pd-meta { font-size: 0.72rem; }
+.pd-board-head { flex-wrap: wrap; }
+/* S43 (mobile audit): the head's CTA row (اسپرینت جدید · برد تمام‌صفحه · اسپرینت‌ها)
+   is a nowrap flex row — its ~396px min-content overflowed the 363px card content
+   box (the project page scrolled +37/+48 sideways at 390px, the long-known S35
+   "board bleed"). Let the buttons wrap onto their own line on phones. */
+@media (max-width: 640px) {
+  .pd-board-head .row { flex-wrap: wrap; gap: 0.35rem; }
+  .pd-board-head .row .btn { flex: 1 1 auto; justify-content: center; }
+}
+.pd-col { min-inline-size: 0; }
+.pd-col-title { overflow-wrap: anywhere; }
+/* Pastel stage coding (user request 2026-09-03; grey backlog per user checklist
+   2026-08-30: New ideas = blue, Backlog = grey, In progress = orange, Implemented =
+   green). Only the border + inline-start edge + header carry the color — the box
+   body stays transparent (light AND dark). --pd-ink hues mirror the status-badge
+   palette so the coding stays on-system.
+   S88 (owner pastel round): each column header wears a barely-there TINT (--pd-h)
+   with the status dot deepened to match (--pd-dot) — the dot + label stay the
+   primary identifiers, the tint is the whisper. Card bodies stay white.
+   S185 (the owner's batch-1 color table): the five tints + dots are ONE family —
+   same lightness, same softness (the OKLCH set derived + AA-checked by
+   qa/s185-palette.mjs; idea/planned inks re-tuned to clear 4.5:1 ON their tints —
+   they were sub-AA on the S88 tints too) — and every per-status value resolves
+   through the --col-* role tokens in variables.css's S185 block. claude-dark
+   re-points those tokens at its own low-alpha washes (claude-dark-theme.css), so
+   this ONE rule set serves both themes — the old five dark overrides retired. */
+.pd-col[data-status='idea']        { --pd-c: var(--col-idea-edge);      --pd-ink: var(--col-idea-ink);      --pd-h: var(--col-idea-bg);      --pd-dot: var(--col-idea-dot); }
+.pd-col[data-status='planned']     { --pd-c: var(--col-planned-edge);  --pd-ink: var(--col-planned-ink);  --pd-h: var(--col-planned-bg);  --pd-dot: var(--col-planned-dot); }
+.pd-col[data-status='in_progress'] { --pd-c: var(--col-progress-edge); --pd-ink: var(--col-progress-ink); --pd-h: var(--col-progress-bg); --pd-dot: var(--col-progress-dot); }
+.pd-col[data-status='done']        { --pd-c: var(--col-done-edge);      --pd-ink: var(--col-done-ink);      --pd-h: var(--col-done-bg);      --pd-dot: var(--col-done-dot); }
+/* 0031 (user approval 2026-09-05): bugs read RED — same pastel treatment as the flow
+   stages, so the defect column pops without shouting. */
+.pd-col[data-status='bug']         { --pd-c: var(--col-bug-edge);       --pd-ink: var(--col-bug-ink);       --pd-h: var(--col-bug-bg);       --pd-dot: var(--col-bug-dot); }
+.pd-col { border-color: rgb(var(--pd-c) / 0.28); border-inline-start: 3px solid rgb(var(--pd-c) / 0.55); }
+/* cross-box drop target: a faint stage tint + stronger edge, only while dragging */
+.pd-col.drag-over { border-color: rgb(var(--pd-c) / 0.7); background: rgb(var(--pd-c) / 0.08); }
+/* S88: the tinted header STRIP — full-bleed to the column's edges (the bleed cancels
+   the column's own 0.55rem padding), rounded to the column's top corners, and the
+   body below stays neutral. The count + actions ride the strip. */
+.pd-col-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
+  background: var(--pd-h, transparent);
+  margin: -0.55rem -0.55rem 0.45rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: calc(var(--radius-sm) - 1px) calc(var(--radius-sm) - 1px) 0 0;
+  min-block-size: 0; /* the strip hugs its content; tall columns grow below it */
+}
+.pd-col-title { /* S155: the kanban stage title joins the EYEBROW rung (12px/500/0.03em, sentence case already, secondary ink via --pd-ink/--muted) */ font-size: var(--text-eyebrow-size); font-weight: var(--text-eyebrow-weight); letter-spacing: var(--text-eyebrow-tracking); color: var(--pd-ink, var(--muted)); display: inline-flex; align-items: center; gap: 0.15rem; /* S88: the dot hugs its label (was 0.35rem — the owner's "bullet sits too far from its title") */ }
+.pd-col-title::before {
+  content: '';
+  inline-size: 0.55rem;
+  block-size: 0.55rem;
+  border-radius: 999px;
+  background: var(--pd-dot, rgb(var(--pd-c) / 0.72)); /* S88: the deepened dot matches the header tint */
+  flex: none;
+}
+.pd-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  cursor: grab;
+}
+/* S144: the in-card priority dot is retired — the PRIORITY BANNER (polish-batch.css)
+   carries the priority across the card's top now. */
+.pd-task:hover { border-color: var(--brand); box-shadow: 0 1px 6px rgb(30 20 10 / 0.06); }
+.pd-task-body { flex: 1; min-inline-size: 0; display: grid; gap: 0.12rem; }
+/* S48 (owner: "the priority dot doesn't stick to its item — strays when text is
+   translated Farsi→English"): the dot was a flex SIBLING of .pd-task-body,
+   positioned by the page's RTL direction. When the title text is English (LTR
+   via unicode-bidi:plaintext on .pd-task-title), the text starts on the LEFT
+   while the dot stayed on the RIGHT → visible gap. Fix: the dot now lives INSIDE
+   .pd-task-title-row — a flex row with dir="auto" so the row's main-axis direction
+   follows EACH title's first strong character (English→LTR→dot on left; Persian→
+   RTL→dot on right). The gap is a logical property (respects the row's direction).
+   The .pd-task-title keeps unicode-bidi:plaintext so the text itself still flows
+   correctly per-paragraph. */
+.pd-task-title-row { display: flex; align-items: flex-start; gap: 0.18rem; /* S88: dot→title tightened (was 0.45rem) — the owner's "bullet sits too far from its title text" */ }
+.pd-task-title {
+  min-inline-size: 0;
+  /* S88 (owner: "the heading of tasks is too big — if it's 14px, make it 12px"):
+     the S86 bump to 0.875rem/14px is rolled back to a 12px heading. The bold weight
+     + the 11.2px muted preview keep the hierarchy; the meta line stays smaller. */
+  font-size: 0.75rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  /* Session 23 (user request): titles may be MULTI-LINE now (code blocks, manual line
+     breaks) — pre-line renders the author's line structure while still collapsing
+     runs of spaces. Single-line legacy titles render exactly as before. */
+  white-space: pre-line;
+}
+/* S86: the content preview — one muted line under the heading (the "little preview
+   of the content" the owner asked for). Single-line clamp; the full content lives
+   behind the card click (the editor splits title\ncontent). */
+.pd-task-preview {
+  display: block;
+  font-size: 0.7rem; /* S88: one step under the 12px heading (was --fs-sm) */
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+.pd-task.st-done .pd-task-preview { text-decoration: line-through; opacity: 0.7; }
+/* Session 22 (user request): task titles are UNLIMITED now (server cap 100k). The
+   progress boxes + board clamp at 150 CHARACTERS (was a 3-line CSS clamp). The split
+   is content-based: the first 150 chars render; the rest lives in a hidden
+   .pd-title-rest span INSIDE the title element — so textContent still reads the FULL
+   title (magic wand, inline editors, copy/export, undo all consume textContent and
+   keep working on the untruncated text). The ellipsis shows only while clamped;
+   [data-task-read-more] toggles the rest open/closed. */
+.pd-title-rest[hidden] { display: none; }
+.pd-task-title[data-clamped]::after,
+.db-card-title[data-clamped]::after { content: '…'; }
+.pd-read-more {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--link);
+  cursor: pointer;
+  text-decoration: none;
+  min-block-size: 1.5rem;
+}
+.pd-read-more:hover {
+  /* Session 23 (user request: "on hover, buttons turn green, text becomes light"):
+     button:hover (0,1,1) used to leak its green bg under this rule's dark text —
+     the pill read green+dark. Now the FULL green+light recipe, explicitly. */
+  background: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+  text-decoration: none;
+}
+.pd-read-more:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+/* --- Session 23 (user request): CODE blocks inside task titles -------------------
+   Titles may carry fenced ``` code blocks (typed via the composer toolbar or pasted).
+   The renderer wraps them in <code class="t-code" dir="ltr"> — a dedicated, visually
+   distinct container: monospace, soft inset surface, LTR island inside RTL cards,
+   preserved whitespace, horizontal scroll for long lines, and an optional language
+   label from data-lang (```html → "HTML"). The ``` fence lines themselves live in
+   <span hidden> markers INSIDE the <code> so textContent still round-trips the RAW
+   title exactly (editors prefill / wand / copy / export all consume textContent).
+   Same rule serves .pd-task-title (project progress boxes) and .db-card-title (board). */
+.t-code {
+  display: block;
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  margin-block: 0.3rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  color: var(--text);
+  overflow-wrap: normal;
+}
+/* The FA font rule "html[lang=fa] body *" (0,1,2) beats the single class above and
+   re-Vazirs the code container — code MUST stay monospace in every locale. Matching
+   specificity + later in the file wins; Vazir sits LAST in the stack so Farsi comments
+   inside code blocks still render (Latin glyphs stay mono). */
+html[lang='fa'] .t-code,
+html[lang='fa'] body .t-code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, 'Vazir', monospace);
+}
+.t-code[data-lang]::before {
+  content: attr(data-lang);
+  display: block;
+  float: right;
+  font-family: inherit;
+  font-size: calc(var(--fs-xs) * 0.82);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.85;
+  user-select: none;
+}
+.t-code[hidden] { display: none; }
+.t-code .t-fence { display: none; } /* belt+ suspenders: fence marker spans never render */
+
+/* --- Session 23 (user request): composer formatting toolbar (Code / Bold / Bullet) --
+   Small ghost icon-button row rendered directly above the task-composer textareas
+   (taskadd modal, inline edit dialog, board editor). Hover = the system button rule:
+   green fill, light text (owner's explicit hover spec). */
+.pd-tb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin-block-end: 0.45rem;
+}
+.pd-tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-block-size: 1.9rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.pd-tb-btn .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.pd-tb-btn:hover {
+  /* Session 23 (user request): green fill + light text — the system hover recipe,
+     written EXPLICITLY so button:hover's leak can never mix with a dark ink. */
+  background: var(--cta-hover, var(--accent-hover));
+  border-color: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+}
+.pd-tb-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+/* S48d: visual separator between toolbar groups (format / list / align / code) */
+.pd-tb-sep { display: inline-block; inline-size: 1px; block-size: 1.1rem; background: var(--line); margin-inline: 0.15rem; flex: none; }
+/* date + clock meta (user request 2026-09-03): smaller + muted — it must whisper */
+.pd-task-meta {
+  font-size: calc(var(--fs-xs) * 0.8); /* 20% smaller — user request 2026-09 */
+  line-height: 1.3;
+  color: var(--muted);
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+  /* S46.13 (owner: "each icon has taken a row, they must be in a row together and
+     compacted"): the meta line is a flex row so the prio label, date, + 📌 button
+     stay on ONE line (was: inline text that wrapped on mobile, putting each element
+     on its own row). */
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+/* S46.13: compact the task cards on mobile — less padding, less gap, tighter body. */
+@media (max-width: 768px) {
+  .pd-task { padding: 0.3rem 0.35rem; gap: 0.3rem; }
+  .pd-task-body { gap: 0.06rem; }
+  .pd-task .prio-dot { margin-block-start: 0.15rem; }
+  .pd-task .spark-menu { flex: none; }
+  .pd-task-shots { font-size: calc(var(--fs-xs) * 0.8); padding: 0 0.3rem; }
+  /* S46.14 (owner: "the buttons are too big on mobile"): shrink the modal action
+     buttons (Save / Cancel / Delete / Add) — the base .btn has padding:0.55rem 1rem +
+     font-size:var(--fs-lg) which is 2-3x too tall on mobile. */
+  #pde-save, #pde-cancel, #pde-delete,
+  #pd-taskadd-save, #pd-taskadd-cancel {
+    padding: 0.3rem 0.6rem !important;
+    font-size: var(--fs-sm) !important;
+    min-block-size: 2rem !important;
+    gap: 0.25rem !important;
+  }
+  #pde-save .icon, #pde-cancel .icon, #pde-delete .icon,
+  #pd-taskadd-save .icon, #pd-taskadd-cancel .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+}
+.pd-task.st-done .pd-task-title { text-decoration: line-through; color: var(--muted); }
+/* Session 19 (user request): the "more" link is a TEXT link, not a styled button.
+   Was .pd-more.muted.small — looked like a disabled button. Now a plain teal text link. */
+.pd-more-link {
+  background: none;
+  border: 0;
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--link);
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  text-align: start;
+}
+.pd-more-link:hover {
+  /* Session 23: green pill + light text (owner hover spec; was green-bg leak + dark text) */
+  background: var(--cta-hover, var(--accent-hover));
+  color: var(--btn-text, #fff);
+  text-decoration: none;
+}
+/* Item 8: per-column export/copy action buttons in the pd-col header */
+.pd-col-actions { display: inline-flex; gap: 0.15rem; margin-inline-start: auto; }
+.pd-col-actions button { padding: 0.15rem 0.35rem; }
+.pd-col-actions .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+/* Item 5 + 7: the shared full-screen modal editor (note Expand + backlog Full screen) */
+/* Session 22: `dialog.` prefix added — same specificity bug as the taskadd composer:
+   .pd-editor-modal (0,1,0) lost to dialog.dialog's 26rem max-inline-size (0,1,1), so
+   the "full screen" note/backlog editor has been rendering 416px wide instead of 60rem. */
+dialog.pd-editor-modal { max-inline-size: min(90vw, 60rem); max-block-size: 85vh; padding: 0; inline-size: min(90vw, 60rem); }
+.pd-editor-modal-inner { padding: 1.25rem; max-block-size: 85vh; display: flex; flex-direction: column; gap: 0.6rem; }
+.pd-editor-head { margin-block-end: 0.2rem; }
+.pd-editor-head h3 { margin: 0; font-size: 1.1rem; }
+.pd-editor-subtitle { font-size: var(--fs-md); padding: 0.4rem 0.6rem; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.pd-editor-modal textarea {
+  flex: 1 1 auto;
+  min-block-size: 40vh;
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  resize: vertical;
+  font-family: inherit;
+}
+.pd-editor-footer { gap: 0.4rem; align-items: center; }
+/* Modal task composer (user request 2026-09-15): the column «افزودن» button opens this
+   dialog instead of the old one-line inline input, so long task sentences stay fully
+   visible while typing. Mirrors the pd-editor-modal recipe at task-title scale — the
+   global input/textarea rule (app.css :441) already carries font, padding, border and
+   bg; only the sizing and rhythm live here. */
+/* Session 22 (user request — the modal was STILL small after Session 19): the v0.3.11.1
+   "50% larger" bump never rendered — `.pd-taskadd-modal` (0,1,0) lost the cascade to
+   `dialog.dialog`'s max-inline-size min(26rem, 92vw) (0,1,1), so the composer stayed
+   416px wide. Fix: `dialog.pd-taskadd-modal` (ties with dialog.dialog, later in this
+   file → wins) + an EXPLICIT inline-size — a native <dialog> is fit-content by default,
+   a max only caps. 78rem = +50% over the 52rem Session 19 intended, +200% over what
+   actually rendered. */
+dialog.pd-taskadd-modal {
+  inline-size: min(78rem, 96vw);
+  max-inline-size: min(78rem, 96vw);
+  max-block-size: min(88vh, 46rem);
+}
+.pd-taskadd-inner { padding: 1.5rem; display: grid; gap: 0.8rem; }
+#pd-taskadd-textarea {
+  /* S48f: now a contenteditable div (was a textarea). The shared .pde-edit-area
+     class handles the textarea-like appearance (padding, border, background,
+     focus, etc.). Only the min-height is specific to the composer (taller). */
+  min-block-size: 18rem; /* Session 22: +50% (was 12rem) — owner wants a real writing area */
+}
+/* Session 22: the inline task EDIT dialog (project.html builds it client-side) gets the
+   same recipe as the composer — it was a bare `dialog.dialog` (26rem cap) with a
+   3-row, 300-char textarea. */
+dialog.pd-taskedit-modal {
+  inline-size: min(78rem, 96vw);
+  max-inline-size: min(78rem, 96vw);
+  max-block-size: min(88vh, 46rem);
+}
+/* S89 (owner item: the "Create a new task" modal's scroll fix) — the sticky
+   header/footer recipe, applied to BOTH task dialogs (the server-rendered
+   #pd-taskadd-modal composer + the client-built #pd-task-edit-modal editor).
+   The DIALOG never scrolls (overflow hidden — the old dialog.dialog recipe
+   scrolled the WHOLE thing, so the title row and the Add/Save footer scrolled
+   out of view the moment the content or the staged-files grid grew); the FORM
+   is a flex column capped at the SAME height as the dialog (they can never
+   disagree), and ONE middle region (.pd-modal-body) carries the scroll.
+   Nested-scroll isolation: a code block inside the content keeps its own
+   horizontal scroll (overflow-x) — the body's vertical wheel never fights it. */
+dialog.pd-taskadd-modal,
+dialog.pd-taskedit-modal { overflow: hidden; }
+form.pd-taskadd-inner,
+dialog.pd-taskedit-modal .modal {
+  display: flex;
+  flex-direction: column;
+  max-block-size: min(88vh, 46rem);   /* same cap as the dialog */
+  overflow: hidden;
+}
+.pd-modal-body {
+  flex: 1 1 auto;
+  min-block-size: 0;                  /* flex may shrink it below its content */
+  overflow-y: auto;
+  overscroll-behavior: contain;       /* the wheel never chains past the modal */
+  display: grid;                      /* the old field rhythm, now inside the region */
+  gap: 0.8rem;
+  scrollbar-gutter: stable;           /* no content shift when the bar appears */
+}
+dialog.pd-taskedit-modal .pd-modal-body { gap: 0.7rem; } /* matches its form gap */
+/* the sticky chrome: the header keeps its identity with a hairline; the footer
+   reads as the action bar it is — both pinned, never scrolled away. */
+.pd-taskadd-inner .pd-editor-head,
+dialog.pd-taskedit-modal .pde-head {
+  flex: none;
+  padding-block-end: 0.55rem;
+  border-block-end: 1px solid var(--line);
+}
+.pd-taskadd-actions,
+dialog.pd-taskedit-modal .pde-foot {
+  flex: none;
+  margin-block-start: 0.3rem;         /* + the form gap ≈ the old 1rem rhythm */
+  padding-block-start: 0.7rem;
+  border-block-start: 1px solid var(--line);
+}
+/* S48j (owner: "these buttons are too big in mobile, decrease their size both
+   in PC and mobile"): the note actions row (Save note / Clear / Expand) gets
+   compact buttons — smaller font, tighter padding, no min-height. */
+.pd-note-actions { gap: 0.3rem; }
+.pd-note-actions button { font-size: var(--fs-xs); padding: 0.3rem 0.55rem; min-block-size: auto; gap: 0.2rem; }
+.pd-note-actions .icon { inline-size: 0.9rem; block-size: 0.9rem; }
+/* S46.2 (owner: "too much distance between it and the project title"): native <dialog>
+   UA style centers the modal vertically in the viewport (margin:auto in the top
+   layer), so on a tall viewport the modal floats mid-screen, far from the project
+   heading at the top. Anchoring it near the top (margin-block-start small,
+   margin-block-end auto) flips the UA flex-centering to start-aligned.
+   (S89: this rule had lost its SELECTOR in an earlier edit — the declarations
+   were dead CSS dropped by the parser; the selector is restored.) */
+dialog.pd-taskadd-modal,
+dialog.pd-taskedit-modal {
+  margin-block-start: clamp(1rem, 4vh, 3rem);
+  margin-block-end: auto;
+}
+/* S46.2: shrink the «ویرایش» label (h3) — was the base h3 size; now a compact header. */
+#pde-title { font-size: var(--fs-md); font-weight: 600; margin: 0; }
+/* S48f: #pde-input + #pd-taskadd-textarea are now contenteditable divs (WYSIWYG).
+   Shared .pde-edit-area styling: textarea-like appearance (padding, border,
+   background, focus ring, overflow-y). Individual IDs keep their own min-height. */
+.pde-edit-area {
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  overflow-y: auto;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  cursor: text;
+  word-break: break-word;
+}
+/* S48g: the separate Title input above the contenteditable — single-line, plain text */
+.pde-title-field { font-size: var(--fs-md); font-weight: 600; padding: 0.45rem 0.75rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); }
+.pde-title-field:focus-visible { border-color: var(--brand); outline: 2px solid transparent; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent); }
+/* S48h: the contenteditable field wrapper — replaces the invalid <label> that wrapped
+   the contenteditable (a contenteditable is interactive content, not allowed inside
+   <label>). Mirrors .modal label's grid + gap + muted color so the field label reads
+   the same as the other labels in the form. */
+.pde-field { display: grid; gap: 0.3rem; font-size: var(--fs-md); color: var(--muted); }
+.pde-field-label { font-size: var(--fs-md); color: var(--muted); }
+.pde-edit-area:focus-visible { border-color: var(--brand); outline: 2px solid transparent; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent); }
+.pde-edit-area:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+.pde-edit-area ul, .pde-edit-area ol { margin: 0.3rem 0; padding-inline-start: 1.5rem; }
+.pde-edit-area li { margin: 0.15rem 0; }
+/* ── S176 (owner round): the composer's CODE BLOCK — one container, no box-in-a-box ──
+   The "<>" toolbar button used to nest <pre> (its own inset box) around code.t-code
+   (ANOTHER box: border + background + padding) — a box inside a box. The block is now
+   ONE <pre class="t-code-pre"> container that wraps a <code class="t-code">: the pre
+   carries the surface (dark code panel — the S83/S88 Notion-style token set), the code
+   carries ONLY the typography. Full width of the text column, its own line, ~14px
+   breathing room above/below. The header bar (language dropdown + copy button) is a
+   non-editable strip inside the pre, above the code. */
+.pde-edit-area pre { margin: 0.4rem 0; } /* legacy bare <pre> (rich pastes) — keep a quiet block rhythm */
+.pde-edit-area pre:not(.t-code-pre) { background: color-mix(in srgb, var(--muted) 8%, transparent); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); overflow-x: auto; }
+.pde-edit-area code { font-family: var(--mono, ui-monospace, monospace); font-size: 0.9em; }
+.t-code-pre {
+  /* the ONE container: the dark panel that clearly contrasts with the editor surface
+     (.pde-edit-area background: var(--bg)) in BOTH themes — light mode: #2D2A26 panel
+     vs the light editor; claude-dark: #1a1917 panel vs the warm card. */
+  background: var(--code-panel-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  margin-block: 0.85rem; /* the owner's ~12-16px vertical margin ask (0.85rem ≈ 13.6px) */
+  margin-inline: 0;      /* full width of the text column */
+  max-inline-size: 100%;
+  overflow: hidden;      /* the rounded frame clips the bar's edges; the code scrolls its own */
+  direction: ltr;        /* code ALWAYS reads left-to-right — the app flips to RTL, code must not */
+  text-align: left;
+  unicode-bidi: isolate;
+}
+/* the header bar: language dropdown on the left, icon-only copy button on the right */
+.t-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.25rem 0.3rem 0.25rem 0.6rem;
+  border-block-end: 1px solid color-mix(in srgb, var(--code-panel-fg) 14%, transparent);
+  user-select: none; /* chrome, not content — the copy/export paths must never pick it up */
+}
+.t-code-langsel {
+  font: 600 0.62rem/1.2 var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--code-panel-fg);
+  opacity: 0.78;
+  background: transparent;
+  border: 0;
+  padding: 0.28rem 0.35rem;
+  border-radius: 6px;
+  cursor: pointer;
+  max-inline-size: 12rem;
+}
+.t-code-langsel:hover { opacity: 1; background: color-mix(in srgb, var(--code-panel-fg) 10%, transparent); }
+.t-code-langsel:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
+.t-code-copy {
+  position: relative; /* the "Copied" tooltip anchors here */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  inline-size: 2rem;    /* ~32px desktop tap target */
+  block-size: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--code-panel-fg);
+  opacity: 0.78;        /* always visible; full ink on hover/focus (touch keeps it lit) */
+  cursor: pointer;
+  transition: opacity 0.12s ease, background-color 0.12s ease;
+}
+.t-code-copy:hover, .t-code-copy:focus-visible { opacity: 1; background: color-mix(in srgb, var(--code-panel-fg) 12%, transparent); }
+.t-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.t-code-copy .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.t-code-copy .i-check { display: none; color: var(--ok); }
+.t-code-copy.copied .i-copy { display: none; }
+.t-code-copy.copied .i-check { display: inline-flex; }
+/* the "Copied" tooltip — ~2s, then the icon restores (JS toggles .copied) */
+.t-code-copy::after {
+  content: attr(data-tip);
+  position: absolute;
+  inset-block-end: calc(100% + 6px);
+  inset-inline-end: 0;
+  padding: 0.18rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  font: 500 0.68rem/1.2 var(--font-sans, sans-serif);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 2;
+}
+.t-code-copy.copied::after { opacity: 1; }
+@media (pointer: coarse) {
+  /* the house touch contract — 44px tap target; the bar grows to host it and the
+     button stays lit (no hover to reveal it on touch) */
+  .t-code-copy { inline-size: 44px; min-block-size: 44px; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-code-copy, .t-code-copy::after { transition: none; }
+}
+/* the CODE element — typography only (the pre is the box; no second border/bg) */
+.t-code-pre > code.t-code {
+  display: block;
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', Consolas, 'JetBrains Mono', monospace);
+  font-size: 0.8125rem; /* ~13px — a step under the 14px body text */
+  line-height: 1.5;
+  white-space: pre;         /* indentation + line structure preserved exactly */
+  overflow-x: auto;         /* long lines scroll, never wrap */
+  scrollbar-width: thin;
+  tab-size: 2;
+  color: var(--code-panel-fg); /* 11.2:1 on the light panel — AA-large well cleared */
+  background: transparent;
+  border: 0;
+  padding: 0.75rem 0.9rem;
+  min-block-size: 2.1rem;
+  overflow-wrap: normal;
+}
+/* the FA font override (html[lang='fa'] .t-code above) keeps Latin glyphs mono while
+   letting Farsi comments render — the new > code.t-code rule matches that selector's
+   specificity, so the SAME override is restated for the editor's code element (equal
+   specificity, later in the file wins — Vazir stays LAST in the stack). */
+html[lang='fa'] .t-code-pre > code.t-code {
+  font-family: var(--font-mono, ui-monospace, 'SF Mono', Consolas, 'JetBrains Mono', 'Vazir', monospace);
+}
+/* ── S176 R5: the syntax palette — FIVE token colors on the dark panel ──
+   highlight.js wraps tokens in .hljs-* spans; the app's own five-ink grammar
+   (--md-kw/-str/-com/-num/-fn, S88) maps onto them: keywords rust, strings olive,
+   comments the most-muted mixed ink, numbers amber, function names teal. Everything
+   else stays the panel's default ink. Muted hues on BOTH themes' panels (light mode's
+   panel is itself dark — one set of lights works for both, the dark theme flips its
+   own --md-* values in claude-dark-theme.css). */
+.t-code-pre .hljs-keyword,
+.t-code-pre .hljs-built_in,
+.t-code-pre .hljs-doctag,
+.t-code-pre .hljs-type { color: var(--md-kw); } /* +type: C-family storage words (const/static) + primitive types read keyword-ish in a 5-color palette */
+.t-code-pre .hljs-string,
+.t-code-pre .hljs-regexp { color: var(--md-str); }
+.t-code-pre .hljs-comment,
+.t-code-pre .hljs-quote {
+  /* S176 AA: the S88 comment ink (--md-com) alone sits at ~4.15:1 on the light panel
+     / ~3.1:1 on the dark one — under the 4.5:1 the owner demanded for THIS block.
+     Mixed 70/30 toward the panel ink it clears 5.4:1+ on BOTH panels, stays the most
+     muted token of the five, and the notes surfaces (the token's original home)
+     keep their approved look untouched. */
+  color: color-mix(in srgb, var(--md-com) 70%, var(--code-panel-fg));
+  font-style: italic;
+}
+.t-code-pre .hljs-number,
+.t-code-pre .hljs-literal { color: var(--md-num); }
+.t-code-pre .hljs-title { color: var(--md-fn); }
+.pde-edit-area b, .pde-edit-area strong { font-weight: 700; }
+.pde-edit-area div[style*="text-align"] { margin: 0.2rem 0; }
+#pde-input { min-block-size: 8rem; }
+/* S46.7 (owner: "compact things so it doesn't need scroll"): the modal's inner padding
+   + the textarea's min-block-size shrunk so the whole form fits a typical viewport
+   without scrolling. The .modal grid gap + the row margins are already tight. */
+dialog.pd-taskedit-modal .modal { padding: 1.1rem; gap: 0.7rem; }
+/* S46.7 (owner: "add a button for full screen writing"): toggling .pde-fullscreen on the
+   dialog expands the textarea to fill the viewport + hides the other rows (status,
+   priority, labels, screenshots, error, delete/cancel/save) so the user can focus on
+   writing the task definition. Click the button again (or ✕) to exit. */
+dialog.pd-taskedit-modal.pde-fullscreen {
+  inline-size: 100vw; max-inline-size: 100vw;
+  max-block-size: 100vh; block-size: 100vh;
+  margin: 0; border-radius: 0;
+}
+dialog.pd-taskedit-modal.pde-fullscreen .modal { block-size: 100vh; max-block-size: none; padding: 1.5rem 2rem; gap: 0.8rem; }
+/* S89: the fullscreen variant rides the new flex chain — the body stops
+   scrolling (overflow hidden), the content field stretches to fill it, and
+   #pde-input's old calc(100vh - 12rem) guess is replaced by an exact flex: 1. */
+dialog.pd-taskedit-modal.pde-fullscreen .pd-modal-body { display: flex; flex-direction: column; overflow: hidden; gap: 0.8rem; }
+dialog.pd-taskedit-modal.pde-fullscreen .pde-field { display: flex; flex-direction: column; flex: 1 1 auto; min-block-size: 0; gap: 0.3rem; }
+dialog.pd-taskedit-modal.pde-fullscreen #pde-input { min-block-size: 0; flex: 1; }
+/* S48d (owner: "when clicking FULLSCREEN, a full text editor must be opened"):
+   the .pd-tb toolbar is now SHOWN in fullscreen (was hidden) so the user has
+   the full formatting palette (bold/underline/strike/lists/alignment/code)
+   while writing. The textarea fills the remaining space. */
+dialog.pd-taskedit-modal.pde-fullscreen .pd-tb { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+dialog.pd-taskedit-modal.pde-fullscreen .pd-taskadd-shots,
+dialog.pd-taskedit-modal.pde-fullscreen .pd-opt,
+dialog.pd-taskedit-modal.pde-fullscreen .error,
+dialog.pd-taskedit-modal.pde-fullscreen .row:has(#pde-status),
+dialog.pd-taskedit-modal.pde-fullscreen .row:has(#pde-delete) { display: none; }
+.pd-taskadd-col { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.pd-taskadd-col .chip { padding: 0.12rem 0.55rem; font-size: var(--fs-xs); }
+#pd-taskadd-error { margin: 0; }
+.pd-taskadd-actions { justify-content: flex-start; gap: 0.4rem; }
+.pd-task-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--link); /* Session 20 (AA): --brand text on --card was 3.1:1 — --link is the text-safe teal */
+  text-decoration: none;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--link) 35%, var(--line));
+  background: var(--card);
+  /* Session 19 (cron round 7): was a dashed --line-strong border + bg-soft fill that
+     read as a disabled input (VLM-flagged twice). Now a solid brand-tinted outline so it
+     reads as a clear "+ Add" affordance. Flat (no shadow) per the 2026-09-16 user request. */
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+/* the add affordance is a <button> now (inline composer, no navigation) — neutral resets */
+button.pd-task-add {
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  inline-size: 100%;
+  cursor: pointer;
+}
+.pd-task-add .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+.pd-task-add:hover {
+  color: #fff; /* Session 19 (user report): explicit white — was var(--btn-text, var(--text)) which could resolve to --text (dark) if --btn-text wasn't set. White-on-teal is the only readable hover. */
+  border-color: var(--cta);
+  background: var(--cta); /* Session 20 (AA): --brand fill was 3.1:1 for the white hover text — --cta keeps the teal at 4.93:1 */
+}
+.pd-task-add .icon { color: var(--brand); transition: color 0.15s ease; }
+.pd-task-add:hover .icon { color: #fff; }
+/* the per-column task list; .pd-quick-add survives for the برنامه آتی Mode A quick-item
+   composer ONLY (form.pd-quick-add.bl-item-form) — the dev-task columns' inline composer
+   was replaced by the #pd-taskadd-modal dialog (2026-09-15) */
+.pd-tasks { display: grid; gap: 0.35rem; }
+.pd-quick-add { display: flex; gap: 0.3rem; }
+.pd-quick-add[hidden] { display: none; }
+.pd-quick-add input {
+  flex: 1;
+  min-inline-size: 0;
+  inline-size: 100%;
+  font: inherit;
+  font-size: var(--fs-xs);
+  padding: 0.14rem 0.45rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px dashed var(--brand);
+  border-radius: var(--radius-sm);
+}
+.pd-quick-add input:focus { border-style: solid; outline: none; }
+.pd-quick-add input:disabled { opacity: 0.6; }
+/* the inline composer's [+] submit button was removed (user request 2026-09-09) — Enter
+   submits the form; the visible affordance is the .pd-task-add (افزودن) button below. */
+/* retry button inside the board/sprint loading line */
+.db-loading .btn { margin-inline-start: 0.6rem; }
+
+/* --- برنامه آتی (Upcoming Plan) tab — batch (p) 2026-09-06 ------------------ */
+/* Mode A: the quick-item composer rides the pd-quick-add look; the hint whispers
+   where items land. Mode B: plan documents (title + content + per-doc "updated" time)
+   and the merged history feed (doc snapshots + quick items, newest first). */
+.bl-item-form { margin-block: 0.2rem 0.3rem; }
+.bl-hint { margin-block-end: 1.2rem; }
+/* S105: the plan ITEMS list — the planned dev_tasks the tab badge counts. A quiet
+   row: priority dot (the board's own prio language) + first-line title + muted
+   preview (HibanaChips — same rendering as the board cards) + timeAgo. */
+.bl-plans { display: grid; gap: 0.25rem; margin-block-end: 0.4rem; }
+.bl-plan {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+.bl-plan .prio-dot { flex: none; margin-block-start: 0.3rem; }
+.bl-plan-main { min-inline-size: 0; flex: 1 1 auto; display: grid; gap: 0.1rem; }
+.bl-plan-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.bl-plan .pd-task-preview {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-inline-size: 0;
+}
+.bl-plan-date { flex: none; margin-block-start: 0.15rem; }
+/* bullets/ordered lists: the shared S46.9/S48d family (polish-batch.css) — the same
+   language as the board cards (extended to .bl-plan-title there). */
+.bl-sub {
+  margin: 1.2rem 0 0.5rem;
+  font-size: var(--fs-md);
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.bl-docs { display: grid; gap: 0.7rem; }
+.bl-doc {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--brand);
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+.bl-doc-head { align-items: baseline; }
+.bl-doc-title { font-size: var(--fs-md); overflow-wrap: anywhere; }
+/* plain-text content: whitespace preserved, long lines wrap — no markdown machinery */
+.bl-doc-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  max-block-size: 22rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent;
+  border-block: 1px dashed var(--line);
+  padding-block: 0.45rem;
+}
+.bl-doc-actions { gap: 0.3rem; justify-content: flex-end; }
+.bl-doc-form { display: grid; gap: 0.5rem; margin-block-start: 0.6rem; }
+.bl-doc-form[hidden] { display: none; }
+.bl-doc-form input,
+.bl-doc-form textarea {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.bl-doc-form input { font-weight: 600; }
+.bl-doc-form textarea { resize: vertical; min-block-size: 8rem; line-height: 1.6; }
+.bl-doc-form input:focus,
+.bl-doc-form textarea:focus { border-color: var(--brand); outline: none; }
+.bl-history { display: grid; gap: 0.3rem; margin-block-start: 0.4rem; }
+.bl-history li { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+/* inline title editor for مشکل‌ها rows (same feel as the header's pd-title input) */
+.pd-inline-edit {
+  font: inherit;
+  font-size: var(--fs-sm);
+  flex: 1;
+  min-inline-size: 0;
+  padding: 0.12rem 0.4rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px dashed var(--brand);
+  border-radius: var(--radius-sm);
+}
+.pd-inline-edit:focus { border-style: solid; outline: none; }
+
+/* ==== S29 follow-up (user request 2026-09-12): priority dropdown + task labels ====
+   The owner's ask: a Priority dropdown in the modals (Urgent / High Priority /
+   Medium Priority / Low Priority, color-coded), boxes that AUTO-SORT by priority,
+   and label/meta tags (UI/UX, Security…) on every task. Colors ride the theme-aware
+   tokens (--err red, --warn amber, --muted grey) so both themes stay
+   AA; the pastel dot hues match the existing .prio-* dots in polish-batch.css. */
+
+/* The modals' priority row: <select> + live color preview chip side by side. */
+.pd-prio-row { display: inline-flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.pd-prio-select { min-inline-size: 11rem; }
+
+/* Color-coded <option>s — honored by Chromium/Firefox in the open list; the chip
+   beside the select is the guaranteed color signal on every engine/platform.
+   S145 (owner: "use this colors"): the pastels + inks are self-contained pairs of
+   the owner's banner palette (native dropdowns don't reliably inherit theme vars,
+   so dark literals on light pastels are the SAFE pair on every engine). */
+.pd-prio-select option.prio-urgent { background: var(--prio-urgent-bg); color: var(--prio-urgent-text); font-weight: 600; } /* S185: the pairs ride the --prio-* role tokens (variables.css) — deliberately NOT theme-flipped, so both themes keep the S145 SAFE light-pastel + dark-ink pair in native popups */
+.pd-prio-select option.prio-high { background: var(--prio-high-bg); color: var(--prio-high-text); }
+.pd-prio-select option.prio-medium { background: var(--prio-medium-bg); color: var(--prio-medium-text); }
+.pd-prio-select option.prio-low { background: var(--prio-low-bg); color: var(--prio-low-text); }
+
+/* Live preview chip — dot + label, tinted per priority (its class is swapped by
+   pdSyncPrioChip on every select change). */
+.pd-prio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  font-size: var(--fs-xs);
+  color: var(--text);
+  white-space: nowrap;
+}
+.pd-prio-chip .prio-dot { inline-size: 9px; block-size: 9px; margin-block-start: 0; }
+/* S145 (owner: "use this colors"): borders + tints from the owner's banner palette
+   (rgba tints over the card stay dark-safe); the text tokens stay theme-adaptive.
+   S149 (owner: "Use this new colors for priority color-coding"): the border + tint
+   derive from the canonical --color-* tokens via color-mix now — the four hardcoded
+   hex/rgb pairs are gone (design-token law); the text tokens stay theme-adaptive
+   (the S149 fills are dark, and dark-on-dark fails in the dark theme). */
+/* S150: the low/medium fills are PALE now (pale slate / pale gold) — their old 14/16%
+   tints would vanish, so the dial rides up for them and the border mixes the pair's
+   INK (the strong half) into the line token. high/urgent keep the S149 recipe
+   (saturated fills carry their own border). Text stays theme-adaptive — these chips
+   are tints over the surface, not the self-contained fill. */
+.pd-prio-chip.prio-urgent { border-color: var(--color-urgent); background: color-mix(in srgb, var(--color-urgent) 12%, transparent); color: var(--err); }
+.pd-prio-chip.prio-high { border-color: var(--color-high); background: color-mix(in srgb, var(--color-high) 12%, transparent); color: var(--err); }
+.pd-prio-chip.prio-medium { border-color: color-mix(in srgb, var(--color-medium-ink) 45%, var(--line)); background: color-mix(in srgb, var(--color-medium) 38%, transparent); color: var(--warn); }
+.pd-prio-chip.prio-low { border-color: color-mix(in srgb, var(--color-low-ink) 45%, var(--line)); background: color-mix(in srgb, var(--color-low) 38%, transparent); color: var(--muted); }
+
+/* The composer's options row (priority + labels side by side, wrapping on mobile). */
+.pd-taskadd-opts { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+.pd-taskadd-opts .pd-opt { flex: 1 1 16rem; display: grid; gap: 0.3rem; }
+/* S46 (user request 2026-09-14): the screenshot-attach row on the task composer —
+   one file input (hidden) + a small ghost picker + a muted "N attached" count. */
+.pd-taskadd-shots { display: flex; flex-direction: column; gap: 0.5rem; }
+.pd-taskadd-shots .ghost.small { font-size: var(--fs-xs); padding: 0.2rem 0.55rem; min-block-size: 0; }
+.pd-taskadd-shots #pd-taskadd-shots-count { font-size: var(--fs-xs); }
+/* S46.3: the inline thumbnail grid for staged screenshots in the task-add composer
+   + the editor (#pde-shots-grid). Reuses .shot-card — each thumbnail has a zoom
+   button (img), an optional note line, + delete ✕ / edit-note actions.
+   S46.5 (owner: "align the pictures regardless of their size, if the ratio of a
+   picture differs with thumbnail, only show part of it"): the thumbnail box is a
+   UNIFORM SQUARE (aspect-ratio 1/1) + object-fit: cover crops any aspect ratio to
+   fill the square — a tall portrait + a wide landscape both render as the same
+   square, showing only the center crop. overflow:hidden on the button clips the
+   overflow so the grid rows align perfectly. */
+.pd-taskadd-shots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: 0.5rem; margin-block-start: 0.3rem; }
+.pd-taskadd-shots-grid:empty { display: none; }
+.pd-taskadd-shots-grid .shot-card { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.pd-taskadd-shots-grid .shot-img-btn { display: block; aspect-ratio: 1 / 1; overflow: hidden; padding: 0; border-radius: var(--radius-sm); }
+.pd-taskadd-shots-grid .shot-img-btn img { inline-size: 100%; block-size: 100%; object-fit: cover; object-position: center; display: block; }
+/* S115: staged webm recordings preview as a real <video> — the same square frame
+   the staged images speak, native controls inside it. */
+.pd-taskadd-shots-grid .shot-video { inline-size: 100%; block-size: 100%; aspect-ratio: 1 / 1; object-fit: cover; border: 0; border-radius: var(--radius-sm); display: block; }
+.pd-taskadd-shots-grid .shot-body { padding: 0.3rem; }
+.pd-taskadd-shots-grid .shot-actions { gap: 0.2rem; }
+.pd-taskadd-shots-grid .shot-actions .ghost.small { font-size: var(--fs-xs); padding: 0.1rem 0.4rem; min-block-size: 0; }
+
+/* S61: the upload progress strip — per-file rows (icon + name + bar + %) mounted by
+   project-page.js above #shots (media panel) and above #pd-taskadd-shots-grid (task
+   composer). States via [data-state]: queued (flat 8% ghost fill), active (live fill),
+   done (full fill, fades out), error (red). The bar fills from the READING side
+   (logical inset-inline-start), so RTL mirrors correctly.
+   S67 refinements: (a) the initial state is READING — a striped indeterminate
+   shimmer (the FileReader base64 pass is real work on big files and used to look
+   like a dead row); (b) the file SIZE rides the row (muted, tabular); (c) a per-row
+   cancel ✕ (visible while there's something to cancel — gone on done/error/canceled);
+   (d) CANCELED drops neutrally (the user cancelled, nothing failed — no red); (e)
+   done shows a ✓ in the success tint. */
+.shots-upload-strip { display: grid; gap: 0.35rem; margin-block: 0.45rem 0.1rem; }
+.shots-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-size: var(--fs-sm);
+  animation: shots-upload-in 0.18s ease;
+}
+@keyframes shots-upload-in { from { opacity: 0; translate: 0 3px; } to { opacity: 1; translate: 0 0; } }
+.shots-upload-row .icon { width: 1rem; height: 1rem; flex: none; color: var(--muted); }
+.shots-upload-row[data-state='active'] .icon { color: var(--brand); }
+.shots-upload-row[data-state='done'] .icon { color: var(--link); }
+.shots-upload-row[data-state='error'] .icon { color: var(--color-error); }
+.shots-upload-name {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+/* S67: the size rides after the name — muted, tabular, never truncating the name. */
+.shots-upload-size {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+.shots-upload-bar {
+  flex: 1 1 5rem;
+  block-size: 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+.shots-upload-fill {
+  block-size: 100%;
+  inline-size: 8%;
+  border-radius: inherit;
+  background: var(--brand);
+  transition: inline-size 0.15s ease;
+  /* A block-level child with a set inline-size naturally hugs the INLINE-START edge —
+     RTL mirrors for free. */
+}
+/* S67: READING — indeterminate. A striped sweep (logical direction: inline-start →
+   inline-end) says "working" without lying about a fraction we don't know yet.
+   The keyframe shifts background-position by EXACTLY one stripe period (1.3rem —
+   percentage positions are a no-op on element-sized gradients, fixed lengths loop
+   seamlessly on the infinite repeating tile). */
+@keyframes shots-upload-read {
+  from { background-position: 0 0; }
+  to { background-position: 1.3rem 0; }
+}
+.shots-upload-row[data-state='reading'] .shots-upload-fill {
+  inline-size: 100%;
+  background: repeating-linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--brand) 55%, transparent) 0 0.6rem,
+    color-mix(in srgb, var(--brand) 14%, transparent) 0.6rem 1.3rem
+  );
+  animation: shots-upload-read 0.9s linear infinite;
+}
+[dir='rtl'] .shots-upload-row[data-state='reading'] .shots-upload-fill {
+  animation-direction: reverse;
+}
+.shots-upload-row[data-state='queued'] .shots-upload-fill { inline-size: 8%; opacity: 0.45; }
+.shots-upload-row[data-state='done'] .shots-upload-fill { inline-size: 100%; background: var(--link); }
+.shots-upload-row[data-state='error'] .shots-upload-fill { inline-size: 100%; background: var(--color-error); opacity: 0.55; }
+.shots-upload-row[data-state='canceled'] .shots-upload-fill { inline-size: 100%; background: var(--line-strong); }
+.shots-upload-row[data-state='done'] { border-color: transparent; opacity: 0; transition: opacity 0.5s ease 0.15s, border-color 0.5s ease; }
+.shots-upload-row[data-state='canceled'] { opacity: 0; transition: opacity 0.24s ease; }
+.shots-upload-pct { flex: none; min-inline-size: 2.6rem; text-align: end; font-variant-numeric: tabular-nums; color: var(--muted); font-size: var(--fs-xs); }
+.shots-upload-row[data-state='error'] .shots-upload-pct { color: var(--color-error); }
+.shots-upload-row[data-state='done'] .shots-upload-pct { color: var(--link); }
+/* S67: the per-row cancel ✕ — a quiet ghost icon-button; only meaningful while the
+   upload is in flight (reading/queued/active). */
+.shots-upload-cancel {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.55rem;
+  block-size: 1.55rem;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.shots-upload-cancel .icon { width: 0.85rem; height: 0.85rem; }
+.shots-upload-cancel:hover { background: var(--bg-soft); color: var(--color-error); }
+.shots-upload-cancel:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.shots-upload-row[data-state='done'] .shots-upload-cancel,
+.shots-upload-row[data-state='error'] .shots-upload-cancel,
+.shots-upload-row[data-state='canceled'] .shots-upload-cancel { display: none; }
+/* Mobile: the name can squeeze harder; the bar keeps a floor. */
+@media (max-width: 720px) {
+  .shots-upload-name { flex-basis: 38%; }
+  .shots-upload-pct { min-inline-size: 2.2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shots-upload-row { animation: none; }
+  .shots-upload-fill { transition: none; }
+  .shots-upload-row[data-state='reading'] .shots-upload-fill { animation: none; }
+  .shots-upload-row[data-state='done'] { transition: none; opacity: 1; }
+}
+.pd-opt input {
+  font: inherit;
+  font-size: var(--fs-md);
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+}
+.pd-opt input:focus-visible { border-color: var(--brand); outline: none; }
+
+/* Label chips on the task cards (under the title) — a colored dot + the name. */
+.pd-task-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-block: 0.18rem 0.05rem; }
+.pd-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-size: calc(var(--fs-xs) * 0.85);
+  line-height: 1.4;
+  padding: 0.02rem 0.5rem 0.14rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.pd-tag-dot { inline-size: 7px; block-size: 7px; border-radius: 999px; flex: none; }
+
+/* Priority label leading the card meta line.
+   S31 (user request 2026-09-13 — "keep the texts themselves like other texts,
+   without red background"): the tier colors + 600 weight are gone, and the solid
+   red/orange pill behind the text was the unscoped .prio-* background leak (fixed
+   in polish-batch.css — scoped to .prio-dot now). The meta priority text inherits
+   the .pd-task-meta muted treatment exactly like the date next to it; the colored
+   dot (pulsing for urgent) carries the whole priority signal. */
+.pd-meta-prio { font-weight: 400; }
+
+/* --- S33 (user request 2026-09-13): «اسپرینت جدید» — the CTA + modal + the
+   FULL-SCREEN sprint editor ----------------------------------------------------
+   The board head's CTA is a SOLID teal button (the ghost links stay quiet next to
+   it). The new-sprint dialog mirrors the taskadd recipe (34rem). The sprint doc
+   editor is a true full-bleed dialog: 100vw × 100dvh, opaque --bg surface, a
+   sticky head + formatting toolbar (reusing .pd-tb), a write pane (centered
+   readable column) + live preview pane (≥75rem shows both side-by-side; below it
+   the Write/Preview tabs swap), and a footer with the autosave state + char count. */
+
+/* The CTA: SOLID teal (a PLAIN <button> — the app's .btn class in canvas.css is the
+   NEUTRAL card-colored button, and .ghost is transparent; neither reads "primary".
+   The plain button base carries --cta fill + white text + 600). Compact row sizing
+   to sit even with the ghost links beside it. */
+.pd-new-sprint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.9rem;
+  font-size: var(--fs-md);
+  min-block-size: 2.75rem; /* match the ghost row's 44px touch floor */
+}
+.pd-new-sprint .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.pd-new-sprint:hover { box-shadow: 0 2px 10px rgb(74 159 163 / 0.35); }
+/* S46.2 (owner: "decrease the size of these buttons" — برد تمام‌صفحه / اسپرینت جدید /
+   اسپرینت‌ها). A single high-specificity rule shrinks all three project-progress head
+   buttons consistently. Specificity (0,2,1) beats both .btn (0,1,0) + .small (0,1,0) +
+   ties .pd-new-sprint (0,1,0) but loads later in this file → wins. The 2rem
+   min-block-size keeps them tap-friendly on (pointer:coarse) without dominating the row. */
+.pd-board-head .row > .btn,
+.pd-board-head .row > .pd-new-sprint {
+  padding: 0.32rem 0.6rem;
+  font-size: var(--fs-sm);
+  min-block-size: 2rem;
+  gap: 0.3rem;
+}
+.pd-board-head .row > .btn .icon,
+.pd-board-head .row > .pd-new-sprint .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+/* The modal's ENTER button — the flow's primary CTA (same solid recipe). */
+.pd-sprintnew-enter { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+/* -- the new-sprint dialog ------------------------------------------------------ */
+/* Same specificity recipe as dialog.pd-taskadd-modal: `dialog.pd-sprintnew-modal`
+   (0,1,1) ties with components.css's `dialog.dialog` (0,1,1) and this file loads
+   later — the explicit inline-size wins over the 26rem cap. */
+dialog.pd-sprintnew-modal {
+  inline-size: min(36rem, 92vw);
+  max-inline-size: min(36rem, 92vw);
+  max-block-size: min(88vh, 44rem);
+}
+.pd-sprintnew-inner { padding: 1.25rem; display: grid; gap: 0.75rem; }
+.pd-sprintnew-fields { display: grid; gap: 0.75rem; }
+.pd-sprintnew-fields .pd-opt { display: grid; gap: 0.3rem; font-size: var(--fs-md); color: var(--text); }
+.pd-sprintnew-fields .pd-opt input,
+.pd-sprintnew-fields .pd-opt textarea { font: inherit; }
+#pd-sprintnew-desc {
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  min-block-size: 7.5rem;
+  border-radius: var(--radius);
+  resize: vertical;
+}
+#pd-sprintnew-desc:focus-visible,
+#pd-sprintnew-name:focus-visible,
+#pd-sprintnew-version:focus-visible { border-color: var(--brand); outline: none; }
+.pd-sprintnew-actions { justify-content: flex-start; gap: 0.4rem; }
+/* the "created → enter" view */
+.pd-sprintnew-done { display: grid; gap: 0.6rem; padding-block: 0.4rem; }
+.pd-sprintnew-done-title { margin: 0; display: flex; align-items: center; gap: 0.45rem; font-size: var(--fs-xl); }
+.pd-sprintnew-check {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.6rem;
+  block-size: 1.6rem;
+  border-radius: 999px;
+  background: var(--accent-soft, rgb(74 159 163 / 0.16));
+  color: var(--brand);
+  font-weight: 700;
+}
+.pd-sprintnew-done-name { margin: 0; font-size: var(--fs-lg); font-weight: 600; overflow-wrap: anywhere; }
+.pd-sprintnew-enter { flex: 0 1 auto; }
+
+/* -- the full-screen sprint editor ---------------------------------------------- */
+/* True full-bleed: ties with dialog.dialog then overrides every cap. 100dvh (with
+   the 100vh fallback) keeps mobile browser chrome honest. The ::backdrop dims the
+   page behind — the editor IS the surface now (no floating card). */
+dialog.pd-sd-full {
+  inline-size: 100vw;
+  max-inline-size: 100vw;
+  block-size: 100vh;
+  block-size: 100dvh;
+  max-block-size: 100vh;
+  max-block-size: 100dvh;
+  padding: 0;
+  border: 0;
+  background: var(--bg);
+  overflow: hidden;
+}
+dialog.pd-sd-full::backdrop { background: rgb(26 20 12 / 0.55); }
+.pd-sd {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100vw;
+  block-size: 100vh;
+  block-size: 100dvh;
+  background: var(--bg);
+}
+.pd-sd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 1rem;
+  border-block-end: 1px solid var(--line);
+  background: var(--card);
+}
+.pd-sd-titlewrap { display: flex; align-items: center; gap: 0.5rem; min-inline-size: 0; flex-wrap: wrap; }
+.pd-sd-titlewrap h3 { margin: 0; font-size: var(--fs-lg); overflow-wrap: anywhere; }
+.pd-sd-diamond { display: inline-grid; place-items: center; color: var(--brand); }
+.pd-sd-diamond .icon { inline-size: 1rem; block-size: 1rem; }
+.pd-sd-ver {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: var(--fs-xs);
+  padding: 0.12rem 0.5rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-weight: 600;
+}
+.pd-sd-project { overflow-wrap: anywhere; }
+.pd-sd-headactions { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.pd-sd-status { min-inline-size: 4.5rem; text-align: center; }
+.pd-sd-status.pd-sd-err { color: var(--danger); }
+.pd-sd-tabs { margin-block: 0; }
+
+/* the formatting toolbar — .pd-tb/.pd-tb-btn carry the look; here: one scrollable
+   row that never wraps (15 buttons, S34: strike + task + table + image + comment),
+   hairline bottom edge, card surface. */
+.pd-sd-tb {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  margin-block-end: 0;
+  padding: 0.4rem 1rem;
+  border-block-end: 1px solid var(--line);
+  background: var(--card);
+}
+.pd-sd-tb .pd-tb-btn { flex: none; }
+.pd-sd-codebtn { border-color: var(--brand); color: var(--text); } /* the special ask: code gets the brand edge */
+/* S34: the COMMENT button gets the amber edge — private notes are their own semantic */
+.pd-sd-notebtn { border-color: #C9973B; color: var(--text); }
+.pd-sd-ital { font-style: italic; font-family: Georgia, 'Times New Roman', serif; font-weight: 600; }
+.pd-sd-quote { font-family: Georgia, 'Times New Roman', serif; }
+.pd-sd-strike { text-decoration: line-through; font-weight: 600; }
+.pd-sd-inlineg { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); font-size: var(--fs-xs); }
+
+/* the writing surface + preview. data-view drives the layout:
+   write  → ≥75rem: BOTH panes (editor | preview); below: editor only
+   preview → preview only (all widths). */
+.pd-sd-main { flex: 1 1 auto; display: flex; min-block-size: 0; }
+#pd-sd-text {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  block-size: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.75;
+  padding: 1.4rem 1.2rem;
+  resize: none;
+  overflow-y: auto;
+  /* a readable centered column — long prose lines stay digestible at any width */
+  margin-inline: auto;
+  max-inline-size: 50rem;
+}
+#pd-sd-text:focus-visible { outline: none; }
+.pd-sd-preview {
+  display: none;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  padding: 1.4rem 1.2rem;
+  margin-inline: auto;
+  max-inline-size: 50rem;
+  inline-size: 100%;
+  font-size: var(--fs-md);
+  line-height: 1.75;
+  color: var(--text);
+}
+.pd-sd-main[data-view='preview'] #pd-sd-text { display: none; }
+.pd-sd-main[data-view='preview'] .pd-sd-preview { display: block; }
+@media (min-width: 75rem) {
+  .pd-sd-main[data-view='write'] .pd-sd-preview {
+    display: block;
+    border-inline-start: 1px solid var(--line);
+    max-inline-size: none;
+    flex: 1 1 46%;
+  }
+  .pd-sd-main[data-view='write'] #pd-sd-text { max-inline-size: none; }
+}
+/* the preview's markdown typography (the .t-code island is already global above) */
+.pd-sd-preview p { margin: 0 0 0.7rem; }
+.pd-sd-preview h1, .pd-sd-preview h2, .pd-sd-preview h3 { margin: 1.1rem 0 0.5rem; line-height: 1.3; }
+.pd-sd-preview h1 { font-size: 1.35rem; }
+.pd-sd-preview h2 { font-size: 1.18rem; }
+.pd-sd-preview h3 { font-size: 1.04rem; }
+.pd-sd-preview ul, .pd-sd-preview ol { margin: 0 0 0.7rem; padding-inline-start: 1.4rem; }
+.pd-sd-preview li { margin-block: 0.2rem; }
+.pd-sd-preview blockquote {
+  margin: 0 0 0.7rem;
+  padding: 0.35rem 0.9rem;
+  border-inline-start: 3px solid var(--brand);
+  background: var(--bg-soft);
+  border-radius: var(--radius-sm);
+}
+.pd-sd-preview blockquote p { margin: 0; }
+.pd-sd-preview code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 0.85em;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 0.35em;
+  padding: 0.08em 0.35em;
+}
+.pd-sd-preview .t-code { margin-block: 0.45rem; } /* fenced blocks: the global .t-code recipe */
+.pd-sd-preview a { color: var(--link); text-underline-offset: 2px; }
+.pd-sd-preview hr { border: 0; border-block-start: 1px solid var(--line); margin: 1rem 0; }
+
+/* — S34 (user request 2026-09-13): PRIVATE COMMENTS «==text== %%note%%» — visible
+   only to the author: the anchor reads as amber underlined text; hover, focus, or a
+   tap (the .sd-note-open pin — touch has no hover) lifts the note in a popover with
+   a lock glyph. #pd-sd.nonotes (the foot's eye toggle) is the CLEAN READ: anchors
+   render as plain text and the popovers vanish. — */
+.pd-sd-preview .sd-note {
+  position: relative;
+  border-block-end: 2px dashed #C9973B;
+  background: rgb(201 151 59 / 0.09);
+  border-start-start-radius: 0.2em;
+  border-start-end-radius: 0.2em;
+  cursor: help;
+  outline: none;
+}
+.pd-sd-preview .sd-note:focus-visible {
+  background: rgb(201 151 59 / 0.16);
+}
+.pd-sd-preview .sd-note-pop {
+  position: absolute;
+  inset-block-end: calc(100% + 0.45rem);
+  inset-inline-start: 0;
+  inline-size: max-content;
+  max-inline-size: min(22rem, 78vw);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  background: var(--card);
+  border: 1px solid #C9973B;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 24px rgb(26 20 12 / 0.18);
+  padding: 0.5rem 0.7rem;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text);
+  z-index: 5;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s ease, visibility 0.12s;
+  cursor: auto;
+}
+.pd-sd-preview .sd-note:hover .sd-note-pop,
+.pd-sd-preview .sd-note:focus-visible .sd-note-pop,
+.pd-sd-preview .sd-note:focus-within .sd-note-pop,
+.pd-sd-preview .sd-note.sd-note-open .sd-note-pop {
+  visibility: visible;
+  opacity: 1;
+}
+.sd-note-lock { flex: none; inline-size: 0.95rem; block-size: 0.95rem; margin-block-start: 0.2rem; color: #C9973B; }
+.sd-note-txt { overflow-wrap: anywhere; }
+/* the clean read: anchors neutral, popovers gone */
+#pd-sd.nonotes .sd-note-pop { display: none !important; }
+#pd-sd.nonotes .sd-note {
+  background: transparent;
+  border-block-end: 0;
+  cursor: inherit;
+}
+
+/* — S34: TASK LISTS — the checkboxes toggle straight from the preview (each click
+   writes [x]/[ ] back into the source and autosaves) — */
+.pd-sd-preview ul.sd-tasklist { list-style: none; padding-inline-start: 0.35rem; }
+.pd-sd-preview li.sd-task { display: flex; align-items: flex-start; gap: 0.5rem; }
+.pd-sd-preview li.sd-task input[type="checkbox"] {
+  flex: none;
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  margin-block-start: 0.32rem;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+.pd-sd-preview li.sd-task .sd-task-txt { min-inline-size: 0; }
+
+/* — S34: TABLES + IMAGES — */
+.pd-sd-preview table {
+  border-collapse: collapse;
+  inline-size: 100%;
+  margin: 0 0 0.75rem;
+  font-size: 0.95em;
+}
+.pd-sd-preview th,
+.pd-sd-preview td {
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.6rem;
+  text-align: start;
+}
+.pd-sd-preview th { background: var(--bg-soft); font-weight: 600; }
+.pd-sd-preview img.sd-img {
+  max-inline-size: 100%;
+  border-radius: var(--radius-sm);
+  margin-block: 0.45rem;
+  display: block;
+}
+
+/* the foot's comments show/hide toggle (S34) — reads as a toolbar chip */
+.pd-sd-notesbtn { margin-block: 0; }
+.pd-sd-notesbtn[aria-pressed="false"] { opacity: 0.6; }
+
+.pd-sd-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 1rem;
+  border-block-start: 1px solid var(--line);
+  background: var(--card);
+}
+/* ≤640px: the head folds (project name hides, status shrinks), toolbar keeps its
+   own scroll, footer hint hides — the writing surface keeps the space. */
+@media (max-width: 640px) {
+  .pd-sd-project, .pd-sd-kbd { display: none; }
+  .pd-sd-status { min-inline-size: 0; }
+  .pd-sd-head { padding: 0.5rem 0.7rem; }
+  .pd-sd-tb { padding: 0.35rem 0.7rem; }
+  #pd-sd-text, .pd-sd-preview { padding: 1rem 0.8rem; }
+}
+
+/* --- S35: the project/idea ARCHIVE --------------------------------------------
+   archived_state='offline' parks a row: the detail head swaps the Archive button for
+   this banner, and /archive.html renders the shelf rows (.arc-*). Amber = "stored",
+   deliberately distinct from the red danger system (trash) and the teal brand (work). */
+.pd-archived-banner {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  margin-block: 0.6rem; padding: 0.5rem 0.75rem;
+  border: 1px solid #C9973B; border-radius: var(--radius-sm);
+  background: rgb(201 151 59 / 0.08); color: var(--text);
+  font-size: var(--fs-sm);
+}
+.pd-archived-banner .icon { color: #C9973B; flex: none; }
+.pd-archived-banner span { flex: 1 1 14rem; }
+
+/* the Archive shelf rows (archive.html) */
+.arc-list { display: grid; gap: 0.75rem; margin-block-start: 1rem; }
+.arc-row { padding: 0.8rem 1rem; display: grid; gap: 0.45rem; }
+.arc-head { align-items: center; }
+.arc-title-wrap { gap: 0.6rem; min-inline-size: 0; flex-wrap: wrap; }
+.arc-title { font-weight: 600; color: var(--text); text-decoration: none; unicode-bidi: plaintext; }
+.arc-title:hover { text-decoration: underline; }
+.arc-desc { margin: 0; }
+.arc-tags { gap: 0.35rem; flex-wrap: wrap; }
+.arc-actions { gap: 0.5rem; flex-wrap: wrap; }
+.arc-total { margin-block-start: 0.75rem; }
+
+/* --- S39: the pin picker + the pinned-pictures dialog (dynamically created
+   <dialog.pd-pin-modal> — same specificity recipe as dialog.pd-sprintnew-modal:
+   (0,1,1) ties with components.css's dialog.dialog and this file loads later,
+   so the explicit inline-size beats the 26rem cap). Self-removing on close. --- */
+dialog.pd-pin-modal {
+  inline-size: min(34rem, 92vw);
+  max-inline-size: min(34rem, 92vw);
+  max-block-size: min(80vh, 40rem);
+}
+.pd-pin-inner { padding: 1.1rem; display: grid; gap: 0.6rem; }
+.pd-pin-head h3 { margin: 0; }
+.pd-pin-body { display: grid; gap: 0.6rem; min-block-size: 0; }
+/* S46 (user request 2026-09-14): screenshot note modal (shotNoteForm → makeDialog).
+   Replaces the old 2-row inline textarea. Compact Save/Cancel (the owner said the
+   old buttons were too big) + a "create bug/idea from this screenshot" row that
+   turns the note into a tracked progress-box item with the shot pinned to it. */
+.pd-shot-note-ta {
+  width: 100%; box-sizing: border-box;
+  min-block-size: 8rem; resize: vertical;
+  font: inherit; font-size: var(--fs-md);
+  padding: 0.6rem; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--text);
+}
+.pd-shot-note-actions { display: flex; gap: 0.4rem; justify-content: flex-end; }
+.pd-shot-note-actions .btn, .pd-shot-note-actions .ghost {
+  font-size: var(--fs-xs); padding: 0.2rem 0.6rem; min-block-size: 0;
+}
+.pd-shot-note-create {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin-block-start: 0.4rem; padding-block-start: 0.6rem;
+  border-block-start: 1px dashed var(--line);
+}
+.pd-shot-note-create-btns { display: inline-flex; gap: 0.4rem; flex-wrap: wrap; }
+.pd-shot-note-create-btns .ghost {
+  font-size: var(--fs-xs); padding: 0.2rem 0.6rem; min-block-size: 0;
+}
+.pd-pin-search {
+  font: inherit; padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text);
+}
+.pd-pin-list {
+  display: grid; gap: 0.5rem; overflow-y: auto;
+  max-block-size: min(46vh, 26rem);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 0.5rem; margin: 0;
+}
+.pd-pin-group { display: grid; gap: 0.3rem; }
+.pd-pin-grouplabel { text-transform: none; letter-spacing: 0.02em; }
+.pd-pin-row {
+  display: flex; align-items: baseline; gap: 0.5rem; inline-size: 100%;
+  font: inherit; font-size: var(--fs-sm); text-align: start;
+  padding: 0.4rem 0.5rem; border: 1px solid transparent;
+  border-radius: var(--radius-sm); background: none; color: var(--text);
+  cursor: pointer;
+}
+.pd-pin-row:hover { background: var(--soft, rgb(0 0 0 / 0.05)); border-color: var(--line); }
+.pd-pin-row[aria-current="true"] { border-color: var(--brand); }
+.pd-pin-box { flex: none; max-inline-size: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-pin-box-bug { color: #C0453B; border-color: rgb(192 69 59 / 0.4); }
+.pd-pin-box-idea { color: var(--brand); }
+.pd-pin-title { flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: plaintext; }
+.pd-pin-cur { color: var(--brand); flex: none; }
+.pd-pin-unrow { border: 1px dashed var(--line); }
+.pd-tshots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.75rem; overflow-y: auto; max-block-size: min(52vh, 30rem); }
+
+/* ==== S185 — the owner's batch-1 color round (scoped to the Project Detail page) ====
+   Blocks 2 + 5 of the color table: the warm canvas + the bordered cards + the
+   Notes tab's editable-field affordance. The tokens live in variables.css's S185
+   block (dark twins in claude-dark-theme.css); body.pd-page is project.html's own
+   body class — no other shell page carries it, so nothing else moves. */
+body.pd-page { background: var(--page-bg); }
+/* Block 2 — every card on the page wears the light warm gray hairline (the white
+   card vs the near-white page is 1.1:1 alone; the border carries the separation).
+   The kanban columns keep their stage-edge language (above); text fields are
+   Block 5's own treatment below. S209: the embedded board's .db-frame (the old
+   `section.card.pd-board` lost the .card class when it gained the mother-container
+   recipe) joins the selector at the SAME specificity (0,2,1) so the dark theme's
+   top-rung interplay (claude-dark-theme.css .card border-block-start-color) keeps
+   working exactly as it did on the .card original. */
+body.pd-page .card,
+body.pd-page section.pd-board,
+body.pd-page .pd-task { border-color: var(--border-soft); }
+/* Block 5 — the Notes tab's note area: the card's own surface + a visible hairline
+   (the old page-gray fill matched the canvas and read as disabled) + the teal
+   --primary border on focus, in the app's accent-border + halo focus grammar. */
+body.pd-page #pd-note-textarea {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+}
+body.pd-page #pd-note-textarea:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+}
