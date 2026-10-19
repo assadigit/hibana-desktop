@@ -71,20 +71,28 @@ jobs:
       #    warning, exactly what the first green run exposed).
       - name: Install wails CLI + NSIS
         run: |
-          # NSIS 3.x — the nsis-unicode package is 2.46 (2011) and wails cannot find its makensis.
-          # choco's V2 feed FLAKES (run#13: "Unable to find package 'nsis'" — and pwsh
-          # swallows the nonzero exit) after which wails SILENTLY skips the installer.
-          # So: retry the install, VERIFY makensis.exe actually landed, fail loudly otherwise.
+          # NSIS 3.x — the nsis-unicode choco package is 2.46 (2011); wails needs makensis on
+          # PATH or it SILENTLY skips the installer (S211's documented trap).
+          # choco's community V2 feed went hard-down mid-session (runs #13/#15: "Unable to
+          # find package 'nsis'" 5/5 attempts, pwsh swallows the exit; the feed even serves
+          # the nsis nupkg metadata-only, so there is no offline side-door through choco's
+          # CDN) — so: one choco attempt, then the DETERMINISTIC fallback: the official
+          # NSIS 3.13 portable zip from SourceForge (the exact binary the winget manifest
+          # ships; verified layout nsis-3.13/makensis.exe + Stubs — NSIS is portable by
+          # design). Every path VERIFIES makensis.exe; the product asserts stay downstream.
           $nsisDir = 'C:\Program Files (x86)\NSIS'
-          $attempt = 0
-          while (-not (Test-Path (Join-Path $nsisDir 'makensis.exe')) -and $attempt -lt 3) {
-            $attempt++
-            Write-Host "choco nsis install attempt $attempt of 3"
-            choco install nsis -y --no-progress
-            if (-not (Test-Path (Join-Path $nsisDir 'makensis.exe'))) { Start-Sleep -Seconds 20 }
+          Write-Host 'choco nsis install attempt 1'
+          choco install nsis -y --no-progress
+          if (-not (Test-Path (Join-Path $nsisDir 'makensis.exe'))) {
+            Write-Host 'choco V2 feed unavailable — falling back to the official NSIS 3.13 portable zip'
+            $zip = Join-Path $env:RUNNER_TEMP 'nsis-3.13.zip'
+            curl.exe -L --fail --retry 3 --retry-delay 5 -o $zip 'https://sourceforge.net/projects/nsis/files/NSIS%203/3.13/nsis-3.13.zip/download'
+            $dst = Join-Path $env:RUNNER_TEMP 'NSIS-313'
+            Expand-Archive -Path $zip -DestinationPath $dst -Force
+            $nsisDir = Join-Path $dst 'nsis-3.13'
           }
           if (-not (Test-Path (Join-Path $nsisDir 'makensis.exe'))) {
-            Write-Error "makensis.exe still missing after $attempt choco attempt(s) — failing loudly: wails build -nsis would silently skip the installer"
+            Write-Error "makensis.exe still missing after choco + the official zip fallback ($nsisDir)"
             exit 1
           }
           # makensis is NOT put on PATH by choco; the wails CLI resolves it via LookPath,
