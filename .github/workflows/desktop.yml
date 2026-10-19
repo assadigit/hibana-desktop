@@ -70,7 +70,7 @@ jobs:
       #    warning, exactly what the first green run exposed).
       - name: Install wails CLI + NSIS
         run: |
-          choco install nsis-unicode -y --no-progress
+          choco install nsis -y --no-progress   # NSIS 3.x — the nsis-unicode package is 2.46 (2011) and wails cannot find its makensis
           go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
 
       # 4. The two artifacts — same binary, dual stamps (the never-diverge rule:
