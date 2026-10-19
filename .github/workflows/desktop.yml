@@ -128,7 +128,18 @@ jobs:
           VER="${TAG#v}"; VER="${VER%-desktop}"
           # ubuntu-latest runs bash, not pwsh: $env:WEB_REF is PowerShell syntax and
           # expands to a literal ":WEB_REF" here — the workflow-level env is plain $WEB_REF.
-          # upload-artifact@v4 preserves the build/bin/ subpath, so the installer glob must reach into it.
+          # First live exercise (v0.1.0-desktop, run 39270204244) taught: `no matches
+          # found for build/bin/*installer*.exe` — download-artifact@v4's extraction
+          # carried no build/bin/ subpath. Assume NO layout: locate each asset wherever
+          # it landed, fail loudly with a dump if any is missing.
+          INSTALLER="$(find . -type f -name '*installer*.exe' -print -quit)"
+          PORTABLE="$(find . -type f -name 'hibana-portable-*.zip' -print -quit)"
+          CKSUM="$(find . -type f -name 'checksums.txt' -print -quit)"
+          if [ -z "$INSTALLER" ] || [ -z "$PORTABLE" ] || [ -z "$CKSUM" ]; then
+            echo "::error::release assets missing after download (installer='$INSTALLER' portable='$PORTABLE' checksums='$CKSUM'); extracted layout:"
+            find . -type f | head -50
+            exit 1
+          fi
           gh release create "$TAG" --title "Hibana Kanban $VER (island @ $WEB_REF)" \
             --notes "Desktop $VER — embedded web island pinned at hibana-source $WEB_REF (v$WEB_VERSION). See checksums.txt." \
-            build/bin/*installer*.exe hibana-portable-*.zip checksums.txt
+            "$INSTALLER" "$PORTABLE" "$CKSUM"
