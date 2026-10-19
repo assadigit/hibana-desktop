@@ -43,6 +43,7 @@ import (
 	"hibana/desktop/internal/auth"
 	"hibana/desktop/internal/store"
 	"hibana/desktop/internal/sync"
+	"hibana/desktop/internal/tray"
 	"hibana/desktop/internal/ui"
 )
 
@@ -51,9 +52,9 @@ import (
 // derives all three). Overridden at build time:
 //
 //	wails build -platform windows/amd64 -ldflags \
-//	  "-s -w -X main.Version=0.1.1 -X main.WebRef=e6661c8"
+//	  "-s -w -X main.Version=0.1.3 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.2-dev"
+	Version = "0.1.3-dev"
 	WebRef  = "unpinned"
 )
 
@@ -76,6 +77,28 @@ const (
 // auth-lost emitter can EventsEmit from any goroutine. atomic because the
 // sync loop can hit a 401 before the window finishes starting.
 var appCtxVal atomic.Value // context.Context
+
+// The close-to-tray state (S214 — "minimize to taskbar"):
+//   - hideOnClose is the user's persisted preference (mirror meta table,
+//     tray.MetaKey; missing → ON — the owner asked for the behavior, so a
+//     missing row must never silently turn the X into quit);
+//   - quitRequested is the bypass flag the tray's "Quit Hibana" sets so
+//     OnBeforeClose lets the REAL exit through (runtime.Quit routes through
+//     OnBeforeClose too — wails' Frontend.Quit consults it on every path).
+var (
+	hideOnClose   atomic.Bool
+	quitRequested atomic.Bool
+)
+
+// showWindow restores the board window from any state — hidden to tray,
+// minimized — on whatever thread the caller is on (winc's Hide/Show are
+// plain ShowWindow syscalls, no marshaling; safe from the tray's thread).
+func showWindow() {
+	if c, ok := appCtxVal.Load().(context.Context); ok {
+		wailsruntime.WindowShow(c)
+		wailsruntime.WindowUnminimise(c)
+	}
+}
 
 func main() {
 	dataDir, err := resolveDataDir()
@@ -165,6 +188,51 @@ func main() {
 	// outbox drain rides the same tick — FIFO, one in-flight, §10.
 	go syncLoop(syncCtx, engine, bridge)
 
+	// The S214 tray — the "minimize to taskbar" option: the Hibana icon
+	// sits in the notification area the whole session; left-click
+	// restores, right-click offers Open / the close-to-tray toggle / Quit.
+	// The preference rides the mirror's meta table (default ON). A failed
+	// tray is survivable but then the X must QUIT — otherwise a hidden
+	// window with no icon to bring it back would strand the app.
+	if v, ok, err := mirror.GetMeta(ctx0, tray.MetaKey); err != nil {
+		log.Printf("hibana: tray preference read: %v (defaulting on)", err)
+	} else {
+		hideOnClose.Store(tray.HideOnCloseFromMeta(v, ok))
+	}
+	go func() {
+		err := tray.Run(tray.Config{
+			Icon:    trayIconICO,
+			Tooltip: "Hibana Kanban — running",
+			IsOn:    hideOnClose.Load,
+			OnShow:  showWindow,
+			OnToggle: func(on bool) {
+				hideOnClose.Store(on)
+				v := "0"
+				if on {
+					v = "1"
+				}
+				if err := mirror.SetMeta(context.Background(), tray.MetaKey, v); err != nil {
+					log.Printf("hibana: persisting hide-on-close=%v failed: %v", on, err)
+				}
+				state := "off — close button quits"
+				if on {
+					state = "on — close button hides to the tray"
+				}
+				log.Printf("hibana: hide-on-close %s", state)
+			},
+			OnQuit: func() {
+				quitRequested.Store(true) // OnBeforeClose must let the real exit through
+				if c, ok := appCtxVal.Load().(context.Context); ok {
+					wailsruntime.Quit(c)
+				}
+			},
+		})
+		if err != nil {
+			log.Printf("hibana: tray unavailable (%v) — close button quits", err)
+			hideOnClose.Store(false) // NEVER strand a hidden window behind a dead tray
+		}
+	}()
+
 	err = wails.Run(&options.App{
 		Title:            "Hibana Kanban",
 		Width:            1600,
@@ -175,12 +243,36 @@ func main() {
 		OnStartup: func(ctx context.Context) {
 			appCtxVal.Store(ctx)
 		},
+		OnShutdown: func(context.Context) {
+			tray.Stop() // NIM_DELETE + quit the tray's message loop
+		},
+		// The close button contract (S214): with the preference ON
+		// (default) the X hides the window to the tray — the app keeps
+		// running, the sync loop keeps pulling; the tray icon (or a
+		// second exe launch) brings it back. The tray's Quit sets
+		// quitRequested so the REAL exit passes. Preference OFF → X
+		// quits. WindowHide here is a plain ShowWindow(SW_HIDE)
+		// syscall (winc), safe to call from this main-thread callback.
+		OnBeforeClose: func(context.Context) bool {
+			if quitRequested.Load() {
+				return false
+			}
+			if !hideOnClose.Load() {
+				return false
+			}
+			log.Printf("hibana: close → tray (hide-on-close on; quit via the tray menu)")
+			if c, ok := appCtxVal.Load().(context.Context); ok {
+				wailsruntime.WindowHide(c)
+			}
+			return true // prevent the quit; the window is gone from the taskbar
+		},
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "hibana-kanban-desktop",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
-				// Second launch focuses the first window instead of forking a
-				// second data-dir writer (the never-mix rule, WPP §1).
-				log.Printf("hibana: second instance launched (%v) — focusing this one", secondInstanceData.Args)
+				// Second launch focuses THIS window — even from the tray: the
+				// close-to-tray recovery path when the user forgets the icon.
+				log.Printf("hibana: second instance launched (%v) — showing this one", secondInstanceData.Args)
+				showWindow()
 			},
 		},
 		AssetServer: &assetserver.Options{

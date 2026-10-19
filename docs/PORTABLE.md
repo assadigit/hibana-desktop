@@ -3,6 +3,22 @@
 > For the installed build, none of this applies: data lives in
 > `%LOCALAPPDATA%\hibana\` and the NSIS uninstaller owns removal.
 
+## Stays in the tray (closing ≠ quitting)
+
+The **Hibana icon sits in the notification area** (by the clock) the whole
+session. The **✕ button hides the window to the tray** — the app keeps
+running and syncing in the background; it never quit. To bring it back:
+
+- **left-click the tray icon** (or double-click), or
+- **launch the .exe again** — the running instance shows itself, or
+- right-click the icon → **Open Hibana**.
+
+Right-click also offers **Hide to tray on close** (a checked menu item —
+uncheck it and ✕ really quits; the choice is remembered in
+`data\mirror.db`), and **Quit Hibana** — the real exit. If the tray ever
+fails to start (it is the first thing in the log), the ✕ falls back to
+quitting so a hidden window is never stranded.
+
 ## Signing in (first launch)
 
 The first launch opens a **sign-in card** — use your **hibana.ir account**
