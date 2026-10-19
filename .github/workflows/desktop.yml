@@ -71,11 +71,25 @@ jobs:
       #    warning, exactly what the first green run exposed).
       - name: Install wails CLI + NSIS
         run: |
-          choco install nsis -y --no-progress   # NSIS 3.x — the nsis-unicode package is 2.46 (2011) and wails cannot find its makensis
-          # choco's nsis package deploys makensis to Program Files (x86)\NSIS but does
-          # NOT put it on PATH; the wails CLI resolves makensis via LookPath, so the
-          # directory joins GITHUB_PATH (visible to every subsequent step).
-          Add-Content $env:GITHUB_PATH "C:\Program Files (x86)\NSIS"
+          # NSIS 3.x — the nsis-unicode package is 2.46 (2011) and wails cannot find its makensis.
+          # choco's V2 feed FLAKES (run#13: "Unable to find package 'nsis'" — and pwsh
+          # swallows the nonzero exit) after which wails SILENTLY skips the installer.
+          # So: retry the install, VERIFY makensis.exe actually landed, fail loudly otherwise.
+          $nsisDir = 'C:\Program Files (x86)\NSIS'
+          $attempt = 0
+          while (-not (Test-Path (Join-Path $nsisDir 'makensis.exe')) -and $attempt -lt 3) {
+            $attempt++
+            Write-Host "choco nsis install attempt $attempt of 3"
+            choco install nsis -y --no-progress
+            if (-not (Test-Path (Join-Path $nsisDir 'makensis.exe'))) { Start-Sleep -Seconds 20 }
+          }
+          if (-not (Test-Path (Join-Path $nsisDir 'makensis.exe'))) {
+            Write-Error "makensis.exe still missing after $attempt choco attempt(s) — failing loudly: wails build -nsis would silently skip the installer"
+            exit 1
+          }
+          # makensis is NOT put on PATH by choco; the wails CLI resolves it via LookPath,
+          # so the directory joins GITHUB_PATH (visible to every subsequent step).
+          Add-Content $env:GITHUB_PATH $nsisDir
           go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
 
       # 4. The two artifacts — same binary, dual stamps (the never-diverge rule:
@@ -84,7 +98,12 @@ jobs:
         run: wails build -platform windows/amd64 -ldflags "-s -w -X main.Version=0.1.0 -X main.WebRef=$env:WEB_REF"
 
       - name: Build NSIS installer
-        run: wails build -platform windows/amd64 -nsis -ldflags "-s -w -X main.Version=0.1.0 -X main.WebRef=$env:WEB_REF"
+        run: |
+          wails build -platform windows/amd64 -nsis -ldflags "-s -w -X main.Version=0.1.0 -X main.WebRef=$env:WEB_REF"
+          # wails exits 0 with a mere warning when makensis is missing — assert the PRODUCT.
+          $installer = Get-ChildItem -Path 'build/bin','.' -Filter '*installer*.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $installer) { Write-Error "NSIS installer not produced (wails silently skipped — makensis missing?)"; exit 1 }
+          Write-Host "installer produced: $($installer.FullName)"
 
       - name: Portable zip + checksums
         run: |
@@ -93,6 +112,11 @@ jobs:
           # product lands in build/bin/) and hash them with Get-FileHash —
           # no name/location assumptions, sha256 lowercased like sha256sum.
           $artifacts = Get-ChildItem -Path 'build/bin/hibana.exe', 'build/bin/*installer*.exe', '*installer*.exe', 'hibana-portable-*.zip' -ErrorAction SilentlyContinue | Sort-Object FullName -Unique
+          $found = @($artifacts)
+          if ($found.Count -lt 3) {
+            Write-Error "expected 3 artifacts (exe + installer + portable zip), found $($found.Count): $($found.FullName -join ', ')"
+            exit 1
+          }
           $artifacts | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $(Split-Path -Leaf $_.FullName)" } | Out-File checksums.txt -Encoding utf8
           Get-Content checksums.txt
 
