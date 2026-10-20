@@ -5,7 +5,10 @@
 # TWO island gates (WPP §7.4 — the highest-value check of the separate-repo design):
 #   1. CHECKSUM gate (always): the committed frontend/dist must be byte-identical
 #      to the committed island.checksums.json — catches any hand-edit.
-#   2. PINNED-REF gate (needs HIBANA_SOURCE_TOKEN — hibana-source is PRIVATE):
+#   2. PINNED-REF gate (hibana-source is PUBLIC since the owner's 2026-10-20
+#      flip — the clone is anonymous by default; the HIBANA_SOURCE_TOKEN
+#      secret, when present and valid, is preferred so the gate survives
+#      a flip back to private):
 #      a fresh sync from hibana-source AT THE PIN must reproduce the same
 #      checksums — catches a drifted/dishonestly re-checksummed island.
 
@@ -41,18 +44,33 @@ jobs:
       - name: Island checksum gate
         run: node scripts/sync-island.mjs --ref $env:WEB_REF --check
 
-      # 1b. The pinned-ref gate — hibana-source is a PRIVATE repo: the clone
-      #     needs the PAT secret. Skipped (with a visible note) until the
-      #     owner sets HIBANA_SOURCE_TOKEN in this repo's secrets.
+      # 1b. The pinned-ref gate — hibana-source is PUBLIC (the owner's
+      #     2026-10-20 flip): the clone works anonymously; the token secret,
+      #     when present and valid, is still preferred (it keeps the gate
+      #     alive if the repo ever flips back to private). A stale/invalid
+      #     token can NEVER red the gate — the anonymous clone is the
+      #     fallback.
       - name: Island pinned-ref gate
-        if: env.HAS_SOURCE_TOKEN == 'true'
         env:
-          HAS_SOURCE_TOKEN: ${{ secrets.HIBANA_SOURCE_TOKEN != '' }}
+          SOURCE_TOKEN: ${{ secrets.HIBANA_SOURCE_TOKEN }}
         run: |
-          git clone --no-checkout https://x-access-token:${{ secrets.HIBANA_SOURCE_TOKEN }}@github.com/assadigit/hibana-source.git $env:RUNNER_TEMP\hibana-source
+          $dst = Join-Path $env:RUNNER_TEMP 'hibana-source'
+          if ($env:SOURCE_TOKEN) {
+            Write-Host 'clone attempt 1: via the HIBANA_SOURCE_TOKEN secret'
+            git clone --no-checkout "https://x-access-token:$($env:SOURCE_TOKEN)@github.com/assadigit/hibana-source.git" $dst 2>$null
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host 'token clone refused (stale/invalid token?) — falling back to the anonymous public clone'
+              if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
+            }
+          }
+          if (-not (Test-Path $dst)) {
+            Write-Host 'clone attempt 2: anonymous (hibana-source is public)'
+            git clone --no-checkout https://github.com/assadigit/hibana-source.git $dst
+            if ($LASTEXITCODE -ne 0) { Write-Error 'hibana-source clone failed (token AND anonymous both refused)'; exit 1 }
+          }
           $tmp = Join-Path $env:RUNNER_TEMP "island-fresh"
           New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-          node scripts/sync-island.mjs --ref $env:WEB_REF --src $env:RUNNER_TEMP\hibana-source --out (Join-Path $tmp "dist")
+          node scripts/sync-island.mjs --ref $env:WEB_REF --src $dst --out (Join-Path $tmp "dist")
           if (Compare-Object (Get-Content frontend\island.checksums.json) (Get-Content (Join-Path $tmp "island.checksums.json"))) {
             Write-Error "ISLAND DRIFT: a fresh sync at pin $env:WEB_REF does not reproduce the committed checksums"
           }
@@ -188,6 +206,26 @@ jobs:
             echo "::error::release assets missing after download (installer='$INSTALLER' portable='$PORTABLE' checksums='$CKSUM'); extracted layout:"
             find . -type f | head -50
             exit 1
+          fi
+          # IDEMPOTENT LANE: a re-run must never red on a release that already
+          # exists (a hand-published release like v0.1.5/v0.1.6 during the
+          # billing-wall outage, or any retry) — the existing release keeps
+          # its assets; only MISSING ones upload. Fresh tags take the create
+          # path below.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists — filling in any missing assets only (idempotent re-run)"
+            EXISTING="$(gh release view "$TAG" --json assets --jq '.[].name')"
+            for f in "$INSTALLER" "$PORTABLE" "$CKSUM"; do
+              n="$(basename "$f")"
+              if printf '%s\n' "$EXISTING" | grep -qx "$n"; then
+                echo "  $n already attached — leaving it be"
+              else
+                echo "  uploading missing asset $n"
+                gh release upload "$TAG" "$f"
+              fi
+            done
+            echo "IDEMPOTENT RELEASE PASS: $TAG complete."
+            exit 0
           fi
           # THE NOTES RIDE THE ANNOTATED TAG (one mechanism for every release):
           # the hand-cut ritual writes the round's notes into `git tag -a -m`,
