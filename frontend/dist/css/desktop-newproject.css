@@ -1,0 +1,38 @@
+/* desktop-newproject.css — the new-project round (v0.1.11 — the owner ask:
+   "Add ability to define a new project, and get a kanban for it as well. this
+   project then will be updated in hibana's cloudflare as a new project.").
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
+   The dialog + .modal card + the .modal label grid + the .error line are the
+   island's own (components.css / base.css) — this sheet starts INSIDE the card. */
+
+/* The switcher popup's New project row — injected at RUNTIME by
+   js/desktop-newproject.js (board-page.js builds the popup lazily on first
+   open), riding the pin's own .db-switch-row grammar (devboard.css) with the
+   + glyph where a project row carries its status badge; accent-as-TEXT —
+   the S204 doctrine (the 5.74:1 --accent-ink), never a filled accent. */
+.db-switch-new { color: var(--accent-ink); }
+
+/* The desktop serves NO projects page — the switcher list IS it — so the
+   popup's dead "All projects →" link (/projects.html, board-page.js:371; a
+   web page the embedded asset server does not carry) is hidden and the New
+   project row replaces it at the popup's foot. The OTHER /projects.html
+   links (the no-projects CTA :466, the fail state :920) are click-intercepted
+   into the dialog by the controller instead. */
+.db-switch-all { display: none; }
+
+/* The dialog's description textarea — rows=3 renders it; the min-block-size
+   belt keeps the box readable if the UA sheet ever disagrees. */
+.db-newproject-modal textarea { min-block-size: 5rem; }
+
+/* The actions row — the .db-logout-actions grammar (the pair right-aligned,
+   start-aligned under RTL). The Create button is the BARE <button> (the S186
+   CTA grammar — the view's one solid primary, the sign-out confirm's shape);
+   Cancel the neutral secondary ahead of it. */
+.db-newproject-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+[dir='rtl'] .db-newproject-actions { justify-content: flex-start; }
+.db-newproject-modal h2 { margin: 0; }

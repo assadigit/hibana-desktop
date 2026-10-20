@@ -31,7 +31,11 @@
 //      js/desktop-theme.js (v0.1.5 — the S216 dark-mode round: the FIRST blocking
 //      head script + the two toggle surfaces), js/desktop-sync.js +
 //      css/desktop-sync.css (v0.1.6 — the S217 sync round: the toolbar button +
-//      its proof modal), and icon.svg.
+//      its proof modal), js/desktop-logout.js + css/desktop-logout.css (v0.1.9 —
+//      the sign-out round: the toolbar's account zone + the confirm dialog),
+//      js/desktop-newproject.js + css/desktop-newproject.css (v0.1.11 — the
+//      new-project round: the switcher's New project row + the live cloud-create
+//      dialog), and icon.svg.
 //   6. Writes web-ref.json (the sealed pin) + island.checksums.json OUTSIDE dist
 //      (frontend/island.checksums.json — dist stays purely servable; guide §3.3.2,
 //      WINDOWS-PACKAGING-PLAN §7.4: CI re-runs --check to fail on web-island drift).
@@ -576,6 +580,115 @@ const HTML_LOGOUT_OPS = [
   },
 ]
 
+// ---------------------------------------------------------------------------
+// The v0.1.11 additions — the new-project round (the owner ask: "Add ability to
+// define a new project, and get a kanban for it as well. this project then will
+// be updated in hibana's cloudflare as a new project."). The desktop could OPEN
+// boards but never CREATE their projects — every project came from the web app.
+// The round closes the gap with a LIVE cloud create, the web API's own
+// idempotent POST /api/projects (routes/projects/index.ts:389 @ pin): the
+// controller (DESKTOP_NEWPROJECT_JS below) mints a client UUID v4, POSTs
+// {id, title, description?, status:'planning'} through window.hibanaFetch —
+// the shim's fetch seam into the bridge's ONE Request transport (the Go
+// client stamps the Origin + the session cookie; the T6 write gate passes) —
+// and on the 201 {ok,id} / 200 {ok,duplicate} resolve deep-links the island's
+// OWN /kanban?project=<id> boot, which loads the fresh board (B().load → GET
+// /api/projects/:id/devboard → the empty columns render — the kanban for the
+// new project) and records it as the last-used board (the island's OWN
+// recordBoard; this round touches NO storage).
+//
+// status:'planning' — the FIRST ACTIVE stage, NOT the createProjectSchema's
+// 'spark' default: the switcher's list (GET /api/projects?sort=recent, the
+// seam's site 9) EXCLUDES sparks (routes/projects/index.ts:66), so a spark
+// would never appear in the very switcher it was created from; 'planning'
+// lands in the list AND owns its kanban. The stage stays editable on the web.
+//
+// THREE entry points, all in the controller: (1) the switcher popup's
+// "New project" row — board-page.js builds the popup lazily at RUNTIME
+// (openSwitch), so the row is injected via MutationObserver the moment the
+// popup is born, riding the pin's own .db-switch-row grammar (devboard.css)
+// + the pin's own cmdk.newProject label (EN 'New project' / FA 'پروژهٔ جدید');
+// (2) the popup's dead "All projects →" link (/projects.html — board-page.js
+// :371, a web page the embedded server does not serve) is HIDDEN by
+// css/desktop-newproject.css — on the desktop the switcher list IS the
+// projects page, and the New project row replaces the dead link; (3) the
+// remaining /projects.html links (the no-projects empty state's "Go to
+// projects" CTA, board-page.js:466; the fail state, :920) are click-
+// intercepted into the dialog by the controller's document delegation.
+//
+// OFFLINE HONESTY: a transport failure surfaces the dialog's unreachable line
+// — NO offline queue (the outbox's project.create entity stays M3's scope:
+// offline mutations; a create that LOOKS queued but is not would be a lie).
+// A 401 opens the login card (the bridge's own NotifyAuthLost fires Go-side)
+// plus the session line here; the user re-signs in and retries.
+//
+// The dialog rides the WEB'S OWN native dialog system (dialog.dialog + .modal
+// — components.css: theme-aware + RTL-native for free), the sync/logout
+// modals' own grammar; every label rides the PIN'S OWN dictionaries
+// (cmdk.newProject / sparks.title / sparks.description / cat.quickAdd /
+// common.cancel — EN+FA @ pin) via data-i18n; only the body copy + the failure
+// lines are the controller's own EN/FA pair.
+// ---------------------------------------------------------------------------
+const HTML_NEWPROJECT_OPS = [
+  {
+    name: 'insert /css/desktop-newproject.css after the logout sheet (rtl.css stays the last ISLAND /css/ sheet)',
+    cite: 'v0.1.11 (the new-project round); the dialog + the switcher row + the dead-link hide — desktop-owned styles',
+    anchor: `  <link rel="stylesheet" href="/css/desktop-logout.css?v=1">`,
+    insert: `  <link rel="stylesheet" href="/css/desktop-newproject.css?v=1">`,
+  },
+  {
+    name: 'insert /js/desktop-newproject.js after desktop-logout.js',
+    cite: 'v0.1.11; the new-project controller — blocking, after the sign-out controller, before the deferred board scripts',
+    anchor: `<script src="/js/desktop-logout.js"></script>`,
+    insert: `<script src="/js/desktop-newproject.js"></script>`,
+  },
+  {
+    // Generated-element anchor (the S217/S219 pattern): BOTH prior dialogs were
+    // spliced in as SINGLE multi-line elements, so a bare '</dialog>' anchor now
+    // matches TWO elements and must fail — the logout dialog's OWN confirm id
+    // is unique, and inserting after ITS element lands the create dialog right
+    // after the sign-out modal in the body chain.
+    name: 'insert the #db-newproject-dialog markup after the logout dialog',
+    cite: "v0.1.11; the WEB'S OWN native dialog system (dialog.dialog + .modal — components.css), the sync/logout modals' own grammar",
+    anchor: `id="db-logout-confirm"`,
+    insert: `  <!-- The new-project modal (v0.1.11 — the owner ask: "Add ability to
+       define a new project, and get a kanban for it as well. this project then
+       will be updated in hibana's cloudflare as a new project."). GENERATED by
+       sync-island.mjs — never hand-edit. The WEB'S OWN native dialog
+       (dialog.dialog + .modal, components.css — theme-aware + RTL-native for
+       free); js/desktop-newproject.js wires the form to a LIVE cloud create:
+       POST /api/projects {id: client UUID, title, description?, status:
+       'planning'} through window.hibanaFetch — the shim's fetch seam into the
+       bridge's ONE Request transport (the Go client stamps the Origin + the
+       session cookie) — the web API's own idempotent-by-client-id contract
+       (201 {ok,id} / 200 {ok,duplicate}), so the project EXISTS on the Hibana
+       cloud the moment the dialog resolves; then the island's own
+       /kanban?project=<id> deep-link boot loads the fresh board — the kanban
+       for the new project, recorded as the last-used board by the island's own
+       recordBoard. Every label rides the pin's own i18n keys (cmdk.newProject
+       / sparks.title / sparks.description / cat.quickAdd / common.cancel); the
+       body copy + the failure lines are the controller's own EN/FA pair.
+       Create is the BARE <button> (the S186 CTA grammar); status:'planning'
+       because the switcher's list excludes sparks (a spark would vanish from
+       the very switcher it was created from). -->
+  <dialog class="dialog" id="db-newproject-dialog" aria-labelledby="db-newproject-title">
+    <form class="modal db-newproject-modal" id="db-newproject-form" method="dialog" novalidate>
+      <h2 id="db-newproject-title" data-i18n="cmdk.newProject">New project</h2>
+      <p class="small muted" id="db-newproject-body">Name the project — it is created on the Hibana cloud (hibana.ir) and its Kanban board opens right here.</p>
+      <label><span data-i18n="sparks.title">Title</span>
+        <input type="text" id="db-newproject-title-input" maxlength="200" autocomplete="off" spellcheck="false" dir="auto" required></label>
+      <label><span data-i18n="sparks.description">Description</span>
+        <textarea id="db-newproject-description" maxlength="2000" rows="3" dir="auto"></textarea></label>
+      <p id="db-newproject-error" class="error" role="alert" hidden></p>
+      <div class="db-newproject-actions">
+        <button type="button" class="btn ghost small" id="db-newproject-cancel" data-i18n="common.cancel">Cancel</button>
+        <button type="button" id="db-newproject-create" data-i18n="cat.quickAdd">Create</button>
+      </div>
+    </form>
+  </dialog>`,
+  },
+]
+
 function adaptBoardHtml(html) {
   const lines = html.split('\n')
   const log = []
@@ -618,17 +731,20 @@ function adaptBoardHtml(html) {
     log.push('inserted: ' + HTML_GATE_INSERT.name)
   }
   // The v0.1.5 theme round + the v0.1.6 sync round + the v0.1.9 sign-out round
-  // (recorded above, per-round, in the order the head/body chain requires — each
-  // op's anchor must already exist when the op runs: the theme script rides the
-  // PINNED chip-render line, the floater rides the gate block HTML_GATE_INSERT
-  // just emitted, the toolbar toggle rides the PINNED labels line, the sync
-  // sheet/script ride the desktop login lines emitted above, the dialog rides
-  // the PINNED skip-link, the sync button rides the toggle line the theme round
-  // just inserted; the logout sheet/script ride the sync round's own emitted
-  // lines, the logout dialog rides the sync dialog's closing line, and the
-  // logout button rides the theme toggle line — the row ends Sprints | Labels |
-  // Sync | theme | Log out).
-  for (const op of [...HTML_THEME_OPS, ...HTML_SYNC_OPS, ...HTML_LOGOUT_OPS]) {
+  // + the v0.1.11 new-project round (recorded above, per-round, in the order the
+  // head/body chain requires — each op's anchor must already exist when the op
+  // runs: the theme script rides the PINNED chip-render line, the floater rides
+  // the gate block HTML_GATE_INSERT just emitted, the toolbar toggle rides the
+  // PINNED labels line, the sync sheet/script ride the desktop login lines
+  // emitted above, the dialog rides the PINNED skip-link, the sync button rides
+  // the toggle line the theme round just inserted; the logout sheet/script ride
+  // the sync round's own emitted lines, the logout dialog rides the sync
+  // dialog's closing line, and the logout button rides the theme toggle line —
+  // the row ends Sprints | Labels | Sync | theme | Log out; the newproject
+  // sheet/script ride the logout round's own emitted lines, and the create
+  // dialog rides the logout dialog's OWN confirm id — a bare '</dialog>' anchor
+  // now matches BOTH spliced dialog elements and must never be used again).
+  for (const op of [...HTML_THEME_OPS, ...HTML_SYNC_OPS, ...HTML_LOGOUT_OPS, ...HTML_NEWPROJECT_OPS]) {
     if (op.anchor !== undefined) {
       const hits = lines.map((l, i) => (l.includes(op.anchor) ? i : -1)).filter((i) => i !== -1)
       if (hits.length !== 1) {
@@ -2125,6 +2241,303 @@ const DESKTOP_LOGOUT_CSS = `/* desktop-logout.css — the sign-out round (v0.1.9
 `
 
 // ---------------------------------------------------------------------------
+// desktop-newproject.js — generated below into dist/js/ (the v0.1.11
+// new-project round). Written without template literals/backticks so it can
+// nest in this literal.
+// ---------------------------------------------------------------------------
+const DESKTOP_NEWPROJECT_JS = `// desktop-newproject.js — the new-project round (v0.1.11 — the owner ask:
+// "Add ability to define a new project, and get a kanban for it as well. this
+// project then will be updated in hibana's cloudflare as a new project.").
+// GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+// into frontend/dist/js/ and checksummed in frontend/island.checksums.json. Loads
+// blocking, right after desktop-logout.js, BEFORE every deferred island script.
+//
+// WHAT THIS FILE OWNS: the ability to DEFINE a project on the desktop and get
+// its kanban — a LIVE cloud create, not a local stub:
+//   1. THREE entry points: the switcher popup's "New project" row (injected by
+//      the MutationObserver the moment board-page.js's openSwitch builds the
+//      popup at runtime), and EVERY dead /projects.html link on the board
+//      surface (the no-projects empty-state CTA, board-page.js:466; the fail
+//      state, :920) — intercepted into the dialog because the embedded server
+//      serves no projects page; the switcher list IS it. The popup's own
+//      "All projects →" link (:371) is css-hidden (desktop-newproject.css).
+//   2. THE CREATE: mint a client UUID v4 -> POST /api/projects {id, title,
+//      description?, status:'planning'} through window.hibanaFetch — the
+//      shim's fetch-compatible seam into the bridge's ONE Request transport
+//      (the Go client stamps the Origin + the session cookie; the T6 write
+//      gate passes) — the web API's own idempotent-by-client-id contract
+//      (201 {ok,id} / 200 {ok,duplicate}: both mean the project EXISTS on
+//      the Hibana cloud; routes/projects/index.ts:389).
+//   3. THE KANBAN: on the ok resolve, location.assign the island's OWN
+//      /kanban?project=<id> deep link — the boot loads the fresh board (GET
+//      /api/projects/:id/devboard: the project + its empty columns), and the
+//      island's own boot->recordBoard() writes hibana-kanban-last; THIS FILE
+//      never touches storage (the island's code does, exactly as on the web).
+//   4. status:'planning' — NOT the createProjectSchema's 'spark' default: the
+//      switcher's list (GET /api/projects?sort=recent) EXCLUDES sparks
+//      (routes/projects/index.ts:66), so a spark would never appear in the
+//      very switcher it was created from; 'planning' is the first ACTIVE
+//      stage — it lands in the list AND owns its kanban.
+//
+// WHAT IT MUST NEVER OWN: no cookie/token handling, no storage of any kind,
+// no offline queueing (the outbox's project.create entity is M3's scope — a
+// create that LOOKS queued but is not would be a lie; offline surfaces the
+// unreachable line honestly).
+(function () {
+  'use strict'
+
+  var STR = {
+    en: {
+      body: 'Name the project — it is created on the Hibana cloud (hibana.ir) and its Kanban board opens right here.',
+      busy: 'Creating on hibana.ir…',
+      notWired: 'The desktop bridge is not wired — restart the app.',
+      unreachable: 'Cannot reach hibana.ir — check your connection and try again.',
+      session: 'Your session expired — sign in again, then retry.',
+      rate: 'Too many attempts — wait a minute and try again.',
+      refused: 'hibana.ir refused the create — check the name and try again.',
+      conflict: 'That project id already exists — try again.',
+      emptyTitle: 'Give the project a name first.'
+    },
+    fa: {
+      body: 'نام پروژه را وارد کنید — روی ابر هیبانا (hibana.ir) ساخته می‌شود و برد کانبانش همین‌جا باز می‌شود.',
+      busy: 'در حال ساخت روی hibana.ir…',
+      notWired: 'پل دسکتاپ وصل نیست — برنامه را دوباره باز کنید.',
+      unreachable: 'اتصال به hibana.ir ممکن نیست — اتصال خود را بررسی کنید.',
+      session: 'نشست شما منقضی شده — دوباره وارد شوید و تلاش کنید.',
+      rate: 'تلاش‌های شما زیاد بوده — کمی صبر کنید و دوباره تلاش کنید.',
+      refused: 'hibana.ir ساخت پروژه را نپذیرفت — نام را بررسی کنید و دوباره تلاش کنید.',
+      conflict: 'پروژه‌ای با این شناسه موجود است — دوباره تلاش کنید.',
+      emptyTitle: 'اول یک نام برای پروژه وارد کنید.'
+    }
+  }
+
+  function lang() { return document.documentElement.lang === 'fa' ? 'fa' : 'en' }
+  function t(key) { return (STR[lang()] && STR[lang()][key]) || STR.en[key] || key }
+
+  // The pin's own dictionaries carry every dialog label (cmdk.newProject /
+  // sparks.title / sparks.description / cat.quickAdd / common.cancel — EN + FA
+  // @ pin). Resolve at CALL time, never a parse-time snapshot (the v0.1.1
+  // lesson) — the switcher row is runtime-injected, so data-i18n cannot own it.
+  function pin(key, fallback) {
+    var s = window.hibanaI18n ? window.hibanaI18n.t(key) : null
+    return s && s !== key ? s : fallback
+  }
+
+  // The client-minted id — the create's idempotency key (the server re-validates
+  // the uuid shape; a replay of the same id answers {ok,duplicate} 200 — the
+  // offline-replay-safety contract the web quick-add itself rides).
+  function uuid() {
+    try {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID()
+    } catch (e) { /* fall through to the v4 shim */ }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0
+      var v = c === 'x' ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn)
+    else fn()
+  }
+
+  ready(function () {
+    var dlg = document.getElementById('db-newproject-dialog')
+    if (!dlg || typeof dlg.showModal !== 'function') return
+
+    var titleInput = document.getElementById('db-newproject-title-input')
+    var descInput = document.getElementById('db-newproject-description')
+    var body = document.getElementById('db-newproject-body')
+    var errEl = document.getElementById('db-newproject-error')
+    var createBtn = document.getElementById('db-newproject-create')
+    var cancelBtn = document.getElementById('db-newproject-cancel')
+    var busy = false
+
+    function authed() {
+      // The login gate owns an unauthenticated surface (the shell serves
+      // data-desktop-authed on <html> at every paint — the first-paint rule).
+      return document.documentElement.getAttribute('data-desktop-authed') !== 'false'
+    }
+
+    function fail(msg) {
+      if (!errEl) return
+      errEl.textContent = msg
+      errEl.hidden = false
+    }
+
+    function reset() {
+      busy = false
+      if (createBtn) { createBtn.disabled = false; createBtn.textContent = pin('cat.quickAdd', 'Create') }
+      if (cancelBtn) cancelBtn.disabled = false
+    }
+
+    function localize() {
+      if (body) body.textContent = t('body')
+      // The runtime-injected switcher row's label — the pin's own
+      // cmdk.newProject (EN 'New project' / FA 'پروژهٔ جدید').
+      var rowLabel = document.getElementById('db-switch-new-label')
+      if (rowLabel) rowLabel.textContent = pin('cmdk.newProject', 'New project')
+      var row = document.getElementById('db-switch-new')
+      if (row) {
+        var lbl = pin('cmdk.newProject', 'New project')
+        row.setAttribute('title', lbl)
+        row.setAttribute('aria-label', lbl)
+      }
+    }
+
+    function open() {
+      if (busy || !authed()) return
+      if (titleInput) titleInput.value = ''
+      if (descInput) descInput.value = ''
+      if (errEl) errEl.hidden = true
+      if (createBtn) { createBtn.disabled = false; createBtn.textContent = pin('cat.quickAdd', 'Create') }
+      if (cancelBtn) cancelBtn.disabled = false
+      localize()
+      dlg.showModal()
+      if (titleInput) titleInput.focus()
+    }
+
+    function create() {
+      if (busy) return
+      var title = titleInput ? String(titleInput.value || '').trim() : ''
+      if (!title) { fail(t('emptyTitle')); if (titleInput) titleInput.focus(); return }
+      if (typeof window.hibanaFetch !== 'function') { fail(t('notWired')); return }
+      var id = uuid()
+      var payload = { id: id, title: title, status: 'planning' }
+      var desc = descInput ? String(descInput.value || '').trim() : ''
+      if (desc) payload.description = desc
+      busy = true
+      if (createBtn) { createBtn.disabled = true; createBtn.textContent = t('busy') }
+      if (cancelBtn) cancelBtn.disabled = true
+      if (errEl) errEl.hidden = true
+      // POST /api/projects — the LIVE Hibana-cloud create through the shim's
+      // fetch seam (the bridge's ONE Request transport: Origin + cookie are
+      // stamped Go-side). 201 {ok,id} / 200 {ok,duplicate} both mean the
+      // project EXISTS on the cloud — navigate the island's own deep link.
+      window.hibanaFetch('/api/projects', { method: 'POST', body: JSON.stringify(payload) })
+        .then(function (r) {
+          if (r.ok) {
+            return r.json().catch(function () { return {} }).then(function (b) {
+              var pid = (b && b.id) || id
+              // The project is on the Hibana cloud — boot its kanban via the
+              // island's own deep-link path (recordBoard runs island-side).
+              location.assign('/kanban?project=' + encodeURIComponent(pid))
+            })
+          }
+          reset()
+          // 401: the bridge already reopened the login card Go-side
+          // (NotifyAuthLost); the session line explains the retry.
+          if (r.status === 401) { fail(t('session')); return }
+          if (r.status === 429) { fail(t('rate')); return }
+          if (r.status === 409) { fail(t('conflict')); return }
+          fail(t('refused'))
+        })
+        .catch(function () { reset(); fail(t('unreachable')) })
+    }
+
+    if (createBtn) createBtn.addEventListener('click', function (e) { e.preventDefault(); create() })
+    if (cancelBtn) cancelBtn.addEventListener('click', function () { if (!busy) dlg.close() })
+    var form = document.getElementById('db-newproject-form')
+    if (form) form.addEventListener('submit', function (e) { e.preventDefault(); create() })
+    // Esc cannot drop an in-flight create — the POST's outcome is unknown until
+    // it resolves (the honest-transport rule; the dialog re-opens on reset).
+    dlg.addEventListener('cancel', function (e) { if (busy) e.preventDefault() })
+    dlg.addEventListener('close', reset)
+
+    // The dead /projects.html links — the embedded server serves no projects
+    // page; the empty state's "Go to projects" CTA (board-page.js:466) and the
+    // fail state's link (:920) both become the create dialog, the desktop's
+    // honest affordance (the empty state's own copy says "Create your first
+    // project" — now the desktop actually can).
+    document.addEventListener('click', function (e) {
+      if (!e.target || !e.target.closest) return
+      var a = e.target.closest('a[href="/projects.html"]')
+      if (!a) return
+      e.preventDefault()
+      open()
+    })
+
+    // The switcher popup's New project row — board-page.js builds the popup
+    // lazily at RUNTIME (openSwitch appends it to <body>), so the row joins via
+    // MutationObserver the moment the popup is born. Appended as a POPUP
+    // SIBLING after the list div: renderSwitchRows rewrites #db-switch-list's
+    // innerHTML on every list update, but this row survives every re-render —
+    // and the popup stays OPEN under the modal's backdrop, so board-page.js's
+    // own switchOpen state is never desynced (closeSwitch stays consistent).
+    function injectRow() {
+      var pop = document.getElementById('db-switch-pop')
+      if (!pop || document.getElementById('db-switch-new')) return
+      var row = document.createElement('button')
+      row.type = 'button'
+      row.id = 'db-switch-new'
+      row.className = 'db-switch-row db-switch-new'
+      row.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="db-switch-name" id="db-switch-new-label"></span>'
+      row.addEventListener('click', function (e) { e.preventDefault(); open() })
+      pop.appendChild(row)
+      localize()
+    }
+    injectRow()
+    try {
+      new MutationObserver(injectRow).observe(document.body, { childList: true, subtree: true })
+    } catch (e) { /* no observer — the row injects on the ready pass only */ }
+
+    // Live language flips (i18n.js owns html[lang]) — relabel the body line +
+    // the runtime-injected row.
+    localize()
+    try {
+      new MutationObserver(localize).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
+    } catch (e) { /* no observer — the labels stay at the open-time language */ }
+  })
+})()
+`
+
+// ---------------------------------------------------------------------------
+// desktop-newproject.css — generated below into dist/css/. The dialog +
+// .modal card + the .modal label grid + the .error line are the island's own
+// (components.css / base.css) — this sheet starts INSIDE the card.
+// ---------------------------------------------------------------------------
+const DESKTOP_NEWPROJECT_CSS = `/* desktop-newproject.css — the new-project round (v0.1.11 — the owner ask:
+   "Add ability to define a new project, and get a kanban for it as well. this
+   project then will be updated in hibana's cloudflare as a new project.").
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
+   The dialog + .modal card + the .modal label grid + the .error line are the
+   island's own (components.css / base.css) — this sheet starts INSIDE the card. */
+
+/* The switcher popup's New project row — injected at RUNTIME by
+   js/desktop-newproject.js (board-page.js builds the popup lazily on first
+   open), riding the pin's own .db-switch-row grammar (devboard.css) with the
+   + glyph where a project row carries its status badge; accent-as-TEXT —
+   the S204 doctrine (the 5.74:1 --accent-ink), never a filled accent. */
+.db-switch-new { color: var(--accent-ink); }
+
+/* The desktop serves NO projects page — the switcher list IS it — so the
+   popup's dead "All projects →" link (/projects.html, board-page.js:371; a
+   web page the embedded asset server does not carry) is hidden and the New
+   project row replaces it at the popup's foot. The OTHER /projects.html
+   links (the no-projects CTA :466, the fail state :920) are click-intercepted
+   into the dialog by the controller instead. */
+.db-switch-all { display: none; }
+
+/* The dialog's description textarea — rows=3 renders it; the min-block-size
+   belt keeps the box readable if the UA sheet ever disagrees. */
+.db-newproject-modal textarea { min-block-size: 5rem; }
+
+/* The actions row — the .db-logout-actions grammar (the pair right-aligned,
+   start-aligned under RTL). The Create button is the BARE <button> (the S186
+   CTA grammar — the view's one solid primary, the sign-out confirm's shape);
+   Cancel the neutral secondary ahead of it. */
+.db-newproject-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+[dir='rtl'] .db-newproject-actions { justify-content: flex-start; }
+.db-newproject-modal h2 { margin: 0; }
+`
+
+// ---------------------------------------------------------------------------
 // icon.svg — the ISLAND'S FAVICON (v0.1.2 — the owner ask: "use the Hibana logo as
 // fav icon. and app icon"). GENERATED, not copied: the pin's own icon.svg is the old
 // H-tile art; these bytes are the traced Hibana logo mark (the h-spark squircle,
@@ -2198,25 +2611,26 @@ function verifyDist(outDir, fileMap) {
   // head link block — the gate sheet (guide §5.5), then the sync modal's sheet
   // (v0.1.6), then the sign-out round's sheet (v0.1.9); the island's 19-sheet
   // order + rtl-last are untouched around them.
-  const expectedLinks = [...CSS_SHEETS.map((p) => '/' + p), '/vendor/manrope/font-face.css', '/css/desktop-login.css', '/css/desktop-sync.css', '/css/desktop-logout.css']
+  const expectedLinks = [...CSS_SHEETS.map((p) => '/' + p), '/vendor/manrope/font-face.css', '/css/desktop-login.css', '/css/desktop-sync.css', '/css/desktop-logout.css', '/css/desktop-newproject.css']
   if (JSON.stringify(links) !== JSON.stringify(expectedLinks)) {
     problems.push('index.html CSS manifest mismatch:\n    expected: ' + JSON.stringify(expectedLinks) + '\n    actual:   ' + JSON.stringify(links))
   }
   if (links[CSS_SHEETS.length - 1] !== '/css/rtl.css') problems.push('index.html: rtl.css is not the last ISLAND /css/ sheet (the desktop-owned sheets follow it)')
-  // The blocking head chain (v0.1.5 + v0.1.6 + v0.1.9 grew it): the pre-paint theme
+  // The blocking head chain (v0.1.5 + v0.1.6 + v0.1.9 + v0.1.11 grew it): the pre-paint theme
   // bootstrap FIRST, then the transport shim, the login controller, the sync
-  // controller, the sign-out controller — all blocking, so they own their
-  // contracts before every deferred island script.
+  // controller, the sign-out controller, the new-project controller — all
+  // blocking, so they own their contracts before every deferred island script.
   const themeIdx = indexHtml.indexOf('/js/desktop-theme.js')
   const shimIdx = indexHtml.indexOf('/js/desktop-shim.js')
   const loginIdx = indexHtml.indexOf('/js/desktop-login.js')
   const syncIdx = indexHtml.indexOf('/js/desktop-sync.js')
   const logoutIdx = indexHtml.indexOf('/js/desktop-logout.js')
+  const newProjIdx = indexHtml.indexOf('/js/desktop-newproject.js')
   const devIdx = indexHtml.indexOf('/js/devboard.js')
   const bpIdx = indexHtml.indexOf('/js/board-page.js')
-  if (!(themeIdx !== -1 && shimIdx !== -1 && loginIdx !== -1 && syncIdx !== -1 && logoutIdx !== -1 && devIdx !== -1 && bpIdx !== -1 &&
-      themeIdx < shimIdx && shimIdx < loginIdx && loginIdx < syncIdx && syncIdx < logoutIdx && logoutIdx < devIdx && devIdx < bpIdx)) {
-    problems.push('index.html: desktop-theme.js → desktop-shim.js → desktop-login.js → desktop-sync.js → desktop-logout.js → devboard.js → board-page.js order broken (got indices ' + themeIdx + '/' + shimIdx + '/' + loginIdx + '/' + syncIdx + '/' + logoutIdx + '/' + devIdx + '/' + bpIdx + ')')
+  if (!(themeIdx !== -1 && shimIdx !== -1 && loginIdx !== -1 && syncIdx !== -1 && logoutIdx !== -1 && newProjIdx !== -1 && devIdx !== -1 && bpIdx !== -1 &&
+      themeIdx < shimIdx && shimIdx < loginIdx && loginIdx < syncIdx && syncIdx < logoutIdx && logoutIdx < newProjIdx && newProjIdx < devIdx && devIdx < bpIdx)) {
+    problems.push('index.html: desktop-theme.js → desktop-shim.js → desktop-login.js → desktop-sync.js → desktop-logout.js → desktop-newproject.js → devboard.js → board-page.js order broken (got indices ' + themeIdx + '/' + shimIdx + '/' + loginIdx + '/' + syncIdx + '/' + logoutIdx + '/' + newProjIdx + '/' + devIdx + '/' + bpIdx + ')')
   }
   for (const kept of ['id="db-toolbar"', 'id="db-loading"', 'id="db-board"', 'data-i18n="db.board"', 'data-i18n="db.backToProject"',
     'js/i18n-en.js', 'js/i18n.js', 'vendor/jalaali.min.js', 'js/chip-render.js', 'vendor/general-sans/GeneralSans-400.woff2']) {
@@ -2309,11 +2723,45 @@ function verifyDist(outDir, fileMap) {
   if (!logoutCss.includes('#db-logout-button')) problems.push('css/desktop-logout.css: the toolbar Log out button rule is missing (the twin-metrics icon+label pill)')
   if (!fs.existsSync(path.join(outDir, 'css/desktop-logout.css'))) problems.push('css/desktop-logout.css: missing from dist')
 
+  // The v0.1.11 new-project round (the owner ask: "Add ability to define a new
+  // project, and get a kanban for it as well. this project then will be updated
+  // in hibana's cloudflare as a new project."): the create dialog's ids must
+  // exist with the PIN'S OWN i18n keys on every label (cmdk.newProject /
+  // sparks.title / sparks.description / cat.quickAdd / common.cancel — the
+  // logout round's data-i18n discipline); the controller must POST through the
+  // shim seam with the client-minted idempotency id + the FIXED 'planning'
+  // status (the switcher's list EXCLUDES sparks — a spark would vanish from
+  // the very switcher it was created from), deep-link the fresh board on the
+  // ok resolve, inject the switcher row via MutationObserver, intercept the
+  // dead /projects.html links, and touch NO storage; the sheet must hide the
+  // dead "All projects →" link + own the create-row accent.
+  for (const kept of ['id="db-newproject-dialog"', 'id="db-newproject-title"', 'id="db-newproject-body"', 'id="db-newproject-title-input"', 'id="db-newproject-description"', 'id="db-newproject-error"', 'id="db-newproject-create"', 'id="db-newproject-cancel"', 'id="db-newproject-form"',
+    'data-i18n="cmdk.newProject"', 'data-i18n="sparks.title"', 'data-i18n="sparks.description"', 'data-i18n="cat.quickAdd"', 'data-i18n="common.cancel"', 'css/desktop-newproject.css',
+    // The S186 CTA grammar: Create is the BARE <button> (the view's one solid
+    // primary — the sign-out confirm's shape), Cancel the neutral secondary.
+    '<button type="button" id="db-newproject-create" data-i18n="cat.quickAdd">Create</button>']) {
+    if (!indexHtml.includes(kept)) problems.push('index.html: the new-project round is missing "' + kept + '"')
+  }
+  const newProjectJs = fileMap['js/desktop-newproject.js'] || ''
+  if (!newProjectJs.includes("window.hibanaFetch('/api/projects'")) problems.push("js/desktop-newproject.js: the create must POST through the shim's fetch seam (window.hibanaFetch('/api/projects'))")
+  if (!newProjectJs.includes("status: 'planning'")) problems.push("js/desktop-newproject.js: the fixed 'planning' status is missing (the switcher's list excludes sparks)")
+  if (!newProjectJs.includes('crypto.randomUUID')) problems.push('js/desktop-newproject.js: the client-minted idempotency id is missing')
+  if (!newProjectJs.includes('MutationObserver')) problems.push('js/desktop-newproject.js: the runtime switcher-row injection (MutationObserver) is missing')
+  if (!newProjectJs.includes('a[href="/projects.html"]')) problems.push('js/desktop-newproject.js: the dead /projects.html link interception is missing')
+  if (!newProjectJs.includes('location.assign(')) problems.push('js/desktop-newproject.js: the fresh-board deep-link boot (location.assign) is missing')
+  if (!newProjectJs.includes('created on the Hibana cloud')) problems.push('js/desktop-newproject.js: the EN create body copy is missing')
+  if (!newProjectJs.includes('ابر هیبانا')) problems.push('js/desktop-newproject.js: the FA create body copy is missing')
+  const newProjectCss = fileMap['css/desktop-newproject.css'] || ''
+  if (!newProjectCss.includes('.db-switch-all { display: none; }')) problems.push('css/desktop-newproject.css: the dead All-projects link hide rule is missing (the desktop serves no projects page)')
+  if (!newProjectCss.includes('.db-switch-new')) problems.push('css/desktop-newproject.css: the switcher New-project row accent rule is missing')
+  if (!newProjectCss.includes('.db-newproject-actions')) problems.push('css/desktop-newproject.css: the dialog actions row rule is missing')
+  if (!fs.existsSync(path.join(outDir, 'css/desktop-newproject.css'))) problems.push('css/desktop-newproject.css: missing from dist')
+
   // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the
   // persisted mirror-meta pref is Go-side; the island never forks it). The bare WORD
   // may appear in comments (desktop-theme.js's header says "NO localStorage:"), so
   // the gate greps for USAGE — a member/index access on the store.
-  for (const rel of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'css/desktop-login.css', 'css/desktop-sync.css', 'css/desktop-logout.css', 'index.html']) {
+  for (const rel of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'css/desktop-login.css', 'css/desktop-sync.css', 'css/desktop-logout.css', 'css/desktop-newproject.css', 'index.html']) {
     if (/\blocalStorage\s*[.[]/.test(fileMap[rel] || '')) problems.push(rel + ': localStorage usage — the island must never touch storage (the Go mirror owns persistence)')
   }
 
@@ -2377,9 +2825,10 @@ function verifyDist(outDir, fileMap) {
   }
 
   // (4) the JS is parseable — node --check the shim + login + theme + sync +
-  // logout controllers + every copied .js (belt + braces over the patch step; a
-  // mangled patch must never ship). The CSS sheets get the existence check above.
-  for (const js of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', ...JS_FILES]) {
+  // logout + newproject controllers + every copied .js (belt + braces over the
+  // patch step; a mangled patch must never ship). The CSS sheets get the
+  // existence check above.
+  for (const js of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', ...JS_FILES]) {
     try {
       execFileSync(process.execPath, ['--check', path.join(outDir, js)], { stdio: 'pipe' })
     } catch (err) {
@@ -2481,6 +2930,8 @@ function main() {
   fileMap['css/desktop-sync.css'] = DESKTOP_SYNC_CSS
   fileMap['js/desktop-logout.js'] = DESKTOP_LOGOUT_JS
   fileMap['css/desktop-logout.css'] = DESKTOP_LOGOUT_CSS
+  fileMap['js/desktop-newproject.js'] = DESKTOP_NEWPROJECT_JS
+  fileMap['css/desktop-newproject.css'] = DESKTOP_NEWPROJECT_CSS
   fileMap['icon.svg'] = ICON_SVG
 
   // Wipe + regenerate dist (deterministic + idempotent: running twice is byte-identical;
@@ -2510,8 +2961,8 @@ function main() {
   // Report.
   for (const line of adapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
-  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → login → sync → logout → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout, the step relay, the will-not-vanish copy, the login-card reload, no-storage), no-404 asset loop, node --check\n')
+  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + icon.svg + web-ref.json\n')
+  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → login → sync → logout → newproject → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, no-storage), no-404 asset loop, node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }
