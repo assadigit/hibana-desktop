@@ -100,6 +100,81 @@ func showWindow() {
 	}
 }
 
+// S222 — THE MERGED CHROME (the owner ask: "make the edge of app rounded and
+// modern" — the title-bar half; the rounded-corners half lives in
+// edge_windows.go): the native title bar, its text, and the window border
+// hairline paint the ISLAND'S OWN tokens instead of the OS scheme du jour —
+// the dark app wears the #141413 bar with #EDEDEC ink (claude-dark-theme.css
+// --bg/--text), the light app #E7E7E7 with #141414 (themes.css) — so the
+// chrome visually MERGES with the toolbar below it instead of the old
+// OS-white strip floating over a dark app.
+//
+// Ridden through wails' own Windows theme path: SetTheme → UpdateTheme →
+// immersive dark mode (Win10 1809+ — the dark bar survives there) plus the
+// CustomTheme colors (DWMWA_CAPTION_COLOR/_TEXT_COLOR/_BORDER_COLOR,
+// Win11 22000+). 'system' maps to wails' SystemDefault, and the wails
+// window ALREADY watches WM_SETTINGCHANGE "ImmersiveColorSet" (its own
+// window.go), so OS flips while the pref is 'system' re-resolve natively —
+// zero extra code on this side for that path.
+type windowChromeTheme int
+
+const (
+	chromeFollowsSystem windowChromeTheme = iota
+	chromeLight
+	chromeDark
+)
+
+// chromeThemeFor is the pure pref→chrome map (main_test.go): callers pass
+// ALREADY-NORMALIZED preferences (ui.NormalizeTheme output — the boot read,
+// the SetTheme binding, the change hook), so the legacy 'dark' alias and
+// garbage land on 'system' here by contract, exactly like every other
+// unreadable value.
+func chromeThemeFor(pref string) windowChromeTheme {
+	switch pref {
+	case ui.ThemeDark:
+		return chromeDark
+	case ui.ThemeLight:
+		return chromeLight
+	default: // 'system' + anything unreadable
+		return chromeFollowsSystem
+	}
+}
+
+// bootWindowTheme seeds the wails window Theme at creation (the options
+// block runs BEFORE wails.Run, where bootTheme is already resolved) — the
+// chrome is right from the very first frame, no flash of the OS-scheme bar.
+func bootWindowTheme(pref string) windows.Theme {
+	switch chromeThemeFor(pref) {
+	case chromeDark:
+		return windows.Dark
+	case chromeLight:
+		return windows.Light
+	default:
+		return windows.SystemDefault
+	}
+}
+
+// applyWindowThemeChrome pushes a live theme flip into the wails window
+// (the island toggle surfaces' SetTheme binding → the change hook → here,
+// and the tray's Theme submenu rides the same path). Safe from any
+// goroutine — wails' SetTheme Invoke-marshals onto the main thread; a
+// pre-startup call (no ctx yet) no-ops, and the creation-time seed already
+// painted the right chrome anyway.
+func applyWindowThemeChrome(pref string) {
+	c, ok := appCtxVal.Load().(context.Context)
+	if !ok {
+		return
+	}
+	switch chromeThemeFor(pref) {
+	case chromeDark:
+		wailsruntime.WindowSetDarkTheme(c)
+	case chromeLight:
+		wailsruntime.WindowSetLightTheme(c)
+	default:
+		wailsruntime.WindowSetSystemDefaultTheme(c)
+	}
+}
+
 func main() {
 	dataDir, err := resolveDataDir()
 	if err != nil {
@@ -185,6 +260,7 @@ func main() {
 	// island's two toggles use — js/desktop-theme.js listens).
 	bridge.SetThemeChange(func(pref string) {
 		log.Printf("hibana: theme → %s", pref)
+		applyWindowThemeChrome(pref) // S222: the merged chrome follows every flip (island + tray)
 		if c, ok := appCtxVal.Load().(context.Context); ok {
 			wailsruntime.EventsEmit(c, "hibana:theme", map[string]string{"pref": pref})
 		}
@@ -311,6 +387,13 @@ func main() {
 		BackgroundColour: func() *options.RGBA { bg := resolveBootBackground(bootTheme); return &bg }(),
 		OnStartup: func(ctx context.Context) {
 			appCtxVal.Store(ctx)
+			// S222 — the rounded window edge: the DWM corner pass
+			// in its own goroutine (its retry loop sleeps and must
+			// never stall this callback or the message loop). The
+			// chrome itself needs no call here — the options block
+			// seeded the wails window Theme from bootTheme BEFORE
+			// wails.Run, so the title bar is right at frame one.
+			go applyWindowEdge()
 		},
 		OnShutdown: func(context.Context) {
 			tray.Stop() // NIM_DELETE + quit the tray's message loop
@@ -382,6 +465,38 @@ func main() {
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
+			// S222 — THE MERGED CHROME, seeded at creation: the
+			// wails window is BORN in the stored look (Theme from
+			// bootTheme — resolved before wails.Run), so the first
+			// frame never wears the OS scheme's bar; live flips
+			// ride applyWindowThemeChrome. 'system' stays
+			// SystemDefault and the wails window follows OS flips
+			// natively (WM_SETTINGCHANGE watcher).
+			Theme: bootWindowTheme(bootTheme),
+			// The island's own tokens as COLORREFs (0x00BBGGRR),
+			// ACTIVE and INACTIVE (wails paints the inactive pair
+			// on focus loss) — dark: --bg #141413 bar, --text
+			// #EDEDEC ink, --line #34322f hairline; inactive bar
+			// --bg-soft #1f1e1c with --muted #9C9C9B ink. light:
+			// --bg #E7E7E7 bar, --text #141414 ink, --line #D4D4D4
+			// hairline; inactive #DEDEDE with the #5C5C5C ink.
+			// (Win11 22000+ paints all of these; Win10 1809+ keeps
+			// the immersive dark/light bar from Theme — the color
+			// attrs no-op harmlessly there.)
+			CustomTheme: &windows.ThemeSettings{
+				DarkModeTitleBar:           0x00131414,
+				DarkModeTitleText:          0x00ececed,
+				DarkModeBorder:             0x002f3234,
+				DarkModeTitleBarInactive:   0x001c1e1f,
+				DarkModeTitleTextInactive:  0x009b9c9c,
+				DarkModeBorderInactive:     0x002f3234,
+				LightModeTitleBar:          0x00e7e7e7,
+				LightModeTitleText:         0x00141414,
+				LightModeBorder:            0x00d4d4d4,
+				LightModeTitleBarInactive:  0x00dedede,
+				LightModeTitleTextInactive: 0x005c5c5c,
+				LightModeBorderInactive:    0x00d4d4d4,
+			},
 		},
 	})
 	if err != nil {
