@@ -141,6 +141,14 @@ func (e *Engine) PullArchives(ctx context.Context, projectID string) error {
 // every mirrored board (skip-none; 304s make it cheap). Errors are collected,
 // not fatal — one broken board must not stop the others (the same resilience
 // the web switcher shows per-board).
+//
+// A board that answers the web's gone state (404) now TOMBSTONES its mirror
+// row (store.MarkProjectGone) — the v0.1.12 refresh-round lesson: a project
+// deleted on hibana.ir vanished from the server list, but the mirror row
+// stayed live forever, re-polling a dead board every round and counting as a
+// live project in the sync modal's own success line. The tombstone stops the
+// polling; the list pull owns resurrection (a fresh list row clears it via
+// the upsert's excluded.deleted_at overwrite).
 func (e *Engine) SyncOnce(ctx context.Context) (boardsPulled int, errs []error) {
 	if _, err := e.RefreshProjects(ctx); err != nil {
 		errs = append(errs, fmt.Errorf("projects list: %w", err))
@@ -152,12 +160,17 @@ func (e *Engine) SyncOnce(ctx context.Context) (boardsPulled int, errs []error) 
 	}
 	for _, p := range projects {
 		if p.DeletedAt != nil {
-			continue // soft-deleted server-side; the list pull owns its lifecycle
+			continue // tombstoned (web-deleted or gone) — the list pull owns resurrection
 		}
 		pulled, err := e.Pull(ctx, p.ID)
 		if err != nil {
 			if errors.Is(err, ErrProjectGone) {
-				continue // gone state — the shell surfaces it when the user opens it
+				// The web's gone voice (404): tombstone the row so the next
+				// rounds skip it and the modal's live count tells the truth.
+				// Best-effort by design — a failed stamp only costs one extra
+				// 404 poll next round, never the round itself.
+				_ = e.store.MarkProjectGone(ctx, p.ID, e.now().UTC().Format(time.RFC3339Nano))
+				continue
 			}
 			errs = append(errs, fmt.Errorf("board %s: %w", p.ID, err))
 			continue

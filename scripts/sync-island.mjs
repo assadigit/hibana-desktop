@@ -689,6 +689,83 @@ const HTML_NEWPROJECT_OPS = [
   },
 ]
 
+// ---------------------------------------------------------------------------
+// The v0.1.12 additions — the refresh round (the owner ask: "I tried
+// something, deleted something from hibana, clicked sync on the app, but it
+// didn't got deleted. it seems we need a refresh button"). The ROOT CAUSE the
+// owner hit: the sync round DOES pull the boards (deletions included) into
+// the Go MIRROR — but the island's own DOM kept the boot-time render, so the
+// kanban on screen never re-fetched after a green sync: a task deleted on
+// hibana.ir stayed visible until a manual restart. The round closes it on
+// BOTH surfaces:
+//
+//   1. THE REFRESH BUTTON — a LABELED ghost pill right after the Sync CTA
+//      (Sprints | Labels | Sync | Refresh | theme | Log out): clicking it
+//      re-boots the island (location.reload — board-page.js pushState'd
+//      ?project=, so a refresh re-enters the SAME board) and the boot
+//      fetches ride the bridge's ALWAYS-FRESH interactive transport
+//      (bindings.go RequestFresh — never the conditional poll), so the
+//      cloud's truth — the deletion included — paints. The
+//      always-there affordance the owner asked for.
+//
+//   2. THE SYNC ROUND'S OWN REFLEX — the round outcome now carries `pulled`
+//      (the boards whose pull was a live 200 — the mirror rows that MOVED),
+//      desktop-sync.js paints it in the ok panel ("2 board(s) updated from
+//      the cloud — the board shows them when you close this."), and when
+//      the modal closes (Done or Esc — both fire the native close event)
+//      the island reloads, so the pulled deletions reach the VISIBLE board
+//      — the exact gap "clicked sync, but it didn't got deleted". pulled=0
+//      (all 304s — nothing changed server-side) reloads NOTHING: the screen
+//      was already the truth.
+//
+// Go-side companions (this round's other half, main repo): SyncOnce now
+// TOMBSTONES a mirror row whose board answered the web's gone state (404 —
+// store.MarkProjectGone), so a project deleted on hibana.ir stops counting
+// as live in the modal's own success line and stops being re-polled every
+// round; the list pull owns resurrection (a fresh list row clears the
+// tombstone via the upsert's excluded.deleted_at overwrite).
+// ---------------------------------------------------------------------------
+const HTML_REFRESH_OPS = [
+  {
+    name: 'insert /css/desktop-refresh.css after the newproject sheet (rtl.css stays the last ISLAND /css/ sheet)',
+    cite: 'v0.1.12 (the refresh round); the toolbar Refresh button + the busy spin — desktop-owned styles',
+    anchor: `  <link rel="stylesheet" href="/css/desktop-newproject.css?v=1">`,
+    insert: `  <link rel="stylesheet" href="/css/desktop-refresh.css?v=1">`,
+  },
+  {
+    name: 'insert /js/desktop-refresh.js after desktop-newproject.js',
+    cite: 'v0.1.12; the refresh controller — blocking, after the new-project controller, before the deferred board scripts',
+    anchor: `<script src="/js/desktop-newproject.js"></script>`,
+    insert: `<script src="/js/desktop-refresh.js"></script>`,
+  },
+  {
+    // Generated-line anchor: the sync round emitted the CTA line above; at
+    // this op's turn exactly ONE line carries the sync button's own class+id
+    // pair, so the Refresh pill lands right after it:
+    // Sprints | Labels | Sync | Refresh | theme | Log out (FA/RTL mirrors
+    // the whole row — Refresh lands between Sync and theme under RTL too).
+    name: 'insert the #db-refresh-button toolbar button right after the Sync CTA (v0.1.12: the pull-to-screen affordance)',
+    cite: "v0.1.12 (the owner ask: 'I tried something, deleted something from hibana, clicked sync on the app, but it didn't got deleted. it seems we need a refresh button'); a VISIBLE, LABELED ghost (the S220 lesson + the row's grammar: Sync stays the ONE colored action), twin metrics with Sprints/Labels/Sync/Log out",
+    anchor: `class="small db-sync-cta" id="db-sync-button"`,
+    insert: `      <!-- v0.1.12 (the owner ask: "I tried something, deleted something
+           from hibana, clicked sync on the app, but it didn't got deleted.
+           it seems we need a refresh button"): the toolbar's Refresh button —
+           the pull-to-screen affordance right after the Sync CTA. The sync
+           round pulls the boards into the Go MIRROR, but the island's own
+           DOM kept the boot-time render, so a deletion made on hibana.ir
+           stayed on screen even after a green sync; clicking Refresh
+           re-boots the island (board-page.js pushState'd ?project= — the
+           refresh re-enters the SAME board) and the boot fetches ride the
+           bridge's always-fresh interactive transport, so the cloud's truth
+           — the deletion included — paints. Ghost on purpose (Sync stays
+           the ONE colored action in the row); js/desktop-refresh.js owns
+           the click + the EN/FA label; desktop-sync.js grew the same reflex
+           for the sync round itself (an ok round that pulled boards
+           reloads the board when the modal closes). -->
+      <button type="button" class="btn ghost small" id="db-refresh-button" aria-label="Refresh board" title="Refresh board"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg><span id="db-refresh-btn-label">Refresh</span></button>`,
+  },
+]
+
 function adaptBoardHtml(html) {
   const lines = html.split('\n')
   const log = []
@@ -731,20 +808,24 @@ function adaptBoardHtml(html) {
     log.push('inserted: ' + HTML_GATE_INSERT.name)
   }
   // The v0.1.5 theme round + the v0.1.6 sync round + the v0.1.9 sign-out round
-  // + the v0.1.11 new-project round (recorded above, per-round, in the order the
-  // head/body chain requires — each op's anchor must already exist when the op
-  // runs: the theme script rides the PINNED chip-render line, the floater rides
-  // the gate block HTML_GATE_INSERT just emitted, the toolbar toggle rides the
-  // PINNED labels line, the sync sheet/script ride the desktop login lines
-  // emitted above, the dialog rides the PINNED skip-link, the sync button rides
-  // the toggle line the theme round just inserted; the logout sheet/script ride
-  // the sync round's own emitted lines, the logout dialog rides the sync
-  // dialog's closing line, and the logout button rides the theme toggle line —
-  // the row ends Sprints | Labels | Sync | theme | Log out; the newproject
-  // sheet/script ride the logout round's own emitted lines, and the create
-  // dialog rides the logout dialog's OWN confirm id — a bare '</dialog>' anchor
-  // now matches BOTH spliced dialog elements and must never be used again).
-  for (const op of [...HTML_THEME_OPS, ...HTML_SYNC_OPS, ...HTML_LOGOUT_OPS, ...HTML_NEWPROJECT_OPS]) {
+  // + the v0.1.11 new-project round + the v0.1.12 refresh round (recorded
+  // above, per-round, in the order the head/body chain requires — each op's
+  // anchor must already exist when the op runs: the theme script rides the
+  // PINNED chip-render line, the floater rides the gate block HTML_GATE_INSERT
+  // just emitted, the toolbar toggle rides the PINNED labels line, the sync
+  // sheet/script ride the desktop login lines emitted above, the dialog rides
+  // the PINNED skip-link, the sync button rides the toggle line the theme
+  // round just inserted; the logout sheet/script ride the sync round's own
+  // emitted lines, the logout dialog rides the sync dialog's closing line, and
+  // the logout button rides the theme toggle line — the row ends
+  // Sprints | Labels | Sync | theme | Log out; the newproject sheet/script
+  // ride the logout round's own emitted lines, and the create dialog rides
+  // the logout dialog's OWN confirm id — a bare '</dialog>' anchor now
+  // matches BOTH spliced dialog elements and must never be used again; the
+  // refresh sheet/script ride the newproject round's own emitted lines, and
+  // the Refresh pill rides the sync CTA's own class+id pair — the row ends
+  // Sprints | Labels | Sync | Refresh | theme | Log out).
+  for (const op of [...HTML_THEME_OPS, ...HTML_SYNC_OPS, ...HTML_LOGOUT_OPS, ...HTML_NEWPROJECT_OPS, ...HTML_REFRESH_OPS]) {
     if (op.anchor !== undefined) {
       const hits = lines.map((l, i) => (l.includes(op.anchor) ? i : -1)).filter((i) => i !== -1)
       if (hits.length !== 1) {
@@ -1613,6 +1694,14 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
 // v0.1.8 — the owner ask: "next to sprints and labels, but colored (fill
 // colored)": the button is now the LABELED fill-colored CTA pill after Labels
 // (this file also paints its visible label per language, like the aria).
+// v0.1.12 — the refresh-round reflex (the owner ask: "deleted something from
+// hibana, clicked sync on the app, but it didn't got deleted"): the round
+// outcome now carries \`pulled\` (the boards whose pull was a live 200 — the
+// mirror rows that MOVED), the ok panel names it, and closing the modal
+// reloads the island so the pulled cloud truth — the deletion included —
+// reaches the VISIBLE board. pulled=0 reloads NOTHING (the screen was already
+// the truth); the toolbar's own Refresh button (desktop-refresh.js) is the
+// same reflex as an always-there affordance.
 // GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
 // into frontend/dist/js/ and checksummed in frontend/island.checksums.json.
 (function () {
@@ -1633,6 +1722,7 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
       okBody: 'Your boards are saved on the Hibana cloud — they will not vanish.',
       uploaded: '{u} change(s) uploaded',
       noneWaiting: 'no changes were waiting — every edit saves live',
+      updated: '{n} board(s) updated from the cloud — the board shows them when you close this.',
       projectsNote: '{p} project(s) · {b} board(s) checked',
       okTime: 'last synced {t}',
       warnTitle: 'Synced — some changes still uploading',
@@ -1656,6 +1746,7 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
       okBody: 'تخته‌های شما در ابر هیبانا ذخیره شده‌اند — از بین نمی‌روند.',
       uploaded: '{u} تغییر بارگذاری شد',
       noneWaiting: 'تغییر منتظری نبود — هر ویرایش زنده ذخیره می‌شود',
+      updated: '{n} تخته از ابر هیبانا به‌روزرسانی شد — با بستن این پنجره نمایش به‌روز می‌شود.',
       projectsNote: '{p} پروژه · {b} تخته بررسی شد',
       okTime: 'آخرین همگام‌سازی {t}',
       warnTitle: 'همگام شد — چند تغییر هنوز در حال بارگذاری است',
@@ -1731,6 +1822,11 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
     var retryBtn = document.getElementById('db-sync-retry')
     var doneBtn = document.getElementById('db-sync-done')
     var syncing = false
+    // v0.1.12 — the pulled-boards reflex: set when an ok round MOVED mirror
+    // rows (out.pulled > 0 — the cloud changed under the island's boot-time
+    // render), consumed by the modal's close listener (Done or Esc) so the
+    // reload lands AFTER the user reads the success panel, never under it.
+    var needsReload = false
 
     function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text }
 
@@ -1812,7 +1908,14 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
         var note = out.uploaded > 0 ? fmt('uploaded', { u: out.uploaded }) : t('noneWaiting')
         var counts = fmt('projectsNote', { p: out.projects, b: out.boards })
         var when = fmt('okTime', { t: timeStr(out.at) })
-        showPanel('ok', t('okTitle'), t('okBody') + ' ' + note + ' · ' + counts + ' · ' + when, false)
+        // v0.1.12 — the boards the round PULLED (live 200s — the mirror rows
+        // that moved, deletions included) are named in the ok body, and the
+        // close listener re-renders the board so they reach the SCREEN
+        // (pulled=0 means nothing changed server-side — no reload, no claim).
+        var refreshed = out.pulled > 0 ? fmt('updated', { n: out.pulled }) : ''
+        if (refreshed) refreshed = ' · ' + refreshed
+        needsReload = out.pulled > 0
+        showPanel('ok', t('okTitle'), t('okBody') + ' ' + note + refreshed + ' · ' + counts + ' · ' + when, false)
         return
       }
       if (out.code === 'busy') { showPanel('err', t('busyTitle'), '', false); return }
@@ -1840,6 +1943,7 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
       localize()
       if (syncing) { dlg.showModal(); return } // reopen mid-round: the steps are live
       syncing = true
+      needsReload = false // every fresh round re-earns its own reload verdict
       if (panel) panel.hidden = true
       if (retryBtn) retryBtn.hidden = true
       if (doneBtn) doneBtn.hidden = true
@@ -1874,6 +1978,20 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
         setStep(payload.step, payload.state, payload.detail || '')
       })
     }
+
+    // v0.1.12 — the pulled-boards reflex's trigger: the native close event
+    // fires on EVERY exit (the Done button, the Esc cancel) — exactly when
+    // the user has finished reading the success panel. An ok round that
+    // moved mirror rows (needsReload — the ok body said so) reloads the
+    // island, so the cloud's truth — the deletion made on hibana.ir —
+    // reaches the VISIBLE board. The same re-boot the toolbar's Refresh
+    // button owns, earned by the round's own pulled count; nothing reloads
+    // when nothing changed server-side.
+    dlg.addEventListener('close', function () {
+      if (!needsReload) return
+      needsReload = false
+      location.reload()
+    })
 
     // Live language flips (i18n.js owns html[lang]) — relabel the surfaces.
     localize()
@@ -2538,6 +2656,115 @@ const DESKTOP_NEWPROJECT_CSS = `/* desktop-newproject.css — the new-project ro
 `
 
 // ---------------------------------------------------------------------------
+// desktop-refresh.js — generated below into dist/js/ (the v0.1.12
+// refresh round). Written without template literals/backticks so it can nest
+// in this literal.
+// ---------------------------------------------------------------------------
+const DESKTOP_REFRESH_JS = `// desktop-refresh.js — the refresh round (v0.1.12 — the owner ask: "I tried
+// something, deleted something from hibana, clicked sync on the app, but it
+// didn't got deleted. it seems we need a refresh button"). The sync round
+// PULLS the boards into the Go mirror, but the island's own DOM keeps the
+// boot-time render — a deletion made on hibana.ir stayed on screen even after
+// a green sync. This button is the explicit pull-to-screen: one click re-boots
+// the island (location.reload — board-page.js pushState'd ?project= so a
+// refresh re-enters the SAME board), and the boot fetches ride the bridge's
+// always-fresh interactive transport (never the conditional poll), so the
+// cloud's truth — the deletion included — paints. The sync modal grew the
+// same reflex for its own round (desktop-sync.js v0.1.12: an ok outcome with
+// pulled boards reloads on close); this button is the always-there affordance.
+// GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+// into frontend/dist/js/ and checksummed in frontend/island.checksums.json. Loads
+// blocking, right after desktop-newproject.js, BEFORE every deferred island script.
+(function () {
+  'use strict'
+
+  // The desktop-owned strings. The pin's dictionaries carry no refresh key
+  // (verified @ the pin), so this EN/FA pair is the button's own; i18n.js
+  // owns html[lang], and localize() reads it live.
+  var STR = {
+    en: { btn: 'Refresh board', label: 'Refresh' },
+    fa: { btn: 'به‌روزرسانی تخته', label: 'به‌روزرسانی' }
+  }
+
+  function lang() { return document.documentElement.lang === 'fa' ? 'fa' : 'en' }
+  function t(key) { return (STR[lang()] && STR[lang()][key]) || STR.en[key] || key }
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn)
+    else fn()
+  }
+
+  ready(function () {
+    var btn = document.getElementById('db-refresh-button')
+    if (!btn) return
+    var label = document.getElementById('db-refresh-btn-label')
+    var busy = false
+
+    function localize() {
+      btn.setAttribute('aria-label', t('btn'))
+      btn.setAttribute('title', t('btn'))
+      if (label) label.textContent = t('label')
+    }
+
+    // One guard: a second click while the reload is pending must not
+    // double-schedule — the first reload already owns the document. The
+    // data-busy attribute spins the glyph (desktop-refresh.css) for the
+    // frame(s) before the unload; a re-boot always follows on a live click.
+    btn.addEventListener('click', function () {
+      if (busy) return
+      busy = true
+      btn.setAttribute('data-busy', 'true')
+      btn.setAttribute('aria-busy', 'true')
+      location.reload()
+    })
+
+    // Live language flips (i18n.js owns html[lang]) — relabel the surfaces.
+    localize()
+    try {
+      new MutationObserver(localize).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
+    } catch (e) { /* no observer — the label stays at the boot language */ }
+  })
+})()
+`
+
+// ---------------------------------------------------------------------------
+// desktop-refresh.css — generated below into dist/css/. The toolbar row's own
+// grammar owns the button; this sheet only pins the twin metrics + the spin.
+// ---------------------------------------------------------------------------
+const DESKTOP_REFRESH_CSS = `/* desktop-refresh.css — the refresh round (v0.1.12 — the owner ask: "I tried
+   something, deleted something from hibana, clicked sync on the app, but it
+   didn't got deleted. it seems we need a refresh button").
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json. */
+
+/* The toolbar's Refresh button — the pull-to-screen affordance right after
+   the Sync CTA (Sprints | Labels | Sync | Refresh | theme | Log out). Ghost
+   on purpose (the row's grammar: Sync stays the ONE colored action), the
+   refresh glyph + the desktop-owned label at the same twin metrics as
+   Sprints/Labels/Sync/Log out (the S220 "same size" grammar — the icon +
+   label pill inline-flex so the glyph centers against the text). */
+#db-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+#db-refresh-button .icon { flex: none; }
+
+/* The between-clicks frame: the glyph spins while the reload is pending (the
+   unload usually beats the first turn — the spin is the belt for a slow one,
+   never a fake progress bar). The prefers-reduced-motion respect mirrors the
+   sync modal's own spin discipline. */
+#db-refresh-button[data-busy] .icon {
+  animation: db-refresh-rotate 0.7s linear infinite;
+}
+@keyframes db-refresh-rotate { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #db-refresh-button[data-busy] .icon { animation-duration: 1.6s; }
+}
+`
+
+// ---------------------------------------------------------------------------
 // icon.svg — the ISLAND'S FAVICON (v0.1.2 — the owner ask: "use the Hibana logo as
 // fav icon. and app icon"). GENERATED, not copied: the pin's own icon.svg is the old
 // H-tile art; these bytes are the traced Hibana logo mark (the h-spark squircle,
@@ -2611,26 +2838,28 @@ function verifyDist(outDir, fileMap) {
   // head link block — the gate sheet (guide §5.5), then the sync modal's sheet
   // (v0.1.6), then the sign-out round's sheet (v0.1.9); the island's 19-sheet
   // order + rtl-last are untouched around them.
-  const expectedLinks = [...CSS_SHEETS.map((p) => '/' + p), '/vendor/manrope/font-face.css', '/css/desktop-login.css', '/css/desktop-sync.css', '/css/desktop-logout.css', '/css/desktop-newproject.css']
+  const expectedLinks = [...CSS_SHEETS.map((p) => '/' + p), '/vendor/manrope/font-face.css', '/css/desktop-login.css', '/css/desktop-sync.css', '/css/desktop-logout.css', '/css/desktop-newproject.css', '/css/desktop-refresh.css']
   if (JSON.stringify(links) !== JSON.stringify(expectedLinks)) {
     problems.push('index.html CSS manifest mismatch:\n    expected: ' + JSON.stringify(expectedLinks) + '\n    actual:   ' + JSON.stringify(links))
   }
   if (links[CSS_SHEETS.length - 1] !== '/css/rtl.css') problems.push('index.html: rtl.css is not the last ISLAND /css/ sheet (the desktop-owned sheets follow it)')
-  // The blocking head chain (v0.1.5 + v0.1.6 + v0.1.9 + v0.1.11 grew it): the pre-paint theme
+  // The blocking head chain (v0.1.5 + v0.1.6 + v0.1.9 + v0.1.11 + v0.1.12 grew it): the pre-paint theme
   // bootstrap FIRST, then the transport shim, the login controller, the sync
-  // controller, the sign-out controller, the new-project controller — all
-  // blocking, so they own their contracts before every deferred island script.
+  // controller, the sign-out controller, the new-project controller, the
+  // refresh controller — all blocking, so they own their contracts before
+  // every deferred island script.
   const themeIdx = indexHtml.indexOf('/js/desktop-theme.js')
   const shimIdx = indexHtml.indexOf('/js/desktop-shim.js')
   const loginIdx = indexHtml.indexOf('/js/desktop-login.js')
   const syncIdx = indexHtml.indexOf('/js/desktop-sync.js')
   const logoutIdx = indexHtml.indexOf('/js/desktop-logout.js')
   const newProjIdx = indexHtml.indexOf('/js/desktop-newproject.js')
+  const refreshIdx = indexHtml.indexOf('/js/desktop-refresh.js')
   const devIdx = indexHtml.indexOf('/js/devboard.js')
   const bpIdx = indexHtml.indexOf('/js/board-page.js')
-  if (!(themeIdx !== -1 && shimIdx !== -1 && loginIdx !== -1 && syncIdx !== -1 && logoutIdx !== -1 && newProjIdx !== -1 && devIdx !== -1 && bpIdx !== -1 &&
-      themeIdx < shimIdx && shimIdx < loginIdx && loginIdx < syncIdx && syncIdx < logoutIdx && logoutIdx < newProjIdx && newProjIdx < devIdx && devIdx < bpIdx)) {
-    problems.push('index.html: desktop-theme.js → desktop-shim.js → desktop-login.js → desktop-sync.js → desktop-logout.js → desktop-newproject.js → devboard.js → board-page.js order broken (got indices ' + themeIdx + '/' + shimIdx + '/' + loginIdx + '/' + syncIdx + '/' + logoutIdx + '/' + newProjIdx + '/' + devIdx + '/' + bpIdx + ')')
+  if (!(themeIdx !== -1 && shimIdx !== -1 && loginIdx !== -1 && syncIdx !== -1 && logoutIdx !== -1 && newProjIdx !== -1 && refreshIdx !== -1 && devIdx !== -1 && bpIdx !== -1 &&
+      themeIdx < shimIdx && shimIdx < loginIdx && loginIdx < syncIdx && syncIdx < logoutIdx && logoutIdx < newProjIdx && newProjIdx < refreshIdx && refreshIdx < devIdx && devIdx < bpIdx)) {
+    problems.push('index.html: desktop-theme.js → desktop-shim.js → desktop-login.js → desktop-sync.js → desktop-logout.js → desktop-newproject.js → desktop-refresh.js → devboard.js → board-page.js order broken (got indices ' + themeIdx + '/' + shimIdx + '/' + loginIdx + '/' + syncIdx + '/' + logoutIdx + '/' + newProjIdx + '/' + refreshIdx + '/' + devIdx + '/' + bpIdx + ')')
   }
   for (const kept of ['id="db-toolbar"', 'id="db-loading"', 'id="db-board"', 'data-i18n="db.board"', 'data-i18n="db.backToProject"',
     'js/i18n-en.js', 'js/i18n.js', 'vendor/jalaali.min.js', 'js/chip-render.js', 'vendor/general-sans/GeneralSans-400.woff2']) {
@@ -2757,11 +2986,48 @@ function verifyDist(outDir, fileMap) {
   if (!newProjectCss.includes('.db-newproject-actions')) problems.push('css/desktop-newproject.css: the dialog actions row rule is missing')
   if (!fs.existsSync(path.join(outDir, 'css/desktop-newproject.css'))) problems.push('css/desktop-newproject.css: missing from dist')
 
+  // The v0.1.12 refresh round (the owner ask: "I tried something, deleted
+  // something from hibana, clicked sync on the app, but it didn't got deleted.
+  // it seems we need a refresh button"): the toolbar's Refresh button — the
+  // pull-to-screen affordance — must sit right after the Sync CTA and before
+  // the theme toggle (Sprints | Labels | Sync | Refresh | theme | Log out), a
+  // VISIBLE, LABELED ghost (the S220 lesson + the row's grammar: Sync stays
+  // the ONE colored action) carrying the desktop-owned EN/FA pair; the
+  // controller must re-boot the island on click (location.reload); and the
+  // sync modal grew the same reflex — the outcome's `pulled` count reaches
+  // desktop-sync.js, the ok panel names the updated boards, and the native
+  // close listener (Done/Esc) reloads the island so the deletions pulled by
+  // the round reach the VISIBLE board.
+  for (const kept of ['id="db-refresh-button"', 'id="db-refresh-btn-label"', 'aria-label="Refresh board"', 'css/desktop-refresh.css']) {
+    if (!indexHtml.includes(kept)) problems.push('index.html: the refresh round is missing "' + kept + '"')
+  }
+  {
+    const syncBtnIdx = indexHtml.indexOf('id="db-sync-button"')
+    const refreshBtnIdx = indexHtml.indexOf('id="db-refresh-button"')
+    const themeBtnIdx = indexHtml.indexOf('id="db-theme-toggle"')
+    if (!(syncBtnIdx !== -1 && refreshBtnIdx > syncBtnIdx && themeBtnIdx > refreshBtnIdx)) {
+      problems.push('index.html: the Refresh button must sit right after the Sync CTA and before the theme toggle — got sync@' + syncBtnIdx + ', refresh@' + refreshBtnIdx + ', theme@' + themeBtnIdx)
+    }
+  }
+  const refreshJs = fileMap['js/desktop-refresh.js'] || ''
+  if (!refreshJs.includes('location.reload()')) problems.push('js/desktop-refresh.js: the click must re-boot the island (location.reload — board-page.js\'s pushState\'d ?project= re-enters the same board)')
+  if (!refreshJs.includes('db-refresh-btn-label')) problems.push('js/desktop-refresh.js: the visible Refresh label localization hook is missing')
+  if (!refreshJs.includes("getAttribute('data-busy'") && !refreshJs.includes("setAttribute('data-busy'")) problems.push('js/desktop-refresh.js: the busy-state spin hook is missing')
+  if (!refreshJs.includes('Refresh board')) problems.push('js/desktop-refresh.js: the EN label pair is missing')
+  if (!refreshJs.includes('به‌روزرسانی')) problems.push('js/desktop-refresh.js: the FA label pair is missing')
+  const refreshCss = fileMap['css/desktop-refresh.css'] || ''
+  if (!refreshCss.includes('#db-refresh-button')) problems.push('css/desktop-refresh.css: the toolbar Refresh button rule is missing (the twin-metrics icon+label pill)')
+  if (!fs.existsSync(path.join(outDir, 'css/desktop-refresh.css'))) problems.push('css/desktop-refresh.css: missing from dist')
+  if (!syncJs.includes('out.pulled > 0')) problems.push('js/desktop-sync.js: the v0.1.12 pulled count must drive the ok panel\'s updated-boards fact + the close-time reload')
+  if (!syncJs.includes("addEventListener('close'")) problems.push('js/desktop-sync.js: the native close listener (Done/Esc) must carry the pulled-boards reload')
+  if (!syncJs.includes('updated from the cloud')) problems.push('js/desktop-sync.js: the EN pulled-boards fact is missing')
+  if (!syncJs.includes('از ابر هیبانا به‌روزرسانی')) problems.push('js/desktop-sync.js: the FA pulled-boards fact is missing')
+
   // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the
   // persisted mirror-meta pref is Go-side; the island never forks it). The bare WORD
   // may appear in comments (desktop-theme.js's header says "NO localStorage:"), so
   // the gate greps for USAGE — a member/index access on the store.
-  for (const rel of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'css/desktop-login.css', 'css/desktop-sync.css', 'css/desktop-logout.css', 'css/desktop-newproject.css', 'index.html']) {
+  for (const rel of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'js/desktop-refresh.js', 'css/desktop-login.css', 'css/desktop-sync.css', 'css/desktop-logout.css', 'css/desktop-newproject.css', 'css/desktop-refresh.css', 'index.html']) {
     if (/\blocalStorage\s*[.[]/.test(fileMap[rel] || '')) problems.push(rel + ': localStorage usage — the island must never touch storage (the Go mirror owns persistence)')
   }
 
@@ -2825,10 +3091,10 @@ function verifyDist(outDir, fileMap) {
   }
 
   // (4) the JS is parseable — node --check the shim + login + theme + sync +
-  // logout + newproject controllers + every copied .js (belt + braces over the
-  // patch step; a mangled patch must never ship). The CSS sheets get the
-  // existence check above.
-  for (const js of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', ...JS_FILES]) {
+  // logout + newproject + refresh controllers + every copied .js (belt +
+  // braces over the patch step; a mangled patch must never ship). The CSS
+  // sheets get the existence check above.
+  for (const js of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'js/desktop-refresh.js', ...JS_FILES]) {
     try {
       execFileSync(process.execPath, ['--check', path.join(outDir, js)], { stdio: 'pipe' })
     } catch (err) {
@@ -2932,6 +3198,8 @@ function main() {
   fileMap['css/desktop-logout.css'] = DESKTOP_LOGOUT_CSS
   fileMap['js/desktop-newproject.js'] = DESKTOP_NEWPROJECT_JS
   fileMap['css/desktop-newproject.css'] = DESKTOP_NEWPROJECT_CSS
+  fileMap['js/desktop-refresh.js'] = DESKTOP_REFRESH_JS
+  fileMap['css/desktop-refresh.css'] = DESKTOP_REFRESH_CSS
   fileMap['icon.svg'] = ICON_SVG
 
   // Wipe + regenerate dist (deterministic + idempotent: running twice is byte-identical;
@@ -2961,8 +3229,8 @@ function main() {
   // Report.
   for (const line of adapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
-  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → login → sync → logout → newproject → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, no-storage), no-404 asset loop, node --check\n')
+  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + icon.svg + web-ref.json\n')
+  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → login → sync → logout → newproject → refresh → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, no-storage), no-404 asset loop, node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }

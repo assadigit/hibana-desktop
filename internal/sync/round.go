@@ -70,13 +70,14 @@ func emitStep(emit Emit, step Step, state State, detail string) {
 
 // RoundOutcome is the binding's wire result (ui.SyncNow → the modal's
 // onDone). The JSON shape is the JS contract (desktop-sync.js):
-// {ok, code, uploaded, projects, boards, at, message}.
+// {ok, code, uploaded, pulled, projects, boards, at, message}.
 type RoundOutcome struct {
 	OK       bool      `json:"ok"`
 	Code     string    `json:"code,omitempty"`
 	Uploaded int       `json:"uploaded"`
-	Projects int       `json:"projects"`
-	Boards   int       `json:"boards"`
+	Pulled   int       `json:"pulled"`   // boards whose pull was a live 200 — the mirror moved
+	Projects int       `json:"projects"` // live mirror rows (tombstoned ones excluded)
+	Boards   int       `json:"boards"`   // every mirror row checked (304s are checks)
 	At       time.Time `json:"at"`
 	Message  string    `json:"message,omitempty"`
 }
@@ -101,6 +102,13 @@ func (o RoundOutcome) with(code string) RoundOutcome { o.Code = code; return o }
 //	         empty and the step says so ("no pending changes — everything
 //	         is already saved live"), NEVER a fake count.
 //	sync     engine.SyncOnce — the projects list + every mirrored board.
+//	         The step's done detail names the boards that actually MOVED
+//	         (live 200s) vs the already-current ones (304s) — and the
+//	         outcome's Pulled count carries the same fact to the screen:
+//	         desktop-sync.js v0.1.12 paints it in the ok panel and
+//	         re-renders the open board when the modal closes, so a
+//	         deletion made on hibana.ir reaches the VISIBLE kanban, not
+//	         just the mirror (the owner lesson that spawned v0.1.12).
 //
 // Held outbox ops (backoff/ban/unknown-transport) do not fail the round —
 // the sync step still runs; the verdict is then 'pending' with the held ops
@@ -153,6 +161,7 @@ func (e *Engine) SyncRound(ctx context.Context, emit Emit) (RoundOutcome, error)
 	// ---- sync: the projects list + every mirrored board ----
 	emitStep(emit, StepSync, StateActive, "")
 	pulled, errs := e.SyncOnce(ctx)
+	out.Pulled = pulled // the boards whose mirror rows actually moved (live 200s)
 	projects, perr := e.store.ListProjects(ctx)
 	if perr != nil {
 		errs = append(errs, fmt.Errorf("mirror list: %w", perr))
@@ -179,8 +188,13 @@ func (e *Engine) SyncRound(ctx context.Context, emit Emit) (RoundOutcome, error)
 		out.Message = errs[0].Error()
 		return out.with(OutcomeError), nil
 	}
-	emitStep(emit, StepSync, StateDone, fmt.Sprintf("%d project(s) · %d board(s) checked", out.Projects, out.Boards))
-	_ = pulled
+	// The sync step's done fact names the delta honestly: boards that moved
+	// (the mirror rows replaced — deletions included) vs an all-current world.
+	if out.Pulled > 0 {
+		emitStep(emit, StepSync, StateDone, fmt.Sprintf("%d board(s) updated · %d project(s) · %d board(s) checked", out.Pulled, out.Projects, out.Boards))
+	} else {
+		emitStep(emit, StepSync, StateDone, fmt.Sprintf("every board already current · %d project(s) · %d board(s) checked", out.Projects, out.Boards))
+	}
 
 	// ---- the pending honesty: held ops are named, never hidden ----
 	if drain.Held > 0 {

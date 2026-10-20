@@ -309,6 +309,76 @@ func TestSyncOnceCollectsErrorsPerBoard(t *testing.T) {
 	}
 }
 
+// TestSyncOnceTombstonesGoneProjects — the v0.1.12 refresh-round lesson: a
+// project deleted on hibana.ir vanishes from the server list and its board
+// answers 404; the mirror row must STOP counting as live (the sync modal's
+// success line tells the truth) and STOP being re-polled every round. The
+// list pull owns resurrection: a fresh server row clears the tombstone via
+// the upsert, and the board pulls again.
+func TestSyncOnceTombstonesGoneProjects(t *testing.T) {
+	f := newSyncFake()
+	withP1 := `{"projects":[{"id":"p1","user_id":"u1","title":"A","status":"operational","type":"personal","sort_order":0,"latest_note":"","reminders_enabled":0,"created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z","tags":[]}]}`
+	emptyList := `{"projects":[]}`
+	f.bodies["/api/projects"] = withP1
+	f.bodies["/api/projects/p1/devboard"] = testBoard
+	eng, st, done := newEngine(t, f)
+	defer done()
+	ctx := context.Background()
+
+	// Round 1: the list carries p1, the board mirrors.
+	if _, errs := eng.SyncOnce(ctx); len(errs) != 0 {
+		t.Fatalf("seed round errs=%v", errs)
+	}
+	if f.hits["/api/projects/p1/devboard"] == 0 {
+		t.Fatal("the seed round must have pulled p1's board")
+	}
+
+	// The user deletes the project on the web: the list drops it, the board
+	// answers the gone state (404).
+	f.bodies["/api/projects"] = emptyList
+	delete(f.bodies, "/api/projects/p1/devboard")
+	f.statuses["/api/projects/p1/devboard"] = http.StatusNotFound
+	if _, errs := eng.SyncOnce(ctx); len(errs) != 0 {
+		t.Fatalf("gone round errs=%v (the 404 is the gone branch, never an error)", errs)
+	}
+	projects, err := st.ListProjects(ctx)
+	if err != nil || len(projects) != 1 {
+		t.Fatalf("mirror projects after the gone round: %v %+v", err, projects)
+	}
+	if projects[0].ID != "p1" || projects[0].DeletedAt == nil {
+		t.Fatalf("the web-deleted project must be tombstoned in the mirror: %+v", projects[0])
+	}
+
+	// Round 3: the tombstoned row is skipped — the dead board is NOT re-polled.
+	before := f.hits["/api/projects/p1/devboard"]
+	if _, errs := eng.SyncOnce(ctx); len(errs) != 0 {
+		t.Fatalf("post-tombstone round errs=%v", errs)
+	}
+	if f.hits["/api/projects/p1/devboard"] != before {
+		t.Fatalf("a tombstoned row must not be re-polled: hits %d → %d", before, f.hits["/api/projects/p1/devboard"])
+	}
+
+	// Resurrection: the project is live again — the list carries it, the
+	// upsert clears the tombstone, and the board re-mirrors (pulled=1).
+	f.bodies["/api/projects"] = withP1
+	f.bodies["/api/projects/p1/devboard"] = testBoard
+	delete(f.statuses, "/api/projects/p1/devboard")
+	pulled, errs := eng.SyncOnce(ctx)
+	if len(errs) != 0 {
+		t.Fatalf("resurrection round errs=%v", errs)
+	}
+	if pulled != 1 {
+		t.Fatalf("the resurrected board must re-mirror: pulled=%d", pulled)
+	}
+	projects, err = st.ListProjects(ctx)
+	if err != nil || len(projects) != 1 {
+		t.Fatalf("mirror projects after resurrection: %v %+v", err, projects)
+	}
+	if projects[0].DeletedAt != nil {
+		t.Fatalf("a fresh list row must clear the tombstone: %+v", projects[0])
+	}
+}
+
 func TestRefreshProjectsMirrorsFullRows(t *testing.T) {
 	f := newSyncFake()
 	f.bodies["/api/projects"] = `{"projects":[{"id":"p1","user_id":"u1","title":"SportSignal","description":"d","type":"personal","status":"operational","sort_order":0,"latest_note":"note","reminders_enabled":0,"created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-02T00:00:00.000Z","logo_path":"x.webp","tags":["a"]},{"id":"gone","user_id":"u1","title":"Old","type":"personal","status":"spark","sort_order":0,"latest_note":"","reminders_enabled":0,"created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T00:00:00.000Z","deleted_at":"2026-01-03T00:00:00.000Z","tags":[]}]}`

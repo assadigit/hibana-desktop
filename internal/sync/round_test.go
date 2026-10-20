@@ -52,19 +52,26 @@ func TestSyncRoundHappyPathChoreographyAndOrder(t *testing.T) {
 	if out.Projects != 1 || out.Boards != 1 {
 		t.Fatalf("projects/boards = %d/%d, want 1/1", out.Projects, out.Boards)
 	}
+	// v0.1.12: the outcome carries the boards whose mirror rows MOVED (live
+	// 200s — the fake serves no ETags, so the seeded p1 re-pulls as a 200) —
+	// the count that drives the modal's ok fact + the close-time board reload.
+	if out.Pulled != 1 {
+		t.Fatalf("pulled = %d, want 1 (the fake has no ETags — the board re-mirrored)", out.Pulled)
+	}
 	if out.At.IsZero() {
 		t.Fatal("the outcome must carry the round's time (the modal's last-synced line)")
 	}
 
 	// The choreography, in order: connect active → done, upload active →
-	// done (the honest empty-queue fact), sync active → done (the counts).
+	// done (the honest empty-queue fact), sync active → done (the moved-board
+	// fact + the counts — the v0.1.12 detail names the delta).
 	want := []string{
 		"connect:active:hibana.ir",
 		"connect:done:hibana.ir reached",
 		"upload:active:",
 		"upload:done:no pending changes — everything is already saved live",
 		"sync:active:",
-		"sync:done:1 project(s) · 1 board(s) checked",
+		"sync:done:1 board(s) updated · 1 project(s) · 1 board(s) checked",
 	}
 	if len(c.events) != len(want) {
 		t.Fatalf("emitted %d events, want %d:\n  %v", len(c.events), len(want), c.events)
@@ -178,7 +185,7 @@ func TestSyncRoundPendingNamesHeldOpsNeverLost(t *testing.T) {
 		!strings.Contains(out.Message, "will not vanish") {
 		t.Fatalf("the pending message must name the held op + the never-lost note: %q", out.Message)
 	}
-	if !c.has("sync:done:0 project(s) · 0 board(s) checked") {
+	if !c.has("sync:done:every board already current · 0 project(s) · 0 board(s) checked") {
 		t.Fatalf("the sync step must still complete (the boards were checked): %v", c.events)
 	}
 	n, err := st.OutboxLen(ctx)
@@ -256,5 +263,32 @@ func TestSyncRoundNilEmitStillRuns(t *testing.T) {
 	out, err := eng.SyncRound(context.Background(), nil)
 	if err != nil || !out.OK || out.Code != OutcomeOK {
 		t.Fatalf("nil-emit round: out=%+v err=%v", out, err)
+	}
+}
+
+// TestSyncRoundPulledZeroMeansScreenAlreadyCurrent — the v0.1.12 contract the
+// modal rides: pulled=0 (every board answered 304 — the server says nothing
+// changed) means the ok panel carries NO updated-boards fact and the island
+// does NOT reload on close; the screen was already the cloud's truth. The
+// happy-path test above proves the pulled>0 half.
+func TestSyncRoundPulledZeroMeansScreenAlreadyCurrent(t *testing.T) {
+	f := newSyncFake()
+	f.bodies["/api/projects"] = `{"projects":[]}`
+	eng, _, done := newEngine(t, f)
+	defer done()
+
+	var c collect
+	out, err := eng.SyncRound(context.Background(), c.emit)
+	if err != nil {
+		t.Fatalf("SyncRound: %v", err)
+	}
+	if !out.OK || out.Code != OutcomeOK {
+		t.Fatalf("outcome = %+v, want ok", out)
+	}
+	if out.Pulled != 0 {
+		t.Fatalf("pulled = %d, want 0 (nothing moved — the ok panel must not claim updates)", out.Pulled)
+	}
+	if !c.has("sync:done:every board already current · 0 project(s) · 0 board(s) checked") {
+		t.Fatalf("the all-current fact must name itself honestly: %v", c.events)
 	}
 }

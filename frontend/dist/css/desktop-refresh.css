@@ -1,0 +1,31 @@
+/* desktop-refresh.css — the refresh round (v0.1.12 — the owner ask: "I tried
+   something, deleted something from hibana, clicked sync on the app, but it
+   didn't got deleted. it seems we need a refresh button").
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json. */
+
+/* The toolbar's Refresh button — the pull-to-screen affordance right after
+   the Sync CTA (Sprints | Labels | Sync | Refresh | theme | Log out). Ghost
+   on purpose (the row's grammar: Sync stays the ONE colored action), the
+   refresh glyph + the desktop-owned label at the same twin metrics as
+   Sprints/Labels/Sync/Log out (the S220 "same size" grammar — the icon +
+   label pill inline-flex so the glyph centers against the text). */
+#db-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+#db-refresh-button .icon { flex: none; }
+
+/* The between-clicks frame: the glyph spins while the reload is pending (the
+   unload usually beats the first turn — the spin is the belt for a slow one,
+   never a fake progress bar). The prefers-reduced-motion respect mirrors the
+   sync modal's own spin discipline. */
+#db-refresh-button[data-busy] .icon {
+  animation: db-refresh-rotate 0.7s linear infinite;
+}
+@keyframes db-refresh-rotate { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #db-refresh-button[data-busy] .icon { animation-duration: 1.6s; }
+}

@@ -5,6 +5,14 @@
 // v0.1.8 — the owner ask: "next to sprints and labels, but colored (fill
 // colored)": the button is now the LABELED fill-colored CTA pill after Labels
 // (this file also paints its visible label per language, like the aria).
+// v0.1.12 — the refresh-round reflex (the owner ask: "deleted something from
+// hibana, clicked sync on the app, but it didn't got deleted"): the round
+// outcome now carries `pulled` (the boards whose pull was a live 200 — the
+// mirror rows that MOVED), the ok panel names it, and closing the modal
+// reloads the island so the pulled cloud truth — the deletion included —
+// reaches the VISIBLE board. pulled=0 reloads NOTHING (the screen was already
+// the truth); the toolbar's own Refresh button (desktop-refresh.js) is the
+// same reflex as an always-there affordance.
 // GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
 // into frontend/dist/js/ and checksummed in frontend/island.checksums.json.
 (function () {
@@ -25,6 +33,7 @@
       okBody: 'Your boards are saved on the Hibana cloud — they will not vanish.',
       uploaded: '{u} change(s) uploaded',
       noneWaiting: 'no changes were waiting — every edit saves live',
+      updated: '{n} board(s) updated from the cloud — the board shows them when you close this.',
       projectsNote: '{p} project(s) · {b} board(s) checked',
       okTime: 'last synced {t}',
       warnTitle: 'Synced — some changes still uploading',
@@ -48,6 +57,7 @@
       okBody: 'تخته‌های شما در ابر هیبانا ذخیره شده‌اند — از بین نمی‌روند.',
       uploaded: '{u} تغییر بارگذاری شد',
       noneWaiting: 'تغییر منتظری نبود — هر ویرایش زنده ذخیره می‌شود',
+      updated: '{n} تخته از ابر هیبانا به‌روزرسانی شد — با بستن این پنجره نمایش به‌روز می‌شود.',
       projectsNote: '{p} پروژه · {b} تخته بررسی شد',
       okTime: 'آخرین همگام‌سازی {t}',
       warnTitle: 'همگام شد — چند تغییر هنوز در حال بارگذاری است',
@@ -123,6 +133,11 @@
     var retryBtn = document.getElementById('db-sync-retry')
     var doneBtn = document.getElementById('db-sync-done')
     var syncing = false
+    // v0.1.12 — the pulled-boards reflex: set when an ok round MOVED mirror
+    // rows (out.pulled > 0 — the cloud changed under the island's boot-time
+    // render), consumed by the modal's close listener (Done or Esc) so the
+    // reload lands AFTER the user reads the success panel, never under it.
+    var needsReload = false
 
     function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text }
 
@@ -204,7 +219,14 @@
         var note = out.uploaded > 0 ? fmt('uploaded', { u: out.uploaded }) : t('noneWaiting')
         var counts = fmt('projectsNote', { p: out.projects, b: out.boards })
         var when = fmt('okTime', { t: timeStr(out.at) })
-        showPanel('ok', t('okTitle'), t('okBody') + ' ' + note + ' · ' + counts + ' · ' + when, false)
+        // v0.1.12 — the boards the round PULLED (live 200s — the mirror rows
+        // that moved, deletions included) are named in the ok body, and the
+        // close listener re-renders the board so they reach the SCREEN
+        // (pulled=0 means nothing changed server-side — no reload, no claim).
+        var refreshed = out.pulled > 0 ? fmt('updated', { n: out.pulled }) : ''
+        if (refreshed) refreshed = ' · ' + refreshed
+        needsReload = out.pulled > 0
+        showPanel('ok', t('okTitle'), t('okBody') + ' ' + note + refreshed + ' · ' + counts + ' · ' + when, false)
         return
       }
       if (out.code === 'busy') { showPanel('err', t('busyTitle'), '', false); return }
@@ -232,6 +254,7 @@
       localize()
       if (syncing) { dlg.showModal(); return } // reopen mid-round: the steps are live
       syncing = true
+      needsReload = false // every fresh round re-earns its own reload verdict
       if (panel) panel.hidden = true
       if (retryBtn) retryBtn.hidden = true
       if (doneBtn) doneBtn.hidden = true
@@ -266,6 +289,20 @@
         setStep(payload.step, payload.state, payload.detail || '')
       })
     }
+
+    // v0.1.12 — the pulled-boards reflex's trigger: the native close event
+    // fires on EVERY exit (the Done button, the Esc cancel) — exactly when
+    // the user has finished reading the success panel. An ok round that
+    // moved mirror rows (needsReload — the ok body said so) reloads the
+    // island, so the cloud's truth — the deletion made on hibana.ir —
+    // reaches the VISIBLE board. The same re-boot the toolbar's Refresh
+    // button owns, earned by the round's own pulled count; nothing reloads
+    // when nothing changed server-side.
+    dlg.addEventListener('close', function () {
+      if (!needsReload) return
+      needsReload = false
+      location.reload()
+    })
 
     // Live language flips (i18n.js owns html[lang]) — relabel the surfaces.
     localize()

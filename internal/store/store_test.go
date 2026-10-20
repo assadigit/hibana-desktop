@@ -727,6 +727,61 @@ func TestListProjectsOrderAndNullables(t *testing.T) {
 	}
 }
 
+// MarkProjectGone — the v0.1.12 refresh-round tombstone: a mirror row whose
+// board answered the web's gone state (404) gets deleted_at stamped WITHOUT
+// being dropped (the list pull owns resurrection via the upsert's
+// excluded.deleted_at overwrite). Idempotent by the deleted_at IS NULL guard
+// — the FIRST stamp is the honest "when it died"; a fresh UpsertProject row
+// (the project live again) clears it.
+func TestMarkProjectGone(t *testing.T) {
+	ctx := context.Background()
+	s := openTestStore(t)
+	mk := func(id, updated string) Project {
+		return Project{
+			ID: id, UserID: "u1", Title: id, Type: "personal", Status: "operational",
+			CreatedAt: "2026-10-20T00:00:00.000Z", UpdatedAt: updated,
+		}
+	}
+	if err := s.UpsertProject(ctx, mk("p1", "2026-10-20T00:00:00.000Z")); err != nil {
+		t.Fatalf("UpsertProject p1: %v", err)
+	}
+
+	// A gone id the mirror does not hold is a no-op, never an error.
+	if err := s.MarkProjectGone(ctx, "no-such-row", "2026-10-21T00:00:00.000Z"); err != nil {
+		t.Fatalf("MarkProjectGone on a missing id must no-op: %v", err)
+	}
+
+	// The tombstone lands…
+	if err := s.MarkProjectGone(ctx, "p1", "2026-10-21T00:00:00.000Z"); err != nil {
+		t.Fatalf("MarkProjectGone p1: %v", err)
+	}
+	got, err := s.ListProjects(ctx)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("ListProjects after the tombstone: %v %+v", err, got)
+	}
+	if got[0].DeletedAt == nil || *got[0].DeletedAt != "2026-10-21T00:00:00.000Z" {
+		t.Fatalf("the tombstone must round-trip: %+v", got[0])
+	}
+
+	// …and is IDEMPOTENT — the second stamp keeps the first (when it died).
+	if err := s.MarkProjectGone(ctx, "p1", "2026-10-25T00:00:00.000Z"); err != nil {
+		t.Fatalf("MarkProjectGone p1 (second): %v", err)
+	}
+	got, _ = s.ListProjects(ctx)
+	if got[0].DeletedAt == nil || *got[0].DeletedAt != "2026-10-21T00:00:00.000Z" {
+		t.Fatalf("the first stamp is the honest death time: %+v", got[0])
+	}
+
+	// Resurrection: a fresh list row clears the tombstone via the upsert.
+	if err := s.UpsertProject(ctx, mk("p1", "2026-10-26T00:00:00.000Z")); err != nil {
+		t.Fatalf("UpsertProject p1 (resurrection): %v", err)
+	}
+	got, _ = s.ListProjects(ctx)
+	if got[0].DeletedAt != nil {
+		t.Fatalf("a fresh server row must clear the tombstone: %+v", got[0])
+	}
+}
+
 // 11. ResetAccount — the v0.1.9 logout hand-off: every ACCOUNT-scoped table
 // and the pull-cursor meta rows die in ONE transaction; the caller's
 // keep-list (the shell passes ui.theme + tray's ui.hide_on_close) survives

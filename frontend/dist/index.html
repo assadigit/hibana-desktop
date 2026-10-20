@@ -32,6 +32,7 @@
   <link rel="stylesheet" href="/css/desktop-sync.css?v=1">
   <link rel="stylesheet" href="/css/desktop-logout.css?v=1">
   <link rel="stylesheet" href="/css/desktop-newproject.css?v=1">
+  <link rel="stylesheet" href="/css/desktop-refresh.css?v=1">
   <script src="/js/i18n-en.js?v=100" defer></script>
   <script src="/js/i18n.js?v=154" defer></script>
   <script src="/vendor/jalaali.min.js" defer></script>
@@ -42,6 +43,7 @@
 <script src="/js/desktop-sync.js"></script>
 <script src="/js/desktop-logout.js"></script>
 <script src="/js/desktop-newproject.js"></script>
+<script src="/js/desktop-refresh.js"></script>
 <script src="/js/devboard.js?v=28" defer></script>
 </head>
 <body>
@@ -220,6 +222,22 @@
            js/desktop-sync.js owns the flow through the Go SyncNow binding;
            the label + aria are desktop-localized (no pin i18n key exists). -->
       <button type="button" class="small db-sync-cta" id="db-sync-button" aria-label="Sync now" title="Sync now"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg><span id="db-sync-btn-label">Sync</span></button>
+      <!-- v0.1.12 (the owner ask: "I tried something, deleted something
+           from hibana, clicked sync on the app, but it didn't got deleted.
+           it seems we need a refresh button"): the toolbar's Refresh button —
+           the pull-to-screen affordance right after the Sync CTA. The sync
+           round pulls the boards into the Go MIRROR, but the island's own
+           DOM kept the boot-time render, so a deletion made on hibana.ir
+           stayed on screen even after a green sync; clicking Refresh
+           re-boots the island (board-page.js pushState'd ?project= — the
+           refresh re-enters the SAME board) and the boot fetches ride the
+           bridge's always-fresh interactive transport, so the cloud's truth
+           — the deletion included — paints. Ghost on purpose (Sync stays
+           the ONE colored action in the row); js/desktop-refresh.js owns
+           the click + the EN/FA label; desktop-sync.js grew the same reflex
+           for the sync round itself (an ok round that pulled boards
+           reloads the board when the modal closes). -->
+      <button type="button" class="btn ghost small" id="db-refresh-button" aria-label="Refresh board" title="Refresh board"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg><span id="db-refresh-btn-label">Refresh</span></button>
       <!-- v0.1.5 (the owner ask: dark mode + its toggle): the board toolbar's theme toggle —
            the web rail's own affordance (the S87/S93 round) on the desktop's chrome-less board:
            a ghost icon button flipping light <-> claude-dark through the Go SetTheme binding

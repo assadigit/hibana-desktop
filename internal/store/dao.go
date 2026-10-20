@@ -369,6 +369,28 @@ func (s *Store) UpsertProject(ctx context.Context, p Project) error {
 	return nil
 }
 
+// sqlMarkProjectGone tombstones a mirror row WITHOUT deleting it: the web's
+// gone state (404 "doesn't exist or was deleted", board-page.js:913-921) is
+// the server's own tombstone voice, so the mirror records it instead of
+// re-polling a dead board every round. The guard clause (deleted_at IS NULL)
+// keeps the FIRST gone stamp — the honest "when did it die" moment — and the
+// list pull owns resurrection: a fresh server row (the project live again)
+// clears the tombstone via UpsertProject's excluded.deleted_at overwrite.
+const sqlMarkProjectGone = `UPDATE projects SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL`
+
+// MarkProjectGone tombstones one projects row (deleted_at = at, ISO-8601) and
+// is idempotent: a row already tombstoned keeps its original stamp. An id the
+// mirror does not hold is a no-op, never an error (the list pull owns the
+// row's life, the board pull only ends it).
+func (s *Store) MarkProjectGone(ctx context.Context, id, at string) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if _, err := s.db.ExecContext(ctx, sqlMarkProjectGone, at, id); err != nil {
+		return fmt.Errorf("store: mark project gone %s: %w", id, err)
+	}
+	return nil
+}
+
 // ReplaceBoard swaps in one project's freshly-pulled board atomically. One
 // transaction: upsert the project; delete + reinsert that project's dev_tasks /
 // dev_task_tags / project_categories; upsert sprints / categories / tags (tags
