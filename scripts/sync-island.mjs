@@ -400,6 +400,13 @@ const HTML_THEME_OPS = [
 // theme-aware + RTL-native for free); js/desktop-sync.js (DESKTOP_SYNC_JS below)
 // owns the flow through the Go SyncNow binding; the toolbar button's aria-label
 // is desktop-localized (the pin dictionaries carry no sync key — verified @ pin).
+//
+// v0.1.8 — the owner's follow-up: "There is still No Sync button" — the ghost
+// ICON at the toolbar's edge did not read as a sync button. The button is now a
+// LABELED, FILL-COLORED pill right after Labels ("next to sprints and labels,
+// but colored. (fill colored)"), and Sprints + Labels are twin-sized ("sprints
+// and labels need to be same size" — the <a> vs <button> box divergence, below
+// in DESKTOP_SYNC_CSS).
 // ---------------------------------------------------------------------------
 const HTML_SYNC_OPS = [
   {
@@ -447,16 +454,30 @@ const HTML_SYNC_OPS = [
   </dialog>`,
   },
   {
-    name: 'insert the #db-sync-button toolbar button right after the theme toggle',
-    cite: 'v0.1.6 (S217); a ghost icon button — the refresh-cw glyph',
-    anchor: `      <button type="button" class="btn ghost small" id="db-theme-toggle" data-theme-toggle aria-label="Toggle theme" data-i18n-aria-label="nav.themeHint"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>`,
-    insert: `      <!-- v0.1.6 (the owner ask: the physical, visible sync button): the manual sync
-           trigger — a ghost icon button opening the sync modal, which proves the
-           round live (connecting to the Cloudflare server > upload > sync, then the
-           success panel) so the user is 100% sure the boards are synced and will
-           not vanish. js/desktop-sync.js owns the flow through the Go SyncNow
-           binding; the aria-label is desktop-localized (no pin i18n key exists). -->
-      <button type="button" class="btn ghost small" id="db-sync-button" aria-label="Sync now" title="Sync now"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg></button>`,
+    // v0.1.8: the anchor moved from the theme-toggle line (v0.1.6 put the ghost
+    // icon at the toolbar's EDGE) to the PINNED Labels line — the owner ask:
+    // "next to sprints and labels". The theme round runs FIRST (its own anchor
+    // is this same Labels line), so the theme toggle already sits right after
+    // Labels when this op runs; inserting at the same anchor lands the sync
+    // button BETWEEN them: Sprints | Labels | Sync | theme.
+    name: 'insert the #db-sync-button toolbar button right after the Labels button (v0.1.8: next to Sprints and Labels)',
+    cite: "v0.1.8 (the owner ask: 'a sync button on the header of app, next to sprints and labels, but colored. (fill colored)'); the v0.1.6 ghost icon read as NO sync button — now the bare-button CTA grammar (base.css S186: a plain <button> IS the app's solid primary) with the refresh glyph + the Sync label",
+    anchor: `      <button type="button" class="btn ghost small" id="db-labels-btn"><span data-i18n="db.labelsTitle">Labels</span></button>`,
+    insert: `      <!-- v0.1.8 (the owner ask: "a sync button on the header of app, next to
+           sprints and labels, but colored. (fill colored)" — the v0.1.6 ghost
+           icon at the toolbar's edge read as NO sync button): the manual sync
+           trigger is now a LABELED, FILL-COLORED pill right after Labels — the
+           bare-button CTA grammar (base.css S186: a plain <button> IS the
+           app's solid primary — the --cta fill + the white --btn-text label,
+           --cta-hover on hover, theme-native in light AND claude-dark), the
+           refresh glyph + the Sync label at the same twin metrics as Sprints
+           and Labels (desktop-sync.css sizes all three identically). Clicking
+           it opens the sync modal, which proves the round live (connecting to
+           the Cloudflare server > upload > sync, then the success panel) so
+           the user is 100% sure the boards are synced and will not vanish.
+           js/desktop-sync.js owns the flow through the Go SyncNow binding;
+           the label + aria are desktop-localized (no pin i18n key exists). -->
+      <button type="button" class="small db-sync-cta" id="db-sync-button" aria-label="Sync now" title="Sync now"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg><span id="db-sync-btn-label">Sync</span></button>`,
   },
 ]
 
@@ -1374,6 +1395,9 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
 // owner ask: the physical, visible sync button whose modal proves the round:
 // connecting to the Cloudflare server > upload > sync > the success panel —
 // the user is 100% sure the boards are synced and will not vanish).
+// v0.1.8 — the owner ask: "next to sprints and labels, but colored (fill
+// colored)": the button is now the LABELED fill-colored CTA pill after Labels
+// (this file also paints its visible label per language, like the aria).
 // GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
 // into frontend/dist/js/ and checksummed in frontend/island.checksums.json.
 (function () {
@@ -1385,6 +1409,7 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
   var STR = {
     en: {
       btn: 'Sync now',
+      btnLabel: 'Sync',
       title: 'Sync with Hibana cloud',
       connect: 'Connecting to Cloudflare server',
       upload: 'Uploading changes',
@@ -1407,6 +1432,7 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
     },
     fa: {
       btn: 'همگام‌سازی',
+      btnLabel: 'همگام‌سازی',
       title: 'همگام‌سازی با ابر هیبانا',
       connect: 'اتصال به سرور Cloudflare',
       upload: 'بارگذاری تغییرات',
@@ -1481,6 +1507,7 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
     if (!btn || !dlg || typeof dlg.showModal !== 'function') return
 
     var stepsEl = document.getElementById('db-sync-steps')
+    var btnLabel = document.getElementById('db-sync-btn-label')
     var panel = document.getElementById('db-sync-panel')
     var panelIcon = panel ? panel.querySelector('.icon') : null
     var panelTitle = document.getElementById('db-sync-panel-title')
@@ -1495,6 +1522,7 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
     function localize() {
       btn.setAttribute('aria-label', t('btn'))
       btn.setAttribute('title', t('btn'))
+      if (btnLabel) btnLabel.textContent = t('btnLabel')
       setText('db-sync-title', t('title'))
       var rows = stepsEl ? stepsEl.querySelectorAll('li[data-step]') : []
       for (var i = 0; i < rows.length; i++) {
@@ -1644,7 +1672,11 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
 // ---------------------------------------------------------------------------
 // desktop-sync.css — see the recovery note above for what it owns.
 // ---------------------------------------------------------------------------
-const DESKTOP_SYNC_CSS = `/* desktop-sync.css — the manual sync modal's step rows + result panels (v0.1.6).
+const DESKTOP_SYNC_CSS = `/* desktop-sync.css — the manual sync modal's step rows + result panels (v0.1.6;
+   v0.1.8 grew it: the toolbar's fill-colored Sync pill + the Sprints/Labels
+   twin sizing — the owner ask: "a sync button on the header of app, next to
+   sprints and labels, but colored. (fill colored)" + "sprints and labels need
+   to be same size").
    GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
    into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
    The dialog + .modal card are the island's own (components.css) — this sheet
@@ -1765,6 +1797,40 @@ const DESKTOP_SYNC_CSS = `/* desktop-sync.css — the manual sync modal's step r
 /* The modal card is a compact result dialog — the base .modal padding breathes
    a little tighter. */
 .db-sync-modal h2 { margin: 0; }
+
+/* v0.1.8 — the board toolbar row (the owner ask: "sprints and labels need to
+   be same size"): Sprints is an <a class="btn ghost small"> — a.ghost's own
+   explicit box (base.css: padding 0.55rem 0.75rem, weight 400) diverges from
+   its sibling Labels <button class="btn ghost small"> (the global button box:
+   0.55rem 1rem + the 500 label weight) — one read visibly WIDER and BOLDER
+   than the other. ONE #id rule pins BOTH to the button's own twin metrics:
+   identical padding, font, weight, and height. */
+#db-sprint-link,
+#db-labels-btn {
+  padding: 0.55rem 1rem;
+  font-size: var(--fs-md);
+  font-weight: var(--text-label-weight, 500);
+  white-space: nowrap;
+}
+
+/* v0.1.8 — the toolbar's Sync button (the owner ask: VISIBLE + FILL-COLORED,
+   next to Sprints and Labels): the bare-<button> CTA grammar (base.css S186 —
+   a plain <button> IS the app's solid primary: the --cta fill, the white
+   --btn-text label, --cta-hover on hover/active — theme-native in light AND
+   claude-dark), laid out as an icon + label pill at the SAME twin metrics as
+   its neighbors. Sprints/Labels stay neutral ghosts so the ONE colored action
+   in the toolbar row is Sync. */
+#db-sync-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent; /* the ghost twins carry a 1px hairline — a transparent border keeps all three boxes the exact same height */
+  font-size: var(--fs-md);
+  font-weight: var(--text-label-weight, 500);
+  white-space: nowrap;
+}
+#db-sync-button .icon { flex: none; }
 `
 
 // ---------------------------------------------------------------------------
@@ -1886,18 +1952,34 @@ function verifyDist(outDir, fileMap) {
   if (!themeJs.includes("resolveBoundMethod('SetTheme')")) problems.push('js/desktop-theme.js: the toggles must resolve the Go SetTheme binding at CLICK time, not at parse time')
   if (!themeJs.includes("EventsOn('hibana:theme'")) problems.push('js/desktop-theme.js: the tray-driven hibana:theme listener is missing')
 
-  // The v0.1.6 sync round (S217 — the physical, visible sync button ask): the modal
-  // ids must exist, the controller must resolve the Go SyncNow binding at CLICK time
-  // and relay the hibana:sync-progress events, and the "will not vanish" success copy
-  // must ship in BOTH languages.
-  for (const kept of ['id="db-sync-button"', 'id="db-sync-dialog"', 'id="db-sync-steps"', 'id="db-sync-panel"', 'aria-label="Sync now"']) {
+  // The v0.1.6 sync round (S217 — the physical, visible sync button ask) + the
+  // v0.1.8 follow-up (the owner: "There is still No Sync button" — the ghost icon
+  // did not read as one): the button must now be the LABELED FILL-COLORED CTA
+  // pill (class small db-sync-cta + the #db-sync-btn-label span) sitting right
+  // AFTER Labels and BEFORE the theme toggle ("next to sprints and labels"); the
+  // modal ids must exist, the controller must resolve the Go SyncNow binding at
+  // CLICK time and relay the hibana:sync-progress events, and the "will not
+  // vanish" success copy must ship in BOTH languages.
+  for (const kept of ['id="db-sync-button"', 'class="small db-sync-cta"', 'id="db-sync-btn-label"', 'id="db-sync-dialog"', 'id="db-sync-steps"', 'id="db-sync-panel"', 'aria-label="Sync now"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the sync round is missing "' + kept + '"')
+  }
+  {
+    const labelsIdx = indexHtml.indexOf('id="db-labels-btn"')
+    const syncIdx = indexHtml.indexOf('id="db-sync-button"')
+    const themeIdx = indexHtml.indexOf('id="db-theme-toggle"')
+    if (!(labelsIdx !== -1 && syncIdx > labelsIdx && themeIdx > syncIdx)) {
+      problems.push('index.html: the Sync button must sit right after Labels and before the theme toggle (the owner ask: next to Sprints and Labels) — got labels@' + labelsIdx + ', sync@' + syncIdx + ', theme@' + themeIdx)
+    }
   }
   const syncJs = fileMap['js/desktop-sync.js'] || ''
   if (!syncJs.includes("resolveBoundMethod('SyncNow')")) problems.push('js/desktop-sync.js: the button must resolve the Go SyncNow binding at CLICK time (the v0.1.1 parse-time snapshot lesson)')
   if (!syncJs.includes("EventsOn('hibana:sync-progress'")) problems.push('js/desktop-sync.js: the hibana:sync-progress step relay listener is missing')
+  if (!syncJs.includes('db-sync-btn-label')) problems.push('js/desktop-sync.js: the visible Sync label localization hook is missing (the v0.1.8 labeled-button ask)')
   if (!syncJs.includes('they will not vanish.')) problems.push('js/desktop-sync.js: the EN "will not vanish" success copy is missing')
   if (!syncJs.includes('از بین نمی')) problems.push('js/desktop-sync.js: the FA "will not vanish" success copy is missing')
+  const syncCss = fileMap['css/desktop-sync.css'] || ''
+  if (!syncCss.includes('#db-sprint-link')) problems.push('css/desktop-sync.css: the Sprints/Labels twin-sizing rule is missing (the v0.1.8 "same size" ask)')
+  if (!syncCss.includes('#db-sync-button')) problems.push('css/desktop-sync.css: the toolbar Sync CTA pill rule is missing (the v0.1.8 fill-colored ask)')
   if (!fs.existsSync(path.join(outDir, 'css/desktop-sync.css'))) problems.push('css/desktop-sync.css: missing from dist')
 
   // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the

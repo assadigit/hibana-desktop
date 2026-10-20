@@ -1,4 +1,8 @@
-/* desktop-sync.css — the manual sync modal's step rows + result panels (v0.1.6).
+/* desktop-sync.css — the manual sync modal's step rows + result panels (v0.1.6;
+   v0.1.8 grew it: the toolbar's fill-colored Sync pill + the Sprints/Labels
+   twin sizing — the owner ask: "a sync button on the header of app, next to
+   sprints and labels, but colored. (fill colored)" + "sprints and labels need
+   to be same size").
    GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
    into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
    The dialog + .modal card are the island's own (components.css) — this sheet
@@ -119,3 +123,37 @@
 /* The modal card is a compact result dialog — the base .modal padding breathes
    a little tighter. */
 .db-sync-modal h2 { margin: 0; }
+
+/* v0.1.8 — the board toolbar row (the owner ask: "sprints and labels need to
+   be same size"): Sprints is an <a class="btn ghost small"> — a.ghost's own
+   explicit box (base.css: padding 0.55rem 0.75rem, weight 400) diverges from
+   its sibling Labels <button class="btn ghost small"> (the global button box:
+   0.55rem 1rem + the 500 label weight) — one read visibly WIDER and BOLDER
+   than the other. ONE #id rule pins BOTH to the button's own twin metrics:
+   identical padding, font, weight, and height. */
+#db-sprint-link,
+#db-labels-btn {
+  padding: 0.55rem 1rem;
+  font-size: var(--fs-md);
+  font-weight: var(--text-label-weight, 500);
+  white-space: nowrap;
+}
+
+/* v0.1.8 — the toolbar's Sync button (the owner ask: VISIBLE + FILL-COLORED,
+   next to Sprints and Labels): the bare-<button> CTA grammar (base.css S186 —
+   a plain <button> IS the app's solid primary: the --cta fill, the white
+   --btn-text label, --cta-hover on hover/active — theme-native in light AND
+   claude-dark), laid out as an icon + label pill at the SAME twin metrics as
+   its neighbors. Sprints/Labels stay neutral ghosts so the ONE colored action
+   in the toolbar row is Sync. */
+#db-sync-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent; /* the ghost twins carry a 1px hairline — a transparent border keeps all three boxes the exact same height */
+  font-size: var(--fs-md);
+  font-weight: var(--text-label-weight, 500);
+  white-space: nowrap;
+}
+#db-sync-button .icon { flex: none; }

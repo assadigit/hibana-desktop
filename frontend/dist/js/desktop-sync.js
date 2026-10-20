@@ -2,6 +2,9 @@
 // owner ask: the physical, visible sync button whose modal proves the round:
 // connecting to the Cloudflare server > upload > sync > the success panel —
 // the user is 100% sure the boards are synced and will not vanish).
+// v0.1.8 — the owner ask: "next to sprints and labels, but colored (fill
+// colored)": the button is now the LABELED fill-colored CTA pill after Labels
+// (this file also paints its visible label per language, like the aria).
 // GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
 // into frontend/dist/js/ and checksummed in frontend/island.checksums.json.
 (function () {
@@ -13,6 +16,7 @@
   var STR = {
     en: {
       btn: 'Sync now',
+      btnLabel: 'Sync',
       title: 'Sync with Hibana cloud',
       connect: 'Connecting to Cloudflare server',
       upload: 'Uploading changes',
@@ -35,6 +39,7 @@
     },
     fa: {
       btn: 'همگام‌سازی',
+      btnLabel: 'همگام‌سازی',
       title: 'همگام‌سازی با ابر هیبانا',
       connect: 'اتصال به سرور Cloudflare',
       upload: 'بارگذاری تغییرات',
@@ -109,6 +114,7 @@
     if (!btn || !dlg || typeof dlg.showModal !== 'function') return
 
     var stepsEl = document.getElementById('db-sync-steps')
+    var btnLabel = document.getElementById('db-sync-btn-label')
     var panel = document.getElementById('db-sync-panel')
     var panelIcon = panel ? panel.querySelector('.icon') : null
     var panelTitle = document.getElementById('db-sync-panel-title')
@@ -123,6 +129,7 @@
     function localize() {
       btn.setAttribute('aria-label', t('btn'))
       btn.setAttribute('title', t('btn'))
+      if (btnLabel) btnLabel.textContent = t('btnLabel')
       setText('db-sync-title', t('title'))
       var rows = stepsEl ? stepsEl.querySelectorAll('li[data-step]') : []
       for (var i = 0; i < rows.length; i++) {

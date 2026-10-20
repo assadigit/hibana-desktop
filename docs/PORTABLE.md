@@ -39,7 +39,9 @@ password itself is never stored anywhere.
 
 ## The Sync button
 
-The toolbar's refresh-button opens a small window that PROVES a sync live:
+Next to Sprints and Labels, the toolbar's colored **Sync** button (v0.1.8 —
+teal with a white label; it is the one filled button in the toolbar row)
+opens a small window that PROVES a sync live:
 connecting to the Hibana (Cloudflare) server, then uploading any queued
 changes, then re-checking every board — ending on "Everything synced — your
 boards are saved on the Hibana cloud — they will not vanish". If some
