@@ -55,6 +55,12 @@ const maxBridgeBody = 7 << 20
 // drain round.
 const reloginWaitCap = 10 * time.Minute
 
+// logoutDeadline bounds Logout's best-effort server round-trip: a dead/unreachable
+// host must never hang the confirm dialog for more than ten seconds — the LOCAL
+// sign-out proceeds regardless (the cookie being dropped is invalid to the
+// server anyway).
+const logoutDeadline = 10 * time.Second
+
 // BridgeResponse is what Request returns to JS (the desktop-shim's contract,
 // guide §4.3): {status, body, etag}.
 type BridgeResponse struct {
@@ -90,6 +96,15 @@ type LoginResult struct {
 	User    *api.MeUser `json:"user,omitempty"`
 }
 
+// LogoutResult is the sign-out's wire result — {ok:true} when the LOCAL
+// account state is gone (the island reloads into the login card). The
+// server round-trip is best-effort by design, so a transport failure never
+// fails the result; only a Go-side validation error rejects, and Logout
+// takes no arguments to validate.
+type LogoutResult struct {
+	OK bool `json:"ok"`
+}
+
 // API is the struct Wails binds into the WebView (window.go.<pkg>.API).
 type API struct {
 	client  *api.Client
@@ -103,6 +118,7 @@ type API struct {
 	store      auth.Store // optional (nil = tests / no persistence)
 	onLogin    func(me *api.MeUser)
 	onAuthLose func(reason string)
+	onLogout   func() error // optional (nil = tests): the shell's mirror wipe
 
 	reloginWaiters []chan struct{}
 
@@ -149,6 +165,13 @@ func (a *API) SetOnLogin(fn func(me *api.MeUser)) { a.onLogin = fn }
 // "401 mid-session → the session-expiry dialog"). Fires only on the true→false
 // transition — a cold-start unauthenticated boot never spams it.
 func (a *API) SetOnAuthLost(fn func(reason string)) { a.onAuthLose = fn }
+
+// SetOnLogout wires the logout's mirror wipe (the shell passes
+// store.ResetAccount with the device-pref keep-list). A nil hook (tests)
+// skips the wipe; a failing hook is LOGGED, never fatal — the mirror is a
+// cache and the account boundary is already enforced by the session +
+// validator drops that precede it.
+func (a *API) SetOnLogout(fn func() error) { a.onLogout = fn }
 
 // SetAuthed seeds the boot state (auth.Restore's outcome). me may be nil.
 func (a *API) SetAuthed(me *api.Me, live bool) {
@@ -265,6 +288,83 @@ func loginFailMessage(se *api.StatusError) string {
 	default:
 		return "Sign-in failed — try again."
 	}
+}
+
+// Logout is the sign-out round-trip — the §5.5 login surface's counterpart (the
+// v0.1.9 owner ask: "option of logout and enter with a new account"). One bound
+// method, ZERO arguments (nothing hostile to validate). The account state dies
+// in a fixed order:
+//
+//  1. POST /api/auth/logout kills the SERVER session — best-effort: a 401 is
+//     already the wanted end state, and transport trouble only logs (an
+//     OFFLINE sign-out must still complete — the cookie being dropped is
+//     invalid to the server anyway);
+//  2. the client's cookie + ETag cache die TOGETHER (api.ClearSession — a
+//     surviving validator would let post-login pulls cheap-poll 304 against
+//     the wiped mirror);
+//  3. the persisted session file dies (auth.Store.Clear — the next boot finds
+//     no session and opens the login card);
+//  4. the mirror's account-scoped rows die (the shell's onLogout hook —
+//     store.ResetAccount with the device-pref keep-list);
+//  5. the authed state flips WITHOUT the auth-required event: desktop-logout.js
+//     location.reload()s on the {ok:true} resolve, and the shell serves the
+//     document with data-desktop-authed="false" — the login card opens at
+//     first paint and the user signs in with the new account.
+//
+// The sign-out is COMPLETE when this resolves {ok:true}; it cannot partially
+// fail — steps 2-5 are local and unconditional.
+func (a *API) Logout() (LogoutResult, error) {
+	a.mu.Lock()
+	email := ""
+	if a.me != nil {
+		email = a.me.Email
+	}
+	wipe := a.onLogout
+	a.mu.Unlock()
+
+	// 1. The server round-trip, best-effort (never fails the sign-out).
+	ctx, cancel := context.WithTimeout(context.Background(), logoutDeadline)
+	defer cancel()
+	if err := a.client.Logout(ctx); err != nil {
+		if se, ok := err.(*api.StatusError); ok && se.Status == http.StatusUnauthorized {
+			// The server session is already dead — exactly the end state.
+		} else {
+			log.Printf("hibana auth: the logout round-trip failed (continuing the local sign-out): %v", err)
+		}
+	}
+
+	// 2. The cookie + the ETag cache (the account-scoped client state).
+	a.client.ClearSession()
+
+	// 3. The persisted session file.
+	if a.store != nil {
+		if err := a.store.Clear(); err != nil {
+			log.Printf("hibana auth: dropping the stored session failed: %v", err)
+		}
+		a.mu.Lock()
+		a.lastPersisted = ""
+		a.mu.Unlock()
+	}
+
+	// 4. The mirror wipe (the shell's hook; logged, never fatal).
+	if wipe != nil {
+		if err := wipe(); err != nil {
+			log.Printf("hibana auth: the mirror wipe on logout failed: %v", err)
+		}
+	}
+
+	// 5. The state flip — silent by design: the island reloads into the gate.
+	a.mu.Lock()
+	was := a.authed
+	a.authed = false
+	a.me = nil
+	a.mu.Unlock()
+	if was && email != "" {
+		log.Printf("hibana: signed out (%s) — the login card opens on the reload", email)
+	} else {
+		log.Printf("hibana: signed out — the login card opens on the reload")
+	}
+	return LogoutResult{OK: true}, nil
 }
 
 // NotifyAuthLost marks the session dead (a 401 crossed the bridge, the pull

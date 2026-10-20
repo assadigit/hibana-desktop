@@ -726,3 +726,110 @@ func TestListProjectsOrderAndNullables(t *testing.T) {
 		t.Fatalf("order after bump = [%s %s], want p-old first", got[0].ID, got[1].ID)
 	}
 }
+
+// 11. ResetAccount — the v0.1.9 logout hand-off: every ACCOUNT-scoped table
+// and the pull-cursor meta rows die in ONE transaction; the caller's
+// keep-list (the shell passes ui.theme + tray's ui.hide_on_close) survives
+// (device prefs, not account data); the wipe is idempotent; and the next
+// account's first pull refills the mirror through the same ReplaceBoard path.
+func TestResetAccount(t *testing.T) {
+	ctx := context.Background()
+	s := openTestStore(t)
+	const pid = "p1"
+	p, tasks, sprints, cats, tags, taskTags, projCats := boardFixture(pid)
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats); err != nil {
+		t.Fatalf("ReplaceBoard full: %v", err)
+	}
+	// Vanish one task so a deletion shadow exists (account data too).
+	if err := s.ReplaceBoard(ctx, pid, p, tasks[1:2], sprints, cats, tags, nil, projCats); err != nil {
+		t.Fatalf("ReplaceBoard shrink: %v", err)
+	}
+	if err := s.Enqueue(ctx, "create", "task", "t-z", `{"title":"Z"}`, ""); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	for k, v := range map[string]string{
+		"etag:/api/projects/p1/devboard": `W/"v1"`,
+		"lastpull:p1":                    "2026-10-21T00:00:00.000Z",
+		"projects-pull":                  "2026-10-21T00:00:00.000Z",
+		"ui.theme":                       "claude-dark",
+		"ui.hide_on_close":               "1",
+	} {
+		if err := s.SetMeta(ctx, k, v); err != nil {
+			t.Fatalf("SetMeta %q: %v", k, err)
+		}
+	}
+
+	// Precondition: the mirror is visibly loaded.
+	for table, want := range map[string]int{
+		"projects": 1, "dev_tasks": 1, "sprints": 1, "categories": 1, "tags": 1,
+		"dev_task_tags": 0, "project_categories": 1, "local_grace_tasks": 2,
+		"outbox": 1, "meta": 5,
+	} {
+		if n := count(t, s, `SELECT COUNT(*) FROM `+table); n != want {
+			t.Fatalf("precondition %s = %d, want %d", table, n, want)
+		}
+	}
+
+	// The logout wipe (the shell's keep-list: theme + close-to-tray).
+	if err := s.ResetAccount(ctx, "ui.theme", "ui.hide_on_close"); err != nil {
+		t.Fatalf("ResetAccount: %v", err)
+	}
+
+	// Every account-scoped table is empty…
+	for _, table := range []string{
+		"projects", "dev_tasks", "sprints", "categories", "tags",
+		"dev_task_tags", "project_categories", "project_archives",
+		"screenshots", "local_grace_tasks", "outbox",
+	} {
+		if n := count(t, s, `SELECT COUNT(*) FROM `+table); n != 0 {
+			t.Fatalf("%s after ResetAccount = %d, want 0", table, n)
+		}
+	}
+	// …the cursors died, the device prefs survived.
+	if n := count(t, s, `SELECT COUNT(*) FROM meta`); n != 2 {
+		t.Fatalf("meta after ResetAccount = %d rows, want the 2 kept device prefs", n)
+	}
+	if v, ok, err := s.GetMeta(ctx, "ui.theme"); err != nil || !ok || v != "claude-dark" {
+		t.Fatalf("ui.theme survived = (%q, %v, %v), want claude-dark", v, ok, err)
+	}
+	if v, ok, err := s.GetMeta(ctx, "ui.hide_on_close"); err != nil || !ok || v != "1" {
+		t.Fatalf("ui.hide_on_close survived = (%q, %v, %v), want 1", v, ok, err)
+	}
+	if _, ok, _ := s.GetMeta(ctx, "etag:/api/projects/p1/devboard"); ok {
+		t.Fatal("the ETag cursor survived ResetAccount — validators must never cross an account boundary")
+	}
+	if _, ok, _ := s.GetMeta(ctx, "projects-pull"); ok {
+		t.Fatal("the projects-list cursor survived ResetAccount")
+	}
+
+	// Idempotent: a second wipe is a clean no-op.
+	if err := s.ResetAccount(ctx, "ui.theme", "ui.hide_on_close"); err != nil {
+		t.Fatalf("ResetAccount again: %v", err)
+	}
+	if n := count(t, s, `SELECT COUNT(*) FROM meta`); n != 2 {
+		t.Fatalf("meta after the second ResetAccount = %d, want 2", n)
+	}
+
+	// The next account's first pull refills the mirror through the same path.
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats); err != nil {
+		t.Fatalf("ReplaceBoard after the wipe: %v", err)
+	}
+	board, err := s.GetBoard(ctx, pid)
+	if err != nil {
+		t.Fatalf("GetBoard after the wipe: %v", err)
+	}
+	if len(board) != 3 {
+		t.Fatalf("board after the wipe = %d tasks, want 3", len(board))
+	}
+
+	// And a keep-less reset clears meta entirely (the plain variant).
+	if err := s.SetMeta(ctx, "etag:x", "v"); err != nil {
+		t.Fatalf("SetMeta etag:x: %v", err)
+	}
+	if err := s.ResetAccount(ctx); err != nil {
+		t.Fatalf("ResetAccount (no keep list): %v", err)
+	}
+	if n := count(t, s, `SELECT COUNT(*) FROM meta`); n != 0 {
+		t.Fatalf("meta after the keep-less ResetAccount = %d, want 0", n)
+	}
+}

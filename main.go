@@ -222,6 +222,16 @@ func main() {
 			wailsruntime.EventsEmit(c, "hibana:auth-required", reason)
 		}
 	})
+	// THE SIGN-OUT PATH (v0.1.9 — the owner ask: "option of logout and
+	// enter with a new account"): the toolbar's Log out button → the
+	// confirm dialog → ui.Logout, which calls this hook after the cookie,
+	// the session file and the ETag cache are already gone. The wipe
+	// clears the mirror's account-scoped rows + the pull cursors; the
+	// DEVICE-scope rows survive a sign-out (the light/dark theme and the
+	// close-to-tray preference are machine settings, not account data).
+	bridge.SetOnLogout(func() error {
+		return mirror.ResetAccount(context.Background(), ui.ThemeMetaKey, tray.MetaKey)
+	})
 	// The outbox's 401 rule (§10): re-auth (the card), then retry the op
 	// once when the user signs back in.
 	engine.SetRelogin(func(ctx context.Context) error {

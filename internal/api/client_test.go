@@ -80,6 +80,25 @@ func (f *fakeWorker) handler() http.Handler {
 		}
 		_, _ = w.Write([]byte(`{"user":{"id":"u1","username":"t"}}`))
 	})
+	mux.HandleFunc("/api/auth/logout", func(w http.ResponseWriter, r *http.Request) {
+		// The web app's own contract (routes/auth.ts:165): a live cookie dies
+		// server-side, the response clears it. No/invalid cookie → 401.
+		ck, err := r.Cookie(SessionCookie)
+		f.mu.Lock()
+		valid := err == nil && f.sessions[ck.Value]
+		if valid {
+			delete(f.sessions, ck.Value)
+		}
+		f.mu.Unlock()
+		if !valid {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+			return
+		}
+		w.Header().Set("Set-Cookie", SessionCookie+"=; Path=/; Max-Age=0")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	})
 	mux.HandleFunc("/api/projects/p1/devboard", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(f.boardHits, 1)
 		if atomic.LoadInt32(&f.failNext) > 0 {
@@ -287,6 +306,74 @@ func TestSetSessionTokenRestores(t *testing.T) {
 	me, err := c2.Me(context.Background())
 	if err != nil || me.User.ID != "u1" {
 		t.Fatalf("restored session should validate: %v", err)
+	}
+}
+
+// TestLogoutRoundTripAndClearSession — the v0.1.9 logout contract at the
+// client level: POST /api/auth/logout kills the SERVER session, and
+// ClearSession (the bridge's belt, so an OFFLINE sign-out behaves the same)
+// drops the cookie AND the ETag cache TOGETHER — the account-scoped pair.
+func TestLogoutRoundTripAndClearSession(t *testing.T) {
+	fw := newFakeWorker()
+	c := newTestClient(t, fw)
+	if err := c.Login(context.Background(), "u", "p"); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	// A board pull's residue: a live validator in the ETag cache.
+	c.SetETag("/api/projects/p1/devboard", `W/"abc123"`)
+	if c.ETag("/api/projects/p1/devboard") == "" {
+		t.Fatal("precondition: the ETag cache must hold the validator")
+	}
+	if err := c.Logout(context.Background()); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	// The server session is dead: the identity read 401s now.
+	if _, err := c.Me(context.Background()); err == nil {
+		t.Fatal("the server session must be dead after logout")
+	}
+	// The belt: BOTH account-scoped client states drop together.
+	c.ClearSession()
+	if tok := c.SessionToken(); tok != "" {
+		t.Fatalf("ClearSession must drop the session cookie, got %q", tok)
+	}
+	if et := c.ETag("/api/projects/p1/devboard"); et != "" {
+		t.Fatalf("ClearSession must drop the ETag cache, got %q", et)
+	}
+	// And a re-login still works on the same client (the jar is reusable).
+	if err := c.Login(context.Background(), "u", "p"); err != nil {
+		t.Fatalf("re-login after logout: %v", err)
+	}
+	if c.SessionToken() == "" {
+		t.Fatal("re-login must mint a fresh session cookie")
+	}
+}
+
+// TestLogoutOfflineSurfacesError — the bridge treats the server round-trip
+// as best-effort, but the CLIENT must still surface transport trouble so the
+// bridge can log it (never fail the sign-out on it).
+func TestLogoutOfflineSurfacesError(t *testing.T) {
+	c, err := New("http://127.0.0.1:1") // nothing listens
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := c.Logout(context.Background()); err == nil {
+		t.Fatal("an unreachable host must surface the error to the caller")
+	}
+}
+
+// TestLogoutAlreadyDeadIsA401 — a server-side-already-dead session answers
+// 401 (not an error the caller cares about, but the CLIENT reports the status
+// so the bridge's 401 branch can recognize the wanted end state).
+func TestLogoutAlreadyDeadIsA401(t *testing.T) {
+	fw := newFakeWorker()
+	c := newTestClient(t, fw) // never logged in — no cookie in the jar
+	err := c.Logout(context.Background())
+	se, ok := err.(*StatusError)
+	if !ok {
+		t.Fatalf("expected a *StatusError, got %v", err)
+	}
+	if se.Status != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", se.Status)
 	}
 }
 

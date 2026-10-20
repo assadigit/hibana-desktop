@@ -125,6 +125,28 @@ func (c *Client) SessionToken() string {
 	return ""
 }
 
+// ClearSession drops the session cookie AND the per-path ETag cache — the
+// two account-scoped states the client holds in memory. Logout (and only
+// logout) calls it: the pair must die together, because a surviving
+// validator would let the post-login pulls cheap-poll 304 against a mirror
+// that was just wiped (the engine's 304 path assumes the mirror still holds
+// the content — after a logout wipe it does not). The cookie is retired by
+// an expired Set-Cookie (the jar drops the entry); the belt in SessionToken
+// is the "" value check below it.
+func (c *Client) ClearSession() {
+	c.jar.SetCookies(c.base, []*http.Cookie{{
+		Name:    SessionCookie,
+		Value:   "",
+		Path:    "/",
+		Secure:  true,
+		MaxAge:  -1,              // the jar's "delete now" semantics
+		Expires: time.Unix(1, 0), // the epoch — belt for jars keying on Expires
+	}})
+	c.mu.Lock()
+	c.etags = map[string]string{}
+	c.mu.Unlock()
+}
+
 // SetETag seeds the ETag store (e.g. from the local mirror's meta table after
 // a restart) so the first poll is already cheap.
 func (c *Client) SetETag(path, etag string) {
@@ -369,6 +391,23 @@ func (c *Client) Login(ctx context.Context, login, password string) error {
 	}
 	if c.SessionToken() == "" {
 		return fmt.Errorf("hibana api: login 200 without a session cookie")
+	}
+	return nil
+}
+
+// Logout ends the server-side session (POST /api/auth/logout — the web app's
+// own routes/auth.ts:165: destroySession + a clearing Set-Cookie, answered
+// {ok:true}). The CALLER treats the round-trip as best-effort by design: an
+// offline sign-out must still complete locally, and a 401 here means the
+// server session is already dead — exactly the wanted end state, not an
+// error worth reporting.
+func (c *Client) Logout(ctx context.Context) error {
+	resp, err := c.write(ctx, http.MethodPost, "/api/auth/logout", nil)
+	if err != nil {
+		return err
+	}
+	if resp.Status != http.StatusOK {
+		return &StatusError{Status: resp.Status, Method: http.MethodPost, Path: "/api/auth/logout", Body: string(resp.Body), Code: codeOf(resp.Body)}
 	}
 	return nil
 }

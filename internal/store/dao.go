@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -714,6 +715,75 @@ func (s *Store) OutboxLen(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("store: outbox len: %w", err)
 	}
 	return n, nil
+}
+
+// ResetAccount wipes every ACCOUNT-scoped table + the pull-cursor meta rows
+// in ONE transaction — the logout hand-off (the v0.1.9 owner ask: "option of
+// logout and enter with a new account"): the previous account's boards, tasks,
+// chips, screenshots, deletion shadows and queued outbox ops leave the
+// machine with the session, so the next account starts from a clean mirror
+// and its first pull is a full unconditional 200 (the paired
+// api.Client.ClearSession drops the in-memory validators; the engine's 304
+// cheap-poll assumes the mirror still holds the content a wipe just removed).
+//
+// The DEVICE-scoped meta rows survive a sign-out by design — the caller
+// names them in keepMeta (the shell passes ui.ThemeMetaKey +
+// internal/tray.MetaKey): the light/dark preference and the close-to-tray
+// toggle are machine settings, not account data. Every OTHER meta key dies
+// (the engine's cursors — etag:*, lastpull:*, projects-pull — are
+// account-validated facts that must never cross an account boundary).
+// Idempotent: resetting an already-clean mirror is a no-op.
+func (s *Store) ResetAccount(ctx context.Context, keepMeta ...string) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: reset account: %w", err)
+	}
+	defer tx.Rollback() // no-op after a successful Commit
+
+	// Children before parents on the FK graph (dev_tasks → projects etc.),
+	// though foreign_keys would accept any order inside one tx of pure
+	// DELETEs — the explicit order keeps the intent legible.
+	for _, table := range []string{
+		"dev_task_tags",
+		"dev_tasks",
+		"sprints",
+		"categories",
+		"tags",
+		"project_categories",
+		"project_archives",
+		"screenshots",
+		"local_grace_tasks",
+		"projects",
+		"outbox",
+	} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table); err != nil {
+			return fmt.Errorf("store: reset account: wiping %s: %w", table, err)
+		}
+	}
+
+	// The meta keep-list: device prefs stay, engine cursors go.
+	if len(keepMeta) == 0 {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM meta`); err != nil {
+			return fmt.Errorf("store: reset account: wiping meta: %w", err)
+		}
+	} else {
+		placeholders := strings.TrimRight(strings.Repeat("?,", len(keepMeta)), ",")
+		args := make([]interface{}, 0, len(keepMeta))
+		for _, k := range keepMeta {
+			args = append(args, k)
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM meta WHERE key NOT IN (`+placeholders+`)`, args...); err != nil {
+			return fmt.Errorf("store: reset account: pruning meta: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: reset account: commit: %w", err)
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

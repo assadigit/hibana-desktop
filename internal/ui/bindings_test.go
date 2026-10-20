@@ -130,6 +130,19 @@ func loginFake(t *testing.T) (*httptest.Server, *auth.MemStore, *API) {
 				return
 			}
 			_, _ = w.Write([]byte(`{"user":{"id":"u1","username":"user","email":"user@example.com","role":"member","language_pref":"fa","calendar_pref":"gregorian"}}`))
+		case "/api/auth/logout":
+			// The web app's own contract (routes/auth.ts:165): a live cookie
+			// clears; no cookie → 401 (the "already dead" branch the bridge
+			// treats as the wanted end state).
+			ck, err := r.Cookie(api.SessionCookie)
+			if err != nil || ck.Value == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+				return
+			}
+			w.Header().Set("Set-Cookie", api.SessionCookie+"=; Path=/; Max-Age=0")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"ok":true}`))
 		case "/api/ping":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"ok":true}`))
@@ -403,5 +416,123 @@ func TestBridgeFreshAfterEngineSeededETag(t *testing.T) {
 	res2, err := a.Request("GET", boardPath, "")
 	if err != nil || res2.Status != http.StatusOK {
 		t.Fatalf("every interactive GET must stay 200, got err=%v %+v", err, res2)
+	}
+}
+
+// TestLogoutRoundTrip — the v0.1.9 sign-out (the owner ask: "option of logout
+// and enter with a new account"): a signed-in bridge resolves {ok:true} with
+// the LOCAL account state fully gone — authed snapshot flipped (silently: no
+// auth-required event, the island reloads into the gate), persisted session
+// dropped, mirror-wipe hook fired — and the server session dead (a /me
+// through the bridge 401s). A SECOND logout is a clean idempotent pass (the
+// 401-already-dead branch resolves ok too).
+func TestLogoutRoundTrip(t *testing.T) {
+	_, st, a := loginFake(t)
+	lost := 0
+	a.SetOnAuthLost(func(reason string) { lost++ })
+	if _, err := a.Login("user@example.com", "pw"); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if !a.AuthState().Authenticated {
+		t.Fatal("precondition: must be signed in")
+	}
+	wiped := make(chan struct{}, 1)
+	a.SetOnLogout(func() error { wiped <- struct{}{}; return nil })
+
+	res, err := a.Logout()
+	if err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	if !res.OK {
+		t.Fatalf("logout result: %+v", res)
+	}
+	// The state flipped silently: NO auth-required event (the island reloads
+	// into the login card on the JS side; the 401 watcher stays quiet below
+	// the already-false state).
+	if a.AuthState().Authenticated {
+		t.Fatal("the state must be unauthenticated after logout")
+	}
+	if lost != 0 {
+		t.Fatalf("logout must NOT fire the auth-required hook, fired %d", lost)
+	}
+	// The persisted session file is gone.
+	if tok, _ := st.LoadSession(); tok != "" {
+		t.Fatalf("the stored session survived logout: %q", tok)
+	}
+	// The mirror-wipe hook fired.
+	select {
+	case <-wiped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the onLogout hook did not fire")
+	}
+	// The server session died too: a /me through the bridge now 401s (and
+	// the 401 watcher stays silent — the state is already unauthenticated).
+	br, err := a.Request("GET", "/api/auth/me", "")
+	if err != nil {
+		t.Fatalf("Request after logout: %v", err)
+	}
+	if br.Status != http.StatusUnauthorized {
+		t.Fatalf("/me after logout = %d, want 401", br.Status)
+	}
+	if lost != 0 {
+		t.Fatalf("the post-logout 401 must stay silent (state already false), fired %d", lost)
+	}
+
+	// A re-login with a NEW account works on the same bridge (the asked
+	// flow: sign out → the login card → enter a new account).
+	res2, err := a.Login("user@example.com", "pw")
+	if err != nil || !res2.OK || !a.AuthState().Authenticated {
+		t.Fatalf("re-login after logout failed: %v %+v", err, res2)
+	}
+
+	// The second logout's server round-trip 401s (the server session just
+	// died) — the wanted end state branch — and the local sign-out still
+	// completes.
+	res3, err := a.Logout()
+	if err != nil || !res3.OK {
+		t.Fatalf("the second (server-already-dead) logout must resolve ok: %v %+v", err, res3)
+	}
+	if a.AuthState().Authenticated {
+		t.Fatal("the state must be unauthenticated after the second logout")
+	}
+}
+
+// TestLogoutOfflineStillCompletes — the server round-trip is best-effort: a
+// dead host must never block the LOCAL sign-out (an offline "Log out" still
+// drops the cookie + the persisted session + flips the state).
+func TestLogoutOfflineStillCompletes(t *testing.T) {
+	c, _ := api.New("http://127.0.0.1:1") // nothing listens
+	b := New(c, "v", "r")
+	st := &auth.MemStore{}
+	b.SetSessionStore(st)
+	if err := st.SaveSession("tok-offline"); err != nil {
+		t.Fatal(err)
+	}
+	b.SetAuthed(nil, false) // a session restored but the host is down: state stays seeded below
+	b.SetAuthed(&api.Me{User: api.MeUser{ID: "u1", Email: "user@example.com"}}, true)
+
+	res, err := b.Logout()
+	if err != nil || !res.OK {
+		t.Fatalf("an offline logout must resolve ok: %v %+v", err, res)
+	}
+	if b.AuthState().Authenticated {
+		t.Fatal("the offline logout must still flip the state")
+	}
+	if tok, _ := st.LoadSession(); tok != "" {
+		t.Fatal("the offline logout must still drop the persisted session")
+	}
+}
+
+// TestLogoutWithoutSessionStore — the store hook is optional (nil = tests / a
+// no-persistence run): the sign-out still completes.
+func TestLogoutWithoutSessionStore(t *testing.T) {
+	c, err := api.New("http://127.0.0.1:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := New(c, "v", "r") // NO SetSessionStore
+	res, err := b.Logout()
+	if err != nil || !res.OK {
+		t.Fatalf("logout without a session store must resolve ok: %v %+v", err, res)
 	}
 }

@@ -1,0 +1,30 @@
+/* desktop-logout.css — the sign-out round (v0.1.9 — the owner ask: "It must
+   also have option of logout and enter with a new account").
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
+   The dialog + .modal card are the island's own (components.css) — this sheet
+   starts INSIDE the card. */
+
+/* The toolbar's Log out button — the account zone at the row's END (after the
+   theme toggle). Ghost on purpose (account actions are not CTAs — Sync stays
+   the ONE colored action in the row), the log-out glyph + the pin's own
+   nav.signout label, laid out as an icon+label pill at the same twin metrics
+   as Sprints/Labels/Sync (the S220 "same size" grammar). */
+#db-logout-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+#db-logout-button .icon { flex: none; }
+
+/* The confirm dialog's action row — the .db-sync-actions grammar (the pair
+   right-aligned, start-aligned under RTL). The .modal grid's own gap spaces
+   the title / body / error stack above it. */
+.db-logout-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+[dir='rtl'] .db-logout-actions { justify-content: flex-start; }
+.db-logout-modal h2 { margin: 0; }
