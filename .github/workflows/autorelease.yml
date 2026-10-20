@@ -28,7 +28,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write # the bump commit + the annotated tag push
+  contents: write # kept for any GITHUB_TOKEN-path work; the bump push itself rides RELEASE_PAT
 
 concurrency:
   group: autorelease
@@ -39,10 +39,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # The checkout rides RELEASE_PAT (the owner's PAT, sealed in the repo
+      # secrets, the HIBANA_SOURCE_TOKEN precedent): the bump commit carries the
+      # desktop.yml dev-placeholder bump (hard rule 9 lockstep), and GITHUB_TOKEN
+      # can NEVER push a workflow-file change — "refusing to allow a GitHub App
+      # to create or update workflow without workflows permission" (the lane's
+      # second live firing, 2026-10-20). The PAT's workflow scope is the only
+      # token that can carry this push; the checkout embedding it in origin's
+      # remote URL makes `git push origin main "$TAG"` use it automatically.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the full history: the version ladder needs every tag
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PAT }}
 
       - name: Cut the next release (auto-release on every update)
         run: |
