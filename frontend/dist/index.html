@@ -39,6 +39,7 @@
     <script src="/js/chip-render.js?v=12" defer></script>
 <script src="/js/desktop-theme.js"></script>
 <script src="/js/desktop-shim.js"></script>
+<script src="/js/desktop-audio.js"></script>
 <script src="/js/desktop-login.js"></script>
 <script src="/js/desktop-sync.js"></script>
 <script src="/js/desktop-logout.js"></script>
@@ -95,6 +96,29 @@
        hibana:sync-progress events light the step rows live. -->
   <dialog class="dialog" id="db-sync-dialog" aria-labelledby="db-sync-title">
     <form class="modal db-sync-modal" method="dialog">
+      <!-- v0.1.13 (the owner ask: "also in modal i want syncing animation with
+           icons and animation") — the HERO: the round's living emblem, an
+           aria-hidden stage above the factual step rows. One 4.6rem emblem
+           carries the whole choreography: the pulse ring reaches out on
+           connect, three packets rise through upload, the h-spark orbits
+           while the round is in flight, and the central glyph MORPHS per
+           stage (cloud -> upload arrow -> orbit -> check/cross) with the
+           ok pop settling the emblem into the green verdict. js/
+           desktop-sync.js flips data-stage from the hibana:sync-progress
+           events + data-kind from the outcome; desktop-sync.css owns every
+           keyframe (prefers-reduced-motion respected). -->
+      <div class="db-sync-hero" id="db-sync-hero" data-stage="connect" data-kind="" aria-hidden="true">
+        <div class="db-sync-emblem" id="db-sync-emblem">
+          <span class="db-sync-ring"></span>
+          <span class="db-sync-orbit"><span class="db-sync-spark"></span></span>
+          <span class="db-sync-packets" aria-hidden="true"><span></span><span></span><span></span></span>
+          <svg class="icon db-sync-glyph db-sync-glyph-connect" viewBox="0 0 24 24"><path d="M17.5 18a4.5 4.5 0 0 0 .38-8.98A6 6 0 0 0 6.48 7.62 5 5 0 0 0 6.5 17.5"/></svg>
+          <svg class="icon db-sync-glyph db-sync-glyph-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 21h16"/></svg>
+          <svg class="icon db-sync-glyph db-sync-glyph-orbit" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+          <svg class="icon db-sync-glyph db-sync-glyph-ok" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+          <svg class="icon db-sync-glyph db-sync-glyph-err" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </div>
+      </div>
       <h2 id="db-sync-title">Sync with Hibana cloud</h2>
       <ol class="db-sync-steps" id="db-sync-steps">
         <li data-step="connect" data-state="pending"><span class="db-sync-mark" aria-hidden="true"></span><span class="db-sync-label">Connecting to Cloudflare server</span></li>

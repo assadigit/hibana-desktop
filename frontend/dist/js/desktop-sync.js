@@ -133,6 +133,16 @@
     var retryBtn = document.getElementById('db-sync-retry')
     var doneBtn = document.getElementById('db-sync-done')
     var syncing = false
+    // v0.1.13 — the sound round's hero (the owner ask: "also in modal i want
+    // syncing animation with icons and animation"): the living emblem above
+    // the step rows. data-stage follows the round's ACTIVE step (connect /
+    // upload / sync — morphing the central glyph + the choreography), and
+    // data-kind settles it on the outcome (ok / warn / err — the ok pop, the
+    // danger tint). setStage/setKind below own every flip; the CSS owns every
+    // keyframe (prefers-reduced-motion respected).
+    var hero = document.getElementById('db-sync-hero')
+    function setStage(name) { if (hero) hero.setAttribute('data-stage', name) }
+    function setKind(kind) { if (hero) hero.setAttribute('data-kind', kind) }
     // v0.1.12 — the pulled-boards reflex: set when an ok round MOVED mirror
     // rows (out.pulled > 0 — the cloud changed under the island's boot-time
     // render), consumed by the modal's close listener (Done or Esc) so the
@@ -226,18 +236,27 @@
         var refreshed = out.pulled > 0 ? fmt('updated', { n: out.pulled }) : ''
         if (refreshed) refreshed = ' · ' + refreshed
         needsReload = out.pulled > 0
+        // v0.1.13 — the hero settles into the green verdict (the ok pop) and
+        // the all-clear chime plays (cue #5: "when syncing complete" — the
+        // sonic twin of this very panel; desktop-audio.js owns the synth).
+        setKind('ok')
+        if (window.hibanaAudio && typeof window.hibanaAudio.play === 'function') {
+          window.hibanaAudio.play('sync')
+        }
         showPanel('ok', t('okTitle'), t('okBody') + ' ' + note + refreshed + ' · ' + counts + ' · ' + when, false)
         return
       }
-      if (out.code === 'busy') { showPanel('err', t('busyTitle'), '', false); return }
-      if (out.code === 'session') { showPanel('err', t('sessionTitle'), '', false); return }
-      if (out.code === 'unreachable') { showPanel('err', t('unreachableTitle'), '', true); return }
-      if (out.code === 'pending') { showPanel('warn', t('warnTitle'), out.message || '', true); return }
+      if (out.code === 'busy') { setKind('err'); showPanel('err', t('busyTitle'), '', false); return }
+      if (out.code === 'session') { setKind('err'); showPanel('err', t('sessionTitle'), '', false); return }
+      if (out.code === 'unreachable') { setKind('err'); showPanel('err', t('unreachableTitle'), '', true); return }
+      if (out.code === 'pending') { setKind('warn'); showPanel('warn', t('warnTitle'), out.message || '', true); return }
+      setKind('err')
       showPanel('err', t('errTitle'), out.message || '', true)
     }
 
     function onReject() {
       syncing = false
+      setKind('err')
       showPanel('err', t('errTitle'), t('notWired'), false)
     }
 
@@ -255,6 +274,11 @@
       if (syncing) { dlg.showModal(); return } // reopen mid-round: the steps are live
       syncing = true
       needsReload = false // every fresh round re-earns its own reload verdict
+      // v0.1.13 — every fresh round re-boots the hero too: connect stage, no
+      // verdict yet (the ok pop/err tint from the previous round must never
+      // leak into a new one).
+      setStage('connect')
+      setKind('')
       if (panel) panel.hidden = true
       if (retryBtn) retryBtn.hidden = true
       if (doneBtn) doneBtn.hidden = true
@@ -274,6 +298,8 @@
       if (retryBtn) retryBtn.hidden = true
       if (doneBtn) doneBtn.hidden = true
       if (closeBtn) closeBtn.hidden = false
+      setStage('connect')
+      setKind('')
       setStep('connect', 'pending')
       setStep('upload', 'pending')
       setStep('sync', 'pending')
@@ -287,6 +313,10 @@
         if (!payload || typeof payload !== 'object') return
         if (!dlg.open) return // a stale event after the modal closed — the round still finishes Go-side
         setStep(payload.step, payload.state, payload.detail || '')
+        // v0.1.13 — the hero follows the round's ACTIVE step (the glyph morph
+        // + the choreography); a done/failed step leaves the stage where the
+        // round stands until the next active step or the outcome takes it.
+        if (payload.state === 'active' && payload.step) setStage(payload.step)
       })
     }
 

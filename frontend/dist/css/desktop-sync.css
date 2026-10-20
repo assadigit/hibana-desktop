@@ -157,3 +157,177 @@
   white-space: nowrap;
 }
 #db-sync-button .icon { flex: none; }
+
+/* v0.1.13 — THE HERO (the owner ask: "also in modal i want syncing animation
+   with icons and animation"): the round's living emblem, a compact stage
+   above the factual step rows. One 4.6rem emblem carries the whole
+   choreography — the pulse ring reaches out on connect, three packets rise
+   through upload, the h-spark orbits while the round is in flight, and the
+   central glyph MORPHS per stage (cloud -> upload arrow -> orbit ->
+   check/cross) with the ok pop settling the emblem into the green verdict.
+   js/desktop-sync.js flips data-stage (the live hibana:sync-progress
+   events) + data-kind (the outcome); every keyframe lives here. */
+.db-sync-hero {
+  display: flex;
+  justify-content: center;
+  margin-block-end: -0.35rem; /* the emblem breathes tight under the title's grid gap */
+}
+.db-sync-emblem {
+  position: relative;
+  inline-size: 4.6rem;
+  block-size: 4.6rem;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--accent) 5%, var(--card));
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+
+/* The glyphs: only the matching one shows; the rest rest at scale(0.6) +
+   transparent, so every stage flip is a morph (a 280ms cubic pop), never
+   a swap. The kind rules sit AFTER the stage rules — a settled verdict
+   (ok/warn/err) overrides whatever stage the round last stood at. */
+.db-sync-glyph {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  inline-size: 1.8rem;
+  block-size: 1.8rem;
+  stroke-width: 1.9;
+  color: var(--accent);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.db-sync-hero[data-stage='connect'] .db-sync-glyph-connect,
+.db-sync-hero[data-stage='upload'] .db-sync-glyph-upload,
+.db-sync-hero[data-stage='sync'] .db-sync-glyph-orbit { opacity: 1; transform: scale(1); }
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-ok,
+.db-sync-hero[data-kind='warn'] .db-sync-glyph-orbit,
+.db-sync-hero[data-kind='err'] .db-sync-glyph-err { opacity: 1; transform: scale(1); }
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-ok { color: var(--ok); }
+.db-sync-hero[data-kind='err'] .db-sync-glyph-err { color: var(--err); }
+
+/* The verdict settle: the emblem itself tints with the outcome — the green
+   ring for ok (the step marks' own --ok grammar), the danger ring for err. */
+.db-sync-hero[data-kind='ok'] .db-sync-emblem {
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  background: color-mix(in srgb, var(--ok) 9%, transparent);
+}
+.db-sync-hero[data-kind='err'] .db-sync-emblem {
+  border-color: color-mix(in srgb, var(--err) 45%, transparent);
+  background: color-mix(in srgb, var(--err) 8%, transparent);
+}
+.db-sync-hero[data-kind='warn'] .db-sync-emblem {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* The connect pulse: the ring reaches OUT (scale + fade, an outgoing
+   handshake) exactly while the connect step is ACTIVE and no verdict sits. */
+.db-sync-ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.db-sync-hero[data-stage='connect'][data-kind=''] .db-sync-ring {
+  animation: db-sync-pulse 1.15s ease-out infinite;
+}
+@keyframes db-sync-pulse {
+  0% { opacity: 0.65; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+
+/* The orbit: the h-spark circles the emblem while a round is in flight
+   (kind='') — faster through the sync stage — and stops dead on every
+   verdict. The spark is the accent dot with a soft glow, the loader-mark
+   grammar's own tiny descendant. */
+.db-sync-orbit {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.db-sync-spark {
+  position: absolute;
+  top: -2.5px;
+  left: 50%;
+  margin-left: -2.5px;
+  inline-size: 5px;
+  block-size: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.db-sync-hero[data-kind=''] .db-sync-orbit { animation: db-sync-orbit 1.6s linear infinite; }
+.db-sync-hero[data-stage='sync'][data-kind=''] .db-sync-orbit { animation-duration: 1.1s; }
+@keyframes db-sync-orbit { to { transform: rotate(360deg); } }
+
+/* The upload packets: three dots rise through the emblem exactly while the
+   upload step is ACTIVE — changes visibly ON THE WAY UP, staggered. */
+.db-sync-packets {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.db-sync-packets span {
+  position: absolute;
+  bottom: 0.55rem;
+  left: 50%;
+  inline-size: 3px;
+  block-size: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 75%, transparent);
+  opacity: 0;
+}
+.db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets { opacity: 1; }
+.db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets span { animation: db-sync-rise 0.9s ease-in infinite; }
+.db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets span:nth-child(2) { animation-delay: 0.3s; margin-left: 0.35rem; }
+.db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets span:nth-child(3) { animation-delay: 0.6s; margin-left: -1rem; }
+@keyframes db-sync-rise {
+  0% { opacity: 0; transform: translateY(0); }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-1.5rem); }
+}
+
+/* The ok pop: the check lands with the same overshoot the glyph morph uses
+   — the settle IS the satisfaction beat, paired with the all-clear chime. */
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-ok {
+  animation: db-sync-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes db-sync-pop {
+  0% { transform: scale(0.35); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+/* The step rows' own life: a step turning done pops its check in (the same
+   overshoot grammar), and the result panel slides up into place instead of
+   snapping — the whole modal moves with the round now. */
+.db-sync-steps li[data-state='done'] .db-sync-mark .icon {
+  animation: db-sync-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.db-sync-panel:not([hidden]) {
+  animation: db-sync-panel-in 0.3s ease;
+}
+@keyframes db-sync-panel-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* The motion budget: reduced motion keeps the STATE legible (the glyph
+   morph + the verdict tints are information, not ornament) but spends no
+   loops — the pulse/orbit/packets/rise animations go still, the pops and
+   the slide vanish (the glyph morph relaxes to a plain 180ms linear fade),
+   and the activity ring spins at the modal's own reduced tempo. */
+@media (prefers-reduced-motion: reduce) {
+  .db-sync-hero[data-stage='connect'][data-kind=''] .db-sync-ring { animation: none; }
+  .db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets span { animation: none; }
+  .db-sync-hero[data-kind=''] .db-sync-orbit { animation-duration: 1.6s; }
+  .db-sync-glyph { transition-duration: 0.18s; transition-timing-function: linear; }
+  .db-sync-hero[data-kind='ok'] .db-sync-glyph-ok,
+  .db-sync-steps li[data-state='done'] .db-sync-mark .icon { animation: none; }
+  .db-sync-panel:not([hidden]) { animation: none; }
+}

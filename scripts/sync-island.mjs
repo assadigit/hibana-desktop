@@ -439,6 +439,29 @@ const HTML_SYNC_OPS = [
        hibana:sync-progress events light the step rows live. -->
   <dialog class="dialog" id="db-sync-dialog" aria-labelledby="db-sync-title">
     <form class="modal db-sync-modal" method="dialog">
+      <!-- v0.1.13 (the owner ask: "also in modal i want syncing animation with
+           icons and animation") — the HERO: the round's living emblem, an
+           aria-hidden stage above the factual step rows. One 4.6rem emblem
+           carries the whole choreography: the pulse ring reaches out on
+           connect, three packets rise through upload, the h-spark orbits
+           while the round is in flight, and the central glyph MORPHS per
+           stage (cloud -> upload arrow -> orbit -> check/cross) with the
+           ok pop settling the emblem into the green verdict. js/
+           desktop-sync.js flips data-stage from the hibana:sync-progress
+           events + data-kind from the outcome; desktop-sync.css owns every
+           keyframe (prefers-reduced-motion respected). -->
+      <div class="db-sync-hero" id="db-sync-hero" data-stage="connect" data-kind="" aria-hidden="true">
+        <div class="db-sync-emblem" id="db-sync-emblem">
+          <span class="db-sync-ring"></span>
+          <span class="db-sync-orbit"><span class="db-sync-spark"></span></span>
+          <span class="db-sync-packets" aria-hidden="true"><span></span><span></span><span></span></span>
+          <svg class="icon db-sync-glyph db-sync-glyph-connect" viewBox="0 0 24 24"><path d="M17.5 18a4.5 4.5 0 0 0 .38-8.98A6 6 0 0 0 6.48 7.62 5 5 0 0 0 6.5 17.5"/></svg>
+          <svg class="icon db-sync-glyph db-sync-glyph-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 21h16"/></svg>
+          <svg class="icon db-sync-glyph db-sync-glyph-orbit" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+          <svg class="icon db-sync-glyph db-sync-glyph-ok" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+          <svg class="icon db-sync-glyph db-sync-glyph-err" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </div>
+      </div>
       <h2 id="db-sync-title">Sync with Hibana cloud</h2>
       <ol class="db-sync-steps" id="db-sync-steps">
         <li data-step="connect" data-state="pending"><span class="db-sync-mark" aria-hidden="true"></span><span class="db-sync-label">Connecting to Cloudflare server</span></li>
@@ -808,24 +831,27 @@ function adaptBoardHtml(html) {
     log.push('inserted: ' + HTML_GATE_INSERT.name)
   }
   // The v0.1.5 theme round + the v0.1.6 sync round + the v0.1.9 sign-out round
-  // + the v0.1.11 new-project round + the v0.1.12 refresh round (recorded
-  // above, per-round, in the order the head/body chain requires — each op's
-  // anchor must already exist when the op runs: the theme script rides the
-  // PINNED chip-render line, the floater rides the gate block HTML_GATE_INSERT
-  // just emitted, the toolbar toggle rides the PINNED labels line, the sync
-  // sheet/script ride the desktop login lines emitted above, the dialog rides
-  // the PINNED skip-link, the sync button rides the toggle line the theme
-  // round just inserted; the logout sheet/script ride the sync round's own
-  // emitted lines, the logout dialog rides the sync dialog's closing line, and
-  // the logout button rides the theme toggle line — the row ends
-  // Sprints | Labels | Sync | theme | Log out; the newproject sheet/script
+  // + the v0.1.11 new-project round + the v0.1.12 refresh round + the v0.1.13
+  // sound round (recorded above, per-round, in the order the head/body chain
+  // requires — each op's anchor must already exist when the op runs: the theme
+  // script rides the PINNED chip-render line, the floater rides the gate block
+  // HTML_GATE_INSERT just emitted, the toolbar toggle rides the PINNED labels
+  // line, the sync sheet/script ride the desktop login lines emitted above,
+  // the dialog rides the PINNED skip-link, the sync button rides the toggle
+  // line the theme round just inserted; the logout sheet/script ride the sync
+  // round's own emitted lines, the logout dialog rides the sync dialog's
+  // closing line, and the logout button rides the theme toggle line — the row
+  // ends Sprints | Labels | Sync | theme | Log out; the newproject sheet/script
   // ride the logout round's own emitted lines, and the create dialog rides
   // the logout dialog's OWN confirm id — a bare '</dialog>' anchor now
   // matches BOTH spliced dialog elements and must never be used again; the
   // refresh sheet/script ride the newproject round's own emitted lines, and
   // the Refresh pill rides the sync CTA's own class+id pair — the row ends
-  // Sprints | Labels | Sync | Refresh | theme | Log out).
-  for (const op of [...HTML_THEME_OPS, ...HTML_SYNC_OPS, ...HTML_LOGOUT_OPS, ...HTML_NEWPROJECT_OPS, ...HTML_REFRESH_OPS]) {
+  // Sprints | Labels | Sync | Refresh | theme | Log out; the audio script
+  // rides the SHIM'S OWN tag — whichever order the rounds apply in, it lands
+  // between the shim and the login controller (the login insert rides the
+  // same anchor but emits a DIFFERENT line, so both stay unambiguous).
+  for (const op of [...HTML_THEME_OPS, ...HTML_SYNC_OPS, ...HTML_LOGOUT_OPS, ...HTML_NEWPROJECT_OPS, ...HTML_REFRESH_OPS, ...HTML_AUDIO_OPS]) {
     if (op.anchor !== undefined) {
       const hits = lines.map((l, i) => (l.includes(op.anchor) ? i : -1)).filter((i) => i !== -1)
       if (hits.length !== 1) {
@@ -1411,14 +1437,26 @@ const DESKTOP_LOGIN_JS = `// desktop-login.js — the login gate controller (GO-
       busy(true)
       bridgeLogin(login, password).then(
         function (res) {
-          busy(false)
           if (res && res.ok) {
-            // Reload with the live session: the Go shell now serves this
-            // document with data-desktop-authed="true", the card never
-            // appears, and the island boots straight into the boards.
-            location.reload()
+            // v0.1.13 — the login chime (the sound round's cue #1): the
+            // welcome fifth plays on the ok resolve, and the reload WAITS
+            // ~700ms so the chime lands before the document unloads (a
+            // reload kills the AudioContext — an immediate one clips the
+            // cue to silence). The submit stays busy through the chime so
+            // a second click can never double-schedule; with no engine the
+            // reload is immediate, exactly as before.
+            if (window.hibanaAudio && typeof window.hibanaAudio.play === 'function') {
+              window.hibanaAudio.play('login')
+              setTimeout(function () { location.reload() }, 700)
+            } else {
+              // Reload with the live session: the Go shell now serves this
+              // document with data-desktop-authed="true", the card never
+              // appears, and the island boots straight into the boards.
+              location.reload()
+            }
             return
           }
+          busy(false)
           fail((res && res.message) || 'Sign-in failed — try again.')
         },
         function () {
@@ -1822,6 +1860,16 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
     var retryBtn = document.getElementById('db-sync-retry')
     var doneBtn = document.getElementById('db-sync-done')
     var syncing = false
+    // v0.1.13 — the sound round's hero (the owner ask: "also in modal i want
+    // syncing animation with icons and animation"): the living emblem above
+    // the step rows. data-stage follows the round's ACTIVE step (connect /
+    // upload / sync — morphing the central glyph + the choreography), and
+    // data-kind settles it on the outcome (ok / warn / err — the ok pop, the
+    // danger tint). setStage/setKind below own every flip; the CSS owns every
+    // keyframe (prefers-reduced-motion respected).
+    var hero = document.getElementById('db-sync-hero')
+    function setStage(name) { if (hero) hero.setAttribute('data-stage', name) }
+    function setKind(kind) { if (hero) hero.setAttribute('data-kind', kind) }
     // v0.1.12 — the pulled-boards reflex: set when an ok round MOVED mirror
     // rows (out.pulled > 0 — the cloud changed under the island's boot-time
     // render), consumed by the modal's close listener (Done or Esc) so the
@@ -1915,18 +1963,27 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
         var refreshed = out.pulled > 0 ? fmt('updated', { n: out.pulled }) : ''
         if (refreshed) refreshed = ' · ' + refreshed
         needsReload = out.pulled > 0
+        // v0.1.13 — the hero settles into the green verdict (the ok pop) and
+        // the all-clear chime plays (cue #5: "when syncing complete" — the
+        // sonic twin of this very panel; desktop-audio.js owns the synth).
+        setKind('ok')
+        if (window.hibanaAudio && typeof window.hibanaAudio.play === 'function') {
+          window.hibanaAudio.play('sync')
+        }
         showPanel('ok', t('okTitle'), t('okBody') + ' ' + note + refreshed + ' · ' + counts + ' · ' + when, false)
         return
       }
-      if (out.code === 'busy') { showPanel('err', t('busyTitle'), '', false); return }
-      if (out.code === 'session') { showPanel('err', t('sessionTitle'), '', false); return }
-      if (out.code === 'unreachable') { showPanel('err', t('unreachableTitle'), '', true); return }
-      if (out.code === 'pending') { showPanel('warn', t('warnTitle'), out.message || '', true); return }
+      if (out.code === 'busy') { setKind('err'); showPanel('err', t('busyTitle'), '', false); return }
+      if (out.code === 'session') { setKind('err'); showPanel('err', t('sessionTitle'), '', false); return }
+      if (out.code === 'unreachable') { setKind('err'); showPanel('err', t('unreachableTitle'), '', true); return }
+      if (out.code === 'pending') { setKind('warn'); showPanel('warn', t('warnTitle'), out.message || '', true); return }
+      setKind('err')
       showPanel('err', t('errTitle'), out.message || '', true)
     }
 
     function onReject() {
       syncing = false
+      setKind('err')
       showPanel('err', t('errTitle'), t('notWired'), false)
     }
 
@@ -1944,6 +2001,11 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
       if (syncing) { dlg.showModal(); return } // reopen mid-round: the steps are live
       syncing = true
       needsReload = false // every fresh round re-earns its own reload verdict
+      // v0.1.13 — every fresh round re-boots the hero too: connect stage, no
+      // verdict yet (the ok pop/err tint from the previous round must never
+      // leak into a new one).
+      setStage('connect')
+      setKind('')
       if (panel) panel.hidden = true
       if (retryBtn) retryBtn.hidden = true
       if (doneBtn) doneBtn.hidden = true
@@ -1963,6 +2025,8 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
       if (retryBtn) retryBtn.hidden = true
       if (doneBtn) doneBtn.hidden = true
       if (closeBtn) closeBtn.hidden = false
+      setStage('connect')
+      setKind('')
       setStep('connect', 'pending')
       setStep('upload', 'pending')
       setStep('sync', 'pending')
@@ -1976,6 +2040,10 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
         if (!payload || typeof payload !== 'object') return
         if (!dlg.open) return // a stale event after the modal closed — the round still finishes Go-side
         setStep(payload.step, payload.state, payload.detail || '')
+        // v0.1.13 — the hero follows the round's ACTIVE step (the glyph morph
+        // + the choreography); a done/failed step leaves the stage where the
+        // round stands until the next active step or the outcome takes it.
+        if (payload.state === 'active' && payload.step) setStage(payload.step)
       })
     }
 
@@ -2164,6 +2232,180 @@ const DESKTOP_SYNC_CSS = `/* desktop-sync.css — the manual sync modal's step r
   white-space: nowrap;
 }
 #db-sync-button .icon { flex: none; }
+
+/* v0.1.13 — THE HERO (the owner ask: "also in modal i want syncing animation
+   with icons and animation"): the round's living emblem, a compact stage
+   above the factual step rows. One 4.6rem emblem carries the whole
+   choreography — the pulse ring reaches out on connect, three packets rise
+   through upload, the h-spark orbits while the round is in flight, and the
+   central glyph MORPHS per stage (cloud -> upload arrow -> orbit ->
+   check/cross) with the ok pop settling the emblem into the green verdict.
+   js/desktop-sync.js flips data-stage (the live hibana:sync-progress
+   events) + data-kind (the outcome); every keyframe lives here. */
+.db-sync-hero {
+  display: flex;
+  justify-content: center;
+  margin-block-end: -0.35rem; /* the emblem breathes tight under the title's grid gap */
+}
+.db-sync-emblem {
+  position: relative;
+  inline-size: 4.6rem;
+  block-size: 4.6rem;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--accent) 5%, var(--card));
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+
+/* The glyphs: only the matching one shows; the rest rest at scale(0.6) +
+   transparent, so every stage flip is a morph (a 280ms cubic pop), never
+   a swap. The kind rules sit AFTER the stage rules — a settled verdict
+   (ok/warn/err) overrides whatever stage the round last stood at. */
+.db-sync-glyph {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  inline-size: 1.8rem;
+  block-size: 1.8rem;
+  stroke-width: 1.9;
+  color: var(--accent);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.db-sync-hero[data-stage='connect'] .db-sync-glyph-connect,
+.db-sync-hero[data-stage='upload'] .db-sync-glyph-upload,
+.db-sync-hero[data-stage='sync'] .db-sync-glyph-orbit { opacity: 1; transform: scale(1); }
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-ok,
+.db-sync-hero[data-kind='warn'] .db-sync-glyph-orbit,
+.db-sync-hero[data-kind='err'] .db-sync-glyph-err { opacity: 1; transform: scale(1); }
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-ok { color: var(--ok); }
+.db-sync-hero[data-kind='err'] .db-sync-glyph-err { color: var(--err); }
+
+/* The verdict settle: the emblem itself tints with the outcome — the green
+   ring for ok (the step marks' own --ok grammar), the danger ring for err. */
+.db-sync-hero[data-kind='ok'] .db-sync-emblem {
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  background: color-mix(in srgb, var(--ok) 9%, transparent);
+}
+.db-sync-hero[data-kind='err'] .db-sync-emblem {
+  border-color: color-mix(in srgb, var(--err) 45%, transparent);
+  background: color-mix(in srgb, var(--err) 8%, transparent);
+}
+.db-sync-hero[data-kind='warn'] .db-sync-emblem {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* The connect pulse: the ring reaches OUT (scale + fade, an outgoing
+   handshake) exactly while the connect step is ACTIVE and no verdict sits. */
+.db-sync-ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.db-sync-hero[data-stage='connect'][data-kind=''] .db-sync-ring {
+  animation: db-sync-pulse 1.15s ease-out infinite;
+}
+@keyframes db-sync-pulse {
+  0% { opacity: 0.65; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.45); }
+}
+
+/* The orbit: the h-spark circles the emblem while a round is in flight
+   (kind='') — faster through the sync stage — and stops dead on every
+   verdict. The spark is the accent dot with a soft glow, the loader-mark
+   grammar's own tiny descendant. */
+.db-sync-orbit {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.db-sync-spark {
+  position: absolute;
+  top: -2.5px;
+  left: 50%;
+  margin-left: -2.5px;
+  inline-size: 5px;
+  block-size: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.db-sync-hero[data-kind=''] .db-sync-orbit { animation: db-sync-orbit 1.6s linear infinite; }
+.db-sync-hero[data-stage='sync'][data-kind=''] .db-sync-orbit { animation-duration: 1.1s; }
+@keyframes db-sync-orbit { to { transform: rotate(360deg); } }
+
+/* The upload packets: three dots rise through the emblem exactly while the
+   upload step is ACTIVE — changes visibly ON THE WAY UP, staggered. */
+.db-sync-packets {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.db-sync-packets span {
+  position: absolute;
+  bottom: 0.55rem;
+  left: 50%;
+  inline-size: 3px;
+  block-size: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 75%, transparent);
+  opacity: 0;
+}
+.db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets { opacity: 1; }
+.db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets span { animation: db-sync-rise 0.9s ease-in infinite; }
+.db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets span:nth-child(2) { animation-delay: 0.3s; margin-left: 0.35rem; }
+.db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets span:nth-child(3) { animation-delay: 0.6s; margin-left: -1rem; }
+@keyframes db-sync-rise {
+  0% { opacity: 0; transform: translateY(0); }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-1.5rem); }
+}
+
+/* The ok pop: the check lands with the same overshoot the glyph morph uses
+   — the settle IS the satisfaction beat, paired with the all-clear chime. */
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-ok {
+  animation: db-sync-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes db-sync-pop {
+  0% { transform: scale(0.35); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+/* The step rows' own life: a step turning done pops its check in (the same
+   overshoot grammar), and the result panel slides up into place instead of
+   snapping — the whole modal moves with the round now. */
+.db-sync-steps li[data-state='done'] .db-sync-mark .icon {
+  animation: db-sync-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.db-sync-panel:not([hidden]) {
+  animation: db-sync-panel-in 0.3s ease;
+}
+@keyframes db-sync-panel-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* The motion budget: reduced motion keeps the STATE legible (the glyph
+   morph + the verdict tints are information, not ornament) but spends no
+   loops — the pulse/orbit/packets/rise animations go still, the pops and
+   the slide vanish (the glyph morph relaxes to a plain 180ms linear fade),
+   and the activity ring spins at the modal's own reduced tempo. */
+@media (prefers-reduced-motion: reduce) {
+  .db-sync-hero[data-stage='connect'][data-kind=''] .db-sync-ring { animation: none; }
+  .db-sync-hero[data-stage='upload'][data-kind=''] .db-sync-packets span { animation: none; }
+  .db-sync-hero[data-kind=''] .db-sync-orbit { animation-duration: 1.6s; }
+  .db-sync-glyph { transition-duration: 0.18s; transition-timing-function: linear; }
+  .db-sync-hero[data-kind='ok'] .db-sync-glyph-ok,
+  .db-sync-steps li[data-state='done'] .db-sync-mark .icon { animation: none; }
+  .db-sync-panel:not([hidden]) { animation: none; }
+}
 `
 
 // desktop-logout.js — the sign-out controller (v0.1.9 — the owner ask: "It
@@ -2765,6 +3007,263 @@ const DESKTOP_REFRESH_CSS = `/* desktop-refresh.css — the refresh round (v0.1.
 `
 
 // ---------------------------------------------------------------------------
+// desktop-audio.js — generated below into dist/js/ (the v0.1.13 sound round —
+// the owner ask: "I want some sound engineering, some modern, futurist and
+// low-key sounds. for this: 1. when you login. 2. when you delete a task
+// 3. when you fulfill a tasks 4. when you move a task to another state
+// 5. when syncing complete"). The engine is PROCEDURAL — Web Audio API
+// oscillators synthesized in-page, ZERO audio files (no binary assets, no
+// licensing, byte-countable, theme-free) — in a deliberately futurist
+// grammar: pure sine/triangle partials, perfect-fifth intervals, exponential
+// pluck envelopes, master-gain headroom at ~-20dBFS so every cue sits UNDER
+// the work, never over it. Written without template literals/backticks so it
+// can nest in this literal.
+// ---------------------------------------------------------------------------
+const DESKTOP_AUDIO_JS = `// desktop-audio.js — the sound round (v0.1.13 — the owner ask: "I want some
+// sound engineering, some modern, futurist and low-key sounds. for this:
+// 1. when you login. 2. when you delete a task 3. when you fulfill a tasks
+// 4. when you move a task to another state 5. when syncing complete").
+// GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+// into frontend/dist/js/ and checksummed in frontend/island.checksums.json.
+// Loads blocking, right AFTER desktop-shim.js (it wraps the seam the shim
+// just defined) and BEFORE every deferred island script.
+//
+// WHAT THIS FILE OWNS (the desktop-owned sound layer):
+//   1. window.hibanaAudio.play(name) — the five cues, synthesized live via
+//      the Web Audio API (WebView2 = Chromium; window.AudioContext always
+//      exists there). NO audio files ship: every sound is a few oscillator
+//      voices + envelopes, so the whole engine is ~5KB of text and nothing
+//      binary ever enters dist. The palette is FUTURIST + LOW-KEY by design:
+//      sine/triangle partials only (glassy, synthetic — no acoustic
+//      emulations), perfect-fifth intervals (the open, weightless sonority),
+//      short exponential pluck envelopes (attack 8-16ms so nothing clicks,
+//      decay settles under the next paint), per-voice lowpass shaping, and a
+//      master gain of 0.5 with per-voice peaks of 0.02-0.1 — every cue lands
+//      around -20dBFS, audible as a whisper of confirmation, never an alarm.
+//        login   — the welcome fifth: E5 rising to B5 over a soft E4 bed
+//                  with a faint E6 shimmer (~0.75s; desktop-login.js plays
+//                  it on the ok resolve and delays the reload so it lands).
+//        delete  — the dissolve thock: a 320->165Hz triangle body + a 98Hz
+//                  sub weight + a band-passed noise puff (~0.3s; the sound
+//                  of something dissolving — never a trash-can crash).
+//        fulfill — the completion ding: G5 + D6 plucks over a G3 bed with a
+//                  high sparkle tail (~0.8s; the "task done" satisfaction).
+//        move    — the micro tick: a 540->660Hz sine glide, 75ms — the
+//                  quietest of the five, tactile like a precision switch.
+//        sync    — the all-clear: a stacked-fifth arpeggio A4 -> E5 -> B5
+//                  with a glassy E6 tail over an A3 bed (~1.1s; the sonic
+//                  twin of the green "Everything synced" panel).
+//   2. The task-action OBSERVER on the transport seam: it wraps
+//      window.hibanaFetch (the shim's ONE seam — every task mutation the
+//      island makes crosses it) and classifies BEFORE the call (the island
+//      state still holds the PREVIOUS status while the request is in
+//      flight — window.HibanaBoard.findTask reads it live), then plays the
+//      matching cue ONLY on a 2xx resolve — a failed delete/move/fulfill is
+//      silent, because nothing happened:
+//        DELETE /api/devtasks/:id (exactly one path segment — the tag/
+//        screenshot deleters never match)      -> 'delete'
+//        PATCH  /api/devtasks/:id with a status the task did NOT already
+//        carry:  -> 'done' = 'fulfill', any other change = 'move'
+//        (a PATCH whose status equals the current status — the editor's
+//        every-save resend — is a plain edit and stays silent; same-name
+//        cues within 150ms coalesce, so "Clear done" sounds ONCE).
+//   3. The gesture unlock: Chromium gates audio behind a user activation —
+//      the first pointerdown/keydown warms the context (resume()), and
+//      every play() re-checks it; all five call sites inherently follow a
+//      real gesture (submit, confirm, drag, the Sync click).
+//
+// WHAT IT MUST NEVER OWN: no island bytes (the wrapper touches nothing the
+// island ships — it observes the seam the shim already owns), no storage
+// (the Go mirror owns persistence), no network of its own, no volume UI
+// (the ask is the five cues; nothing else).
+(function () {
+  'use strict'
+
+  var ctx = null
+  var master = null
+  var lastPlay = {}
+
+  function ensureCtx() {
+    if (ctx) return ctx
+    var AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) return null
+    try {
+      ctx = new AC()
+      master = ctx.createGain()
+      master.gain.value = 0.5
+      master.connect(ctx.destination)
+    } catch (e) { ctx = null; master = null }
+    return ctx
+  }
+
+  function unlock() {
+    var c = ensureCtx()
+    if (c && c.state === 'suspended') { try { c.resume() } catch (e) { /* a locked context stays silent, never broken */ } }
+  }
+
+  // The warm-up: the FIRST gesture unlocks the context for the document's
+  // life, so a drag's drop (a gesture chain) and every click-driven cue
+  // schedule against an already-running context.
+  document.addEventListener('pointerdown', unlock, { once: true, capture: true })
+  document.addEventListener('keydown', unlock, { once: true, capture: true })
+
+  // One synth voice: osc -> (optional lowpass) -> envelope -> master.
+  function tone(o) {
+    var osc = ctx.createOscillator()
+    osc.type = o.type || 'sine'
+    osc.frequency.setValueAtTime(o.f0, o.t)
+    if (o.f1 && o.f1 !== o.f0) osc.frequency.exponentialRampToValueAtTime(o.f1, o.t + o.dur * 0.85)
+    var g = ctx.createGain()
+    var atk = o.attack || 0.012
+    g.gain.setValueAtTime(0.0001, o.t)
+    g.gain.linearRampToValueAtTime(o.peak, o.t + atk)
+    g.gain.exponentialRampToValueAtTime(0.0001, o.t + o.dur)
+    var head = osc
+    if (o.lp) {
+      var f = ctx.createBiquadFilter()
+      f.type = 'lowpass'
+      f.frequency.value = o.lp
+      f.Q.value = 0.7
+      osc.connect(f)
+      head = f
+    }
+    head.connect(g)
+    g.connect(master)
+    osc.start(o.t)
+    osc.stop(o.t + o.dur + 0.05)
+  }
+
+  // The noise breath (the delete cue's puff): a decaying white-noise buffer
+  // through a band-pass — the "dissolving" tail, barely there.
+  function puff(o) {
+    var len = Math.max(256, Math.floor(ctx.sampleRate * o.dur))
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate)
+    var d = buf.getChannelData(0)
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len)
+    var src = ctx.createBufferSource()
+    src.buffer = buf
+    var bp = ctx.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = o.freq
+    bp.Q.value = 0.9
+    var g = ctx.createGain()
+    g.gain.setValueAtTime(0.0001, o.t)
+    g.gain.linearRampToValueAtTime(o.peak, o.t + 0.008)
+    g.gain.exponentialRampToValueAtTime(0.0001, o.t + o.dur)
+    src.connect(bp)
+    bp.connect(g)
+    g.connect(master)
+    src.start(o.t)
+    src.stop(o.t + o.dur + 0.02)
+  }
+
+  // The five cues (frequencies in Hz, A4=440 — the intervals are perfect
+  // fifths by design: the futurist, weightless sonority).
+  var SOUNDS = {
+    login: function (t) {
+      tone({ f0: 329.63, type: 'triangle', t: t, dur: 0.55, peak: 0.03, lp: 1600 })
+      tone({ f0: 659.25, type: 'sine', t: t, dur: 0.5, peak: 0.1, lp: 2800 })
+      tone({ f0: 987.77, type: 'sine', t: t + 0.16, dur: 0.62, peak: 0.08, lp: 3200 })
+      tone({ f0: 1318.51, type: 'sine', t: t + 0.34, dur: 0.4, peak: 0.022, lp: 6000 })
+    },
+    delete: function (t) {
+      tone({ f0: 320, f1: 165, type: 'triangle', t: t, dur: 0.17, peak: 0.09, lp: 750 })
+      tone({ f0: 98, type: 'sine', t: t, dur: 0.12, peak: 0.05 })
+      puff({ t: t + 0.01, dur: 0.13, freq: 700, peak: 0.032 })
+    },
+    fulfill: function (t) {
+      tone({ f0: 196, type: 'triangle', t: t, dur: 0.5, peak: 0.028, lp: 900 })
+      tone({ f0: 783.99, type: 'sine', t: t, dur: 0.38, peak: 0.085, lp: 3400 })
+      tone({ f0: 1174.66, type: 'sine', t: t + 0.09, dur: 0.5, peak: 0.07, lp: 4000 })
+      tone({ f0: 2349.32, type: 'sine', t: t + 0.2, dur: 0.28, peak: 0.016, lp: 7000 })
+    },
+    move: function (t) {
+      tone({ f0: 540, f1: 660, type: 'sine', t: t, dur: 0.075, peak: 0.05, lp: 1900 })
+    },
+    sync: function (t) {
+      tone({ f0: 220, type: 'triangle', t: t, dur: 0.9, peak: 0.03, lp: 1000 })
+      tone({ f0: 440, type: 'sine', t: t, dur: 0.5, peak: 0.085, lp: 2400 })
+      tone({ f0: 659.25, type: 'sine', t: t + 0.13, dur: 0.6, peak: 0.075, lp: 2800 })
+      tone({ f0: 987.77, type: 'sine', t: t + 0.26, dur: 0.8, peak: 0.065, lp: 3400 })
+      tone({ f0: 1318.51, type: 'sine', t: t + 0.42, dur: 0.7, peak: 0.02, lp: 6000 })
+    },
+  }
+
+  function play(name) {
+    var fn = SOUNDS[name]
+    if (!fn) return false
+    if (!ensureCtx()) return false
+    unlock()
+    var now = Date.now()
+    if (lastPlay[name] && now - lastPlay[name] < 150) return false // coalesce: "Clear done" sounds ONCE
+    lastPlay[name] = now
+    try { fn(ctx.currentTime + 0.02) } catch (e) { return false }
+    return true
+  }
+
+  window.hibanaAudio = { play: play }
+
+  // ------------------------------------------------------ the seam observer
+  // Classify BEFORE the call (the island's live state still holds the
+  // PREVIOUS status while the request is in flight) and play ONLY on a 2xx
+  // resolve — a failed mutation is silent. The wrapper returns the ORIGINAL
+  // promise untouched, so the callers' error/abort semantics are byte-ident.
+  function classify(path, opts) {
+    if (!path || typeof path !== 'string') return null
+    var method = ((opts && opts.method) || 'GET').toUpperCase()
+    var m = /^\\/api\\/devtasks\\/([^\\/?]+)$/.exec(path)
+    if (!m) return null
+    if (method === 'DELETE') return 'delete'
+    if (method === 'PATCH') {
+      var body = opts && opts.body
+      var parsed = null
+      if (typeof body === 'string') { try { parsed = JSON.parse(body) } catch (e) { return null } }
+      else if (body && typeof body === 'object') parsed = body
+      if (!parsed || typeof parsed.status !== 'string') return null
+      var prior = null
+      try {
+        var HB = window.HibanaBoard
+        var task = HB && typeof HB.findTask === 'function' ? HB.findTask(m[1]) : null
+        if (task && typeof task.status === 'string') prior = task.status
+      } catch (e) { /* a missing board never blocks the cue */ }
+      if (parsed.status === prior) return null // the editor's same-status resend: a plain edit
+      return parsed.status === 'done' ? 'fulfill' : 'move'
+    }
+    return null
+  }
+
+  var seam = window.hibanaFetch
+  if (typeof seam === 'function') {
+    window.hibanaFetch = function (path, opts) {
+      var verdict = classify(path, opts)
+      var p = seam.call(window, path, opts)
+      if (verdict) {
+        p.then(function (res) { if (res && res.ok) play(verdict) }, function () { /* a rejected call is silent */ })
+      }
+      return p
+    }
+  }
+})()
+`
+
+// ---------------------------------------------------------------------------
+// The v0.1.13 HTML ops — the sound round's script tag. The engine wraps
+// window.hibanaFetch, so it must load AFTER desktop-shim.js defines it and
+// BEFORE every deferred island script consumes it. The anchor is the shim's
+// OWN tag (unique in the head — the login insert rides the same anchor but
+// emits a DIFFERENT line, so both ops stay unambiguous; whichever order the
+// rounds apply in, this op lands between the shim and the login controller).
+// ---------------------------------------------------------------------------
+const HTML_AUDIO_OPS = [
+  {
+    name: 'insert /js/desktop-audio.js after desktop-shim.js (the sound engine wraps the seam the shim just defined)',
+    cite: "v0.1.13 (the sound round — the owner ask: 'some modern, futurist and low-key sounds'); the observer must wrap the shim's seam and the login/sync controllers call window.hibanaAudio at runtime",
+    anchor: `<script src="/js/desktop-shim.js"></script>`,
+    insert: `<script src="/js/desktop-audio.js"></script>`,
+  },
+]
+
+// ---------------------------------------------------------------------------
 // icon.svg — the ISLAND'S FAVICON (v0.1.2 — the owner ask: "use the Hibana logo as
 // fav icon. and app icon"). GENERATED, not copied: the pin's own icon.svg is the old
 // H-tile art; these bytes are the traced Hibana logo mark (the h-spark squircle,
@@ -2843,13 +3342,15 @@ function verifyDist(outDir, fileMap) {
     problems.push('index.html CSS manifest mismatch:\n    expected: ' + JSON.stringify(expectedLinks) + '\n    actual:   ' + JSON.stringify(links))
   }
   if (links[CSS_SHEETS.length - 1] !== '/css/rtl.css') problems.push('index.html: rtl.css is not the last ISLAND /css/ sheet (the desktop-owned sheets follow it)')
-  // The blocking head chain (v0.1.5 + v0.1.6 + v0.1.9 + v0.1.11 + v0.1.12 grew it): the pre-paint theme
-  // bootstrap FIRST, then the transport shim, the login controller, the sync
+  // The blocking head chain (v0.1.5 + v0.1.6 + v0.1.9 + v0.1.11 + v0.1.12 + v0.1.13 grew it): the pre-paint theme
+  // bootstrap FIRST, then the transport shim, the sound engine (it wraps the
+  // seam the shim just defined), the login controller, the sync
   // controller, the sign-out controller, the new-project controller, the
   // refresh controller — all blocking, so they own their contracts before
   // every deferred island script.
   const themeIdx = indexHtml.indexOf('/js/desktop-theme.js')
   const shimIdx = indexHtml.indexOf('/js/desktop-shim.js')
+  const audioIdx = indexHtml.indexOf('/js/desktop-audio.js')
   const loginIdx = indexHtml.indexOf('/js/desktop-login.js')
   const syncIdx = indexHtml.indexOf('/js/desktop-sync.js')
   const logoutIdx = indexHtml.indexOf('/js/desktop-logout.js')
@@ -2857,9 +3358,9 @@ function verifyDist(outDir, fileMap) {
   const refreshIdx = indexHtml.indexOf('/js/desktop-refresh.js')
   const devIdx = indexHtml.indexOf('/js/devboard.js')
   const bpIdx = indexHtml.indexOf('/js/board-page.js')
-  if (!(themeIdx !== -1 && shimIdx !== -1 && loginIdx !== -1 && syncIdx !== -1 && logoutIdx !== -1 && newProjIdx !== -1 && refreshIdx !== -1 && devIdx !== -1 && bpIdx !== -1 &&
-      themeIdx < shimIdx && shimIdx < loginIdx && loginIdx < syncIdx && syncIdx < logoutIdx && logoutIdx < newProjIdx && newProjIdx < refreshIdx && refreshIdx < devIdx && devIdx < bpIdx)) {
-    problems.push('index.html: desktop-theme.js → desktop-shim.js → desktop-login.js → desktop-sync.js → desktop-logout.js → desktop-newproject.js → desktop-refresh.js → devboard.js → board-page.js order broken (got indices ' + themeIdx + '/' + shimIdx + '/' + loginIdx + '/' + syncIdx + '/' + logoutIdx + '/' + newProjIdx + '/' + refreshIdx + '/' + devIdx + '/' + bpIdx + ')')
+  if (!(themeIdx !== -1 && shimIdx !== -1 && audioIdx !== -1 && loginIdx !== -1 && syncIdx !== -1 && logoutIdx !== -1 && newProjIdx !== -1 && refreshIdx !== -1 && devIdx !== -1 && bpIdx !== -1 &&
+      themeIdx < shimIdx && shimIdx < audioIdx && audioIdx < loginIdx && loginIdx < syncIdx && syncIdx < logoutIdx && logoutIdx < newProjIdx && newProjIdx < refreshIdx && refreshIdx < devIdx && devIdx < bpIdx)) {
+    problems.push('index.html: desktop-theme.js → desktop-shim.js → desktop-audio.js → desktop-login.js → desktop-sync.js → desktop-logout.js → desktop-newproject.js → desktop-refresh.js → devboard.js → board-page.js order broken (got indices ' + themeIdx + '/' + shimIdx + '/' + audioIdx + '/' + loginIdx + '/' + syncIdx + '/' + logoutIdx + '/' + newProjIdx + '/' + refreshIdx + '/' + devIdx + '/' + bpIdx + ')')
   }
   for (const kept of ['id="db-toolbar"', 'id="db-loading"', 'id="db-board"', 'data-i18n="db.board"', 'data-i18n="db.backToProject"',
     'js/i18n-en.js', 'js/i18n.js', 'vendor/jalaali.min.js', 'js/chip-render.js', 'vendor/general-sans/GeneralSans-400.woff2']) {
@@ -3023,11 +3524,49 @@ function verifyDist(outDir, fileMap) {
   if (!syncJs.includes('updated from the cloud')) problems.push('js/desktop-sync.js: the EN pulled-boards fact is missing')
   if (!syncJs.includes('از ابر هیبانا به‌روزرسانی')) problems.push('js/desktop-sync.js: the FA pulled-boards fact is missing')
 
+  // The v0.1.13 sound round (the owner ask: "I want some sound engineering,
+  // some modern, futurist and low-key sounds. for this: 1. when you login.
+  // 2. when you delete a task 3. when you fulfill a tasks 4. when you move
+  // a task to another state 5. when syncing complete. also in modal i want
+  // syncing animation with icons and animation"): the sound engine must
+  // exist as a generated file carrying the five cues + the seam observer
+  // (the hibanaFetch wrapper with the devtasks classifier), the sync modal
+  // must carry the HERO (the living emblem: the id pair + the orbit/ring/
+  // packets anatomy + the five morphing glyphs) and its controller must
+  // wire the stage flips + the all-clear chime, and the login gate must
+  // play the welcome chime on the ok resolve with the DELAYED reload (an
+  // immediate one clips the cue to silence — a reload kills the context).
+  if (!fs.existsSync(path.join(outDir, 'js/desktop-audio.js'))) problems.push('js/desktop-audio.js: missing from dist')
+  const audioJs = fileMap['js/desktop-audio.js'] || ''
+  if (!audioJs.includes('window.hibanaAudio')) problems.push('js/desktop-audio.js: the window.hibanaAudio API is missing')
+  for (const cue of ['login:', 'delete:', 'fulfill:', 'move:', 'sync:']) {
+    if (!audioJs.includes(cue)) problems.push('js/desktop-audio.js: the ' + cue.slice(0, -1) + ' cue is missing (the owner ask names all five)')
+  }
+  if (!audioJs.includes('window.hibanaFetch = function')) problems.push('js/desktop-audio.js: the seam observer wrapper is missing')
+  if (!audioJs.includes('/^\\/api\\/devtasks\\/([^\\/?]+)$/')) problems.push('js/desktop-audio.js: the devtasks classifier path regex is missing')
+  if (!audioJs.includes("parsed.status === 'done' ? 'fulfill' : 'move'")) problems.push('js/desktop-audio.js: the fulfill-vs-move verdict is missing')
+  if (!audioJs.includes('if (parsed.status === prior) return null')) problems.push('js/desktop-audio.js: the same-status plain-edit silence rule is missing (the editor resends status on every save)')
+  for (const kept of ['id="db-sync-hero"', 'id="db-sync-emblem"', 'class="db-sync-ring"', 'class="db-sync-orbit"', 'class="db-sync-spark"', 'class="db-sync-packets"',
+    'db-sync-glyph-connect', 'db-sync-glyph-upload', 'db-sync-glyph-orbit', 'db-sync-glyph-ok', 'db-sync-glyph-err']) {
+    if (!indexHtml.includes(kept)) problems.push('index.html: the sync-modal hero is missing "' + kept + '" (the owner ask: syncing animation with icons)')
+  }
+  if (!syncJs.includes("getElementById('db-sync-hero')")) problems.push('js/desktop-sync.js: the hero element hook is missing')
+  if (!syncJs.includes("setStage('connect')")) problems.push('js/desktop-sync.js: the hero stage reset on a fresh round is missing')
+  if (!syncJs.includes("setKind('ok')")) problems.push('js/desktop-sync.js: the hero ok settle is missing')
+  if (!syncJs.includes("window.hibanaAudio.play('sync')")) problems.push('js/desktop-sync.js: the sync-complete chime call is missing (cue #5)')
+  if (!syncJs.includes("if (payload.state === 'active' && payload.step) setStage(payload.step)")) problems.push('js/desktop-sync.js: the hero live-stage relay is missing')
+  if (!loginJs.includes("window.hibanaAudio.play('login')")) problems.push('js/desktop-login.js: the login chime call is missing (cue #1)')
+  if (!loginJs.includes('setTimeout(function () { location.reload() }, 700)')) problems.push('js/desktop-login.js: the chime-landing delayed reload is missing (an immediate reload clips the cue to silence)')
+  const syncCssFx = fileMap['css/desktop-sync.css'] || ''
+  for (const kept of ['.db-sync-hero', '@keyframes db-sync-pulse', '@keyframes db-sync-orbit', '@keyframes db-sync-rise', '@keyframes db-sync-pop', '@keyframes db-sync-panel-in', 'prefers-reduced-motion: reduce']) {
+    if (!syncCssFx.includes(kept)) problems.push('css/desktop-sync.css: the hero animation layer is missing "' + kept + '"')
+  }
+
   // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the
   // persisted mirror-meta pref is Go-side; the island never forks it). The bare WORD
   // may appear in comments (desktop-theme.js's header says "NO localStorage:"), so
   // the gate greps for USAGE — a member/index access on the store.
-  for (const rel of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'js/desktop-refresh.js', 'css/desktop-login.css', 'css/desktop-sync.css', 'css/desktop-logout.css', 'css/desktop-newproject.css', 'css/desktop-refresh.css', 'index.html']) {
+  for (const rel of ['js/desktop-shim.js', 'js/desktop-audio.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'js/desktop-refresh.js', 'css/desktop-login.css', 'css/desktop-sync.css', 'css/desktop-logout.css', 'css/desktop-newproject.css', 'css/desktop-refresh.css', 'index.html']) {
     if (/\blocalStorage\s*[.[]/.test(fileMap[rel] || '')) problems.push(rel + ': localStorage usage — the island must never touch storage (the Go mirror owns persistence)')
   }
 
@@ -3090,11 +3629,11 @@ function verifyDist(outDir, fileMap) {
     if (!fs.existsSync(path.join(outDir, lazy))) problems.push('lazy island asset missing from dist: ' + lazy)
   }
 
-  // (4) the JS is parseable — node --check the shim + login + theme + sync +
+  // (4) the JS is parseable — node --check the shim + audio + login + theme + sync +
   // logout + newproject + refresh controllers + every copied .js (belt +
   // braces over the patch step; a mangled patch must never ship). The CSS
   // sheets get the existence check above.
-  for (const js of ['js/desktop-shim.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'js/desktop-refresh.js', ...JS_FILES]) {
+  for (const js of ['js/desktop-shim.js', 'js/desktop-audio.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'js/desktop-refresh.js', ...JS_FILES]) {
     try {
       execFileSync(process.execPath, ['--check', path.join(outDir, js)], { stdio: 'pipe' })
     } catch (err) {
@@ -3186,9 +3725,10 @@ function main() {
   const patchLog = applySeamPatches(fileMap)
 
   // The generated desktop-owned files: the transport shim (guide §4.3), the login
-  // gate pair (guide §5.5), the theme controller (v0.1.5 — S216) + the sync pair
-  // (v0.1.6 — S217).
+  // gate pair (guide §5.5), the theme controller (v0.1.5 — S216), the sync pair
+  // (v0.1.6 — S217), and the sound engine (v0.1.13 — the owner's five-cue ask).
   fileMap['js/desktop-shim.js'] = DESKTOP_SHIM_JS
+  fileMap['js/desktop-audio.js'] = DESKTOP_AUDIO_JS
   fileMap['js/desktop-login.js'] = DESKTOP_LOGIN_JS
   fileMap['css/desktop-login.css'] = DESKTOP_LOGIN_CSS
   fileMap['js/desktop-theme.js'] = DESKTOP_THEME_JS
@@ -3229,8 +3769,8 @@ function main() {
   // Report.
   for (const line of adapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
-  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → login → sync → logout → newproject → refresh → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, no-storage), no-404 asset loop, node --check\n')
+  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-audio.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + icon.svg + web-ref.json\n')
+  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the five synthesized cues + the seam observer, no-storage), no-404 asset loop, node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }

@@ -129,14 +129,26 @@
       busy(true)
       bridgeLogin(login, password).then(
         function (res) {
-          busy(false)
           if (res && res.ok) {
-            // Reload with the live session: the Go shell now serves this
-            // document with data-desktop-authed="true", the card never
-            // appears, and the island boots straight into the boards.
-            location.reload()
+            // v0.1.13 — the login chime (the sound round's cue #1): the
+            // welcome fifth plays on the ok resolve, and the reload WAITS
+            // ~700ms so the chime lands before the document unloads (a
+            // reload kills the AudioContext — an immediate one clips the
+            // cue to silence). The submit stays busy through the chime so
+            // a second click can never double-schedule; with no engine the
+            // reload is immediate, exactly as before.
+            if (window.hibanaAudio && typeof window.hibanaAudio.play === 'function') {
+              window.hibanaAudio.play('login')
+              setTimeout(function () { location.reload() }, 700)
+            } else {
+              // Reload with the live session: the Go shell now serves this
+              // document with data-desktop-authed="true", the card never
+              // appears, and the island boots straight into the boards.
+              location.reload()
+            }
             return
           }
+          busy(false)
           fail((res && res.message) || 'Sign-in failed — try again.')
         },
         function () {
