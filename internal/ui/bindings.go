@@ -43,6 +43,7 @@ import (
 	"hibana/desktop/internal/api"
 	"hibana/desktop/internal/auth"
 	hibanasync "hibana/desktop/internal/sync"
+	"hibana/desktop/internal/update"
 )
 
 // maxBridgeBody mirrors the server's own rejection boundary: uploads are
@@ -139,6 +140,19 @@ type API struct {
 	syncBusy atomic.Bool
 	syncRun  func(ctx context.Context, emit hibanasync.Emit) (hibanasync.RoundOutcome, error)
 	syncEmit func(step, state, detail string)
+
+	// THE AUTO-UPDATE ROUND (v0.1.14): single-flight state (one guard serves
+	// BOTH the check and the apply — they are both live HTTP round-trips
+	// against GitHub) + the three hooks (check runner / apply runner / event
+	// relay) + the cached check verdict (display state for the modal, never
+	// authority — the apply re-fetches). See update.go.
+	updateMu      sync.Mutex
+	updateBusy    atomic.Bool
+	updateCheck   func(ctx context.Context) (update.CheckResult, error)
+	updateApply   func(ctx context.Context, progress func(update.Progress)) (update.ApplyResult, error)
+	updateEmit    func(name string, payload map[string]any)
+	updateLast    update.CheckResult
+	updateHasLast bool
 }
 
 // New wires the bridge. The client is the cloud client (cookie jar, Origin

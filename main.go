@@ -45,6 +45,7 @@ import (
 	"hibana/desktop/internal/sync"
 	"hibana/desktop/internal/tray"
 	"hibana/desktop/internal/ui"
+	"hibana/desktop/internal/update"
 )
 
 // The two version stamps (hard rule 9: both versions on every release —
@@ -71,6 +72,15 @@ const (
 	defaultBaseURL = "https://hibana.ir"
 	appDirName     = "hibana"
 	pullEvery      = 5 * time.Minute // contract §10: on focus + every 5 min + manual
+
+	// THE AUTO-UPDATE CADENCE (v0.1.14 — the owner ask: "app syncs with the
+	// internet and github"): the first check waits for the board to boot (a
+	// release check must never compete with the login round for the wire),
+	// then the loop re-checks every 2 hours — GitHub's anonymous API budget
+	// is 60/hour/IP, so a 2-hour cadence is a rounding error, and a release
+	// published mid-session reaches the toolbar within the hour pair.
+	updateFirstDelay = 10 * time.Second
+	updateEvery      = 2 * time.Hour
 )
 
 // appCtxVal holds the Wails runtime context (set by OnStartup) so the
@@ -320,6 +330,60 @@ func main() {
 	// outbox drain rides the same tick — FIFO, one in-flight, §10.
 	go syncLoop(syncCtx, engine, bridge)
 
+	// THE AUTO-UPDATE ROUND (v0.1.14 — the owner ask: "Add an auto update for
+	// the app. when the new version releases in the github, app syncs with
+	// the internet and github, and if new version, whether portable or
+	// installer released, show a button for update. it must update from
+	// github and replace without losing data or needing user to re login."):
+	// the shell owns the Updater — ONE repo, the -X stamped Version, the data
+	// dir for staging (the never-mix rule keeps the session + mirror off the
+	// replace path, so the restarted exe boots straight back into the board).
+	// The check rides the loop below (startup + every 2h); the apply rides
+	// the bridge's ApplyUpdate — every phase honest, verified against the
+	// release's own checksums.txt before the swap.
+	updater := &update.Updater{
+		Repo:    "assadigit/hibana-desktop",
+		Current: Version,
+		DataDir: dataDir,
+	}
+	bridge.SetUpdateCheck(func(ctx context.Context) (update.CheckResult, error) {
+		return updater.Check(ctx)
+	})
+	bridge.SetUpdateEmit(func(name string, payload map[string]any) {
+		if c, ok := appCtxVal.Load().(context.Context); ok {
+			wailsruntime.EventsEmit(c, name, payload)
+		}
+	})
+	bridge.SetUpdateApply(func(ctx context.Context, progress func(update.Progress)) (update.ApplyResult, error) {
+		// THE PREPARE — download + the checksums chain (the asset AND, for
+		// the zip, the hibana.exe entry inside it). A failure resolves as a
+		// verdict for the modal's red panel; nothing was applied.
+		assetPath, kind, err := updater.Prepare(ctx, progress)
+		if err != nil {
+			return update.ApplyResult{Message: err.Error()}, nil
+		}
+		// THE APPLY — the detached helper is spawned (apply_windows.go);
+		// it waits for THIS process to exit, swaps the exe, relaunches it.
+		if err := updater.Apply(assetPath, kind); err != nil {
+			return update.ApplyResult{Message: err.Error()}, nil
+		}
+		// THE RESTART — the modal paints "restarting…" on this {ok:true}
+		// resolve; the quit lands a beat later so the message is on screen
+		// when the window goes. quitRequested bypasses the close-to-tray
+		// contract (an update restart must QUIT, never hide — the helper
+		// would wait forever on a hidden-but-alive process).
+		go func() {
+			time.Sleep(1500 * time.Millisecond)
+			log.Printf("hibana: update to %s staged + helper spawned — restarting", updater.LastVersion)
+			quitRequested.Store(true)
+			if c, ok := appCtxVal.Load().(context.Context); ok {
+				wailsruntime.Quit(c)
+			}
+		}()
+		return update.ApplyResult{OK: true}, nil
+	})
+	go updateLoop(ctx0, bridge)
+
 	// The S214 tray — the "minimize to taskbar" option: the Hibana icon
 	// sits in the notification area the whole session; left-click
 	// restores, right-click offers Open / the close-to-tray toggle / Quit.
@@ -501,6 +565,42 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("hibana: wails: %v", err)
+	}
+}
+
+// updateLoop is the auto-update cadence ("app syncs with the internet and
+// github"): the first check rides updateFirstDelay after boot (the board
+// owns the wire first), then every updateEvery. Every check goes through
+// the bridge's single-flight guard, so a manual modal round and the loop's
+// round can never race; a refusal ("already running") is logged at debug,
+// never an error. An unreachable GitHub is logged and RETRIED at the next
+// tick — the app never claims "no update" when it simply could not ask.
+func updateLoop(ctx context.Context, bridge *ui.API) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(updateFirstDelay):
+	}
+	check := func() {
+		res, err := bridge.CheckForUpdates()
+		if err != nil {
+			log.Printf("hibana update: check failed: %v", err)
+			return
+		}
+		if res.Available {
+			log.Printf("hibana update: %s is out (running %s) — the Update button is on the toolbar", res.Latest, res.Current)
+		}
+	}
+	check()
+	t := time.NewTicker(updateEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			check()
+		}
 	}
 }
 

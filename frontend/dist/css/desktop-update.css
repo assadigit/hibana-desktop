@@ -1,0 +1,92 @@
+/* desktop-update.css — the auto-update round (v0.1.14 — the owner ask: "Add
+   an auto update for the app. when the new version releases in the github,
+   app syncs with the internet and github, and if new version, whether
+   portable or installer released, show a button for update. it must update
+   from github and replace without losing data or needing user to re login.").
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json. */
+
+/* The toolbar's Update pill — HIDDEN until a newer GitHub release exists
+   (the hibana:update-available event removes the hidden attr), then a
+   VISIBLE, LABELED, fill-colored pill right after Refresh: the solid --ok
+   green (the island's own success grammar — distinct from Sync's teal CTA on
+   purpose: an update is the row's "good news" action) at the SAME twin
+   metrics as Sprints/Labels/Sync/Refresh (the S220 "same size" grammar).
+   Light theme: #1f7a34 with white ink (the token's own AA pair). Dark
+   theme: the olive --ok (#9BA77A) is too light for white ink, so the pill
+   flips to dark ink over the same olive fill. */
+#db-update-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent; /* the ghost twins carry a 1px hairline — a transparent border keeps every pill box the exact same height */
+  font-size: var(--fs-md);
+  font-weight: var(--text-label-weight, 500);
+  white-space: nowrap;
+  background: var(--ok);
+  color: #fff;
+}
+#db-update-button[hidden] { display: none; }
+#db-update-button .icon { flex: none; }
+#db-update-button:hover,
+#db-update-button:focus-visible {
+  background: color-mix(in srgb, var(--ok) 86%, #000);
+  color: #fff;
+}
+#db-update-button:active { background: color-mix(in srgb, var(--ok) 76%, #000); }
+html[data-theme='claude-dark'] #db-update-button { color: #141413; }
+html[data-theme='claude-dark'] #db-update-button:hover,
+html[data-theme='claude-dark'] #db-update-button:focus-visible {
+  background: color-mix(in srgb, var(--ok) 88%, #fff);
+  color: #141413;
+}
+
+/* The modal's version line — the one fact the round is about, so it carries
+   the body weight, not the muted smalls under it. */
+#db-update-version {
+  margin: 0.1rem 0 0.15rem;
+  font-size: var(--fs-md);
+  font-weight: var(--text-label-weight, 500);
+  color: var(--fg);
+}
+.db-update-modal h2 { margin: 0; }
+
+/* The live progress bar — a hairline track with the solid --ok fill, the
+   note under it in the muted small. The fill anchors at the inline-start
+   edge via the LOGICAL inset (RTL anchors it right automatically) but
+   SIZES + TWEENS via the physical width — the probe's first lesson: a
+   Chromium fill whose size rode the logical inline-size never left 0
+   (the logical transition never renders), so the size is physical on
+   purpose. Reduced-motion stills the tween (the bar still fills — the
+   STATE stays, the tween goes). */
+.db-update-progress {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.55rem 0 0.35rem;
+}
+.db-update-bar {
+  position: relative;
+  block-size: 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  overflow: hidden;
+}
+.db-update-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--ok);
+  transition: width 0.25s ease;
+}
+.db-update-note {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-update-fill { transition: none; }
+}
