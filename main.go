@@ -41,6 +41,7 @@ import (
 
 	"hibana/desktop/internal/api"
 	"hibana/desktop/internal/auth"
+	"hibana/desktop/internal/quickaccess"
 	"hibana/desktop/internal/store"
 	"hibana/desktop/internal/sync"
 	"hibana/desktop/internal/tray"
@@ -99,6 +100,29 @@ var (
 	hideOnClose   atomic.Bool
 	quitRequested atomic.Bool
 )
+
+// THE QUICK-ACCESS ROUND (the owner's taskbar ask): the boot flag the
+// Startup shortcut passes (quickaccess.AutostartFlag). A boot with it starts
+// the window HIDDEN — the tray icon is the visible presence (one left-click
+// and the board is back), exactly the tray-first contract every background
+// app ships; a manual launch (Start Menu, pinned taskbar, the exe itself)
+// carries no flag and opens the board as always. Parsed BEFORE any side
+// effect so it is testable (main_test.go).
+func hasAutostartFlag(args []string) bool {
+	for _, a := range args {
+		if a == quickaccess.AutostartFlag {
+			return true
+		}
+	}
+	return false
+}
+
+// startupPreference reads the persisted start-with-Windows preference
+// (the mirror meta row; missing/garbage = ON — the owner's "must have an
+// automatic appearance" is the default, so only an explicit opt-out counts).
+const startupMetaKey = "ui.start_with_windows"
+
+func startupPreference(v string, ok bool) bool { return !(ok && v == "0") }
 
 // showWindow restores the board window from any state — hidden to tray,
 // minimized — on whatever thread the caller is on (winc's Hide/Show are
@@ -204,6 +228,14 @@ func main() {
 	}
 	log.Printf("hibana %s (island pin %s), data dir %s", Version, WebRef, dataDir)
 
+	// THE QUICK-ACCESS BOOT (the owner's taskbar ask): the flag the
+	// Startup shortcut passes — the window boots HIDDEN and the tray
+	// icon is the presence (a manual launch never carries it).
+	bootHidden := hasAutostartFlag(os.Args[1:])
+	if bootHidden {
+		log.Printf("hibana: autostart boot — starting hidden to the tray (left-click the icon to open the board)")
+	}
+
 	// The cloud client — cookie jar, Origin stamping on writes (the T6 gate),
 	// the ETag store; credentials NEVER cross the bridge except the §5.5
 	// login round-trip (the cookie itself always stays Go-side).
@@ -239,6 +271,36 @@ func main() {
 	engine := sync.New(client, mirror)
 	syncCtx, syncCancel := context.WithCancel(ctx0)
 	defer syncCancel()
+
+	// THE QUICK-ACCESS WIRING (the owner's taskbar ask): the persisted
+	// start-with-Windows preference (default ON — "must have an automatic
+	// appearance"; only an explicit opt-out counts) drives the Startup
+	// shortcut + the tray toggle's check state. The shortcut pair
+	// (Start Menu + Startup) writes itself in a goroutine — idempotent,
+	// quiet on every later boot (the marker in the data dir matches),
+	// NEVER blocking the window: a slow COM spin is machinery.
+	startWithWindows := true
+	if v, ok, err := mirror.GetMeta(ctx0, startupMetaKey); err != nil {
+		log.Printf("hibana: start-with-Windows preference read: %v (defaulting on)", err)
+	} else {
+		startWithWindows = startupPreference(v, ok)
+	}
+	exePath, exeErr := os.Executable()
+	if exeErr != nil {
+		log.Printf("hibana: resolving the exe path for quick access: %v", exeErr)
+	} else {
+		go func() {
+			if err := quickaccess.Ensure(exePath, dataDir, startWithWindows); err != nil {
+				log.Printf("hibana: quick access (Start Menu + Startup shortcuts): %v", err)
+			} else {
+				state := "off"
+				if startWithWindows {
+					state = "on"
+				}
+				log.Printf("hibana: quick access ensured — Start Menu shortcut present, start with Windows %s", state)
+			}
+		}()
+	}
 
 	// THE THEME PREFERENCE (S216 — v0.1.5): the mirror meta row is the ONE
 	// source of truth ('light' | 'claude-dark' | 'system'; default system —
@@ -283,6 +345,15 @@ func main() {
 	bridge.SetSyncEmit(func(step, state, detail string) {
 		if c, ok := appCtxVal.Load().(context.Context); ok {
 			wailsruntime.EventsEmit(c, "hibana:sync-progress", map[string]string{"step": step, "state": state, "detail": detail})
+		}
+	})
+	// THE UPLOAD ROUND (the owner's dogfood: "it doesn't show whether it
+	// was successful or not"): the progress relay the shim's XHR proxy
+	// routes to the uploader's per-file bars — REAL bytes-in-flight from
+	// the streaming write (ui.Upload → client.WriteStream).
+	bridge.SetUploadEmit(func(name string, payload map[string]any) {
+		if c, ok := appCtxVal.Load().(context.Context); ok {
+			wailsruntime.EventsEmit(c, name, payload)
 		}
 	})
 	bridge.SetSyncRun(func(ctx context.Context, emit sync.Emit) (sync.RoundOutcome, error) {
@@ -395,6 +466,8 @@ func main() {
 	} else {
 		hideOnClose.Store(tray.HideOnCloseFromMeta(v, ok))
 	}
+	startWithWin := &atomic.Bool{}
+	startWithWin.Store(startWithWindows)
 	go func() {
 		err := tray.Run(tray.Config{
 			Icon:      trayIconICO,
@@ -426,6 +499,32 @@ func main() {
 				}
 				log.Printf("hibana: hide-on-close %s", state)
 			},
+			StartupIsOn: startWithWin.Load,
+			OnStartup: func(on bool) {
+				// THE QUICK-ACCESS TOGGLE (the owner's taskbar
+				// ask): persist + write/remove the Startup
+				// .lnk. The shortcut write is the slow half —
+				// it runs on the tray's thread, but it is a
+				// one-shot user click, never a boot path.
+				v := "0"
+				if on {
+					v = "1"
+				}
+				if err := mirror.SetMeta(context.Background(), startupMetaKey, v); err != nil {
+					log.Printf("hibana: persisting start-with-Windows=%v failed: %v", on, err)
+				}
+				startWithWin.Store(on)
+				if exeErr == nil {
+					if err := quickaccess.SetStartup(on, exePath, dataDir); err != nil {
+						log.Printf("hibana: writing the start-with-Windows shortcut failed: %v", err)
+					}
+				}
+				state := "off — launch Hibana from the Start Menu"
+				if on {
+					state = "on — Hibana starts to the tray with Windows"
+				}
+				log.Printf("hibana: start with Windows %s", state)
+			},
 			OnQuit: func() {
 				quitRequested.Store(true) // OnBeforeClose must let the real exit through
 				if c, ok := appCtxVal.Load().(context.Context); ok {
@@ -445,6 +544,12 @@ func main() {
 		Height:    900,
 		MinWidth:  1100, // the board's 5-column grid breakpoint (UI-UX §2)
 		MinHeight: 720,
+		// THE QUICK-ACCESS BOOT (the owner's taskbar ask): a boot
+		// from the Startup shortcut starts HIDDEN — the tray icon is
+		// the visible presence (left-click reopens the board), the
+		// same tray-first contract the close-to-tray round ships;
+		// every manual launch shows the window as always.
+		StartHidden: bootHidden,
 		// The boot frame paints the RESOLVED look (#141413 dark /
 		// #E7E7E7 light — themes.css's own --bg tokens) so a dark-mode
 		// OS never flashes white before the island loads (S216).
@@ -513,8 +618,16 @@ func main() {
 			// card's visibility is a first-paint CSS decision, never a JS
 			// flash).
 			Middleware: func(next http.Handler) http.Handler {
-				root := bridge.IndexMiddleware(next)
-				kanban := bridge.KanbanIndexMiddleware(next)
+				// THE MEDIA PROXY (the upload round's thumbnail
+				// half): the island loads shot tiles as
+				// /api/media/… <img> srcs — on the web those go
+				// to the Worker; in the desktop they land HERE
+				// on the embedded asset server. Route them
+				// through the Go cookie jar first (the media
+				// routes are authed), then the document lanes.
+				media := bridge.MediaMiddleware(next)
+				root := bridge.IndexMiddleware(media)
+				kanban := bridge.KanbanIndexMiddleware(media)
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if p := r.URL.Path; p == "/kanban" || p == "/kanban.html" || p == "/board.html" {
 						r.URL.Path = "/"

@@ -141,6 +141,13 @@ type API struct {
 	syncRun  func(ctx context.Context, emit hibanasync.Emit) (hibanasync.RoundOutcome, error)
 	syncEmit func(step, state, detail string)
 
+	// THE UPLOAD ROUND (guide §5.4 — the M4 ask, the owner's dogfood:
+	// "it doesn't show whether it was successful or not"): the progress
+	// relay + its lock. The transport itself is stateless (WriteStream);
+	// only the emit hook lives here. See upload.go.
+	uploadMu   sync.Mutex
+	uploadEmit func(name string, payload map[string]any)
+
 	// THE AUTO-UPDATE ROUND (v0.1.14): single-flight state (one guard serves
 	// BOTH the check and the apply — they are both live HTTP round-trips
 	// against GitHub) + the three hooks (check runner / apply runner / event

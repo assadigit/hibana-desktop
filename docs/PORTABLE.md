@@ -15,9 +15,33 @@ running and syncing in the background; it never quit. To bring it back:
 
 Right-click also offers **Hide to tray on close** (a checked menu item —
 uncheck it and ✕ really quits; the choice is remembered in
-`data\mirror.db`), and **Quit Hibana** — the real exit. If the tray ever
+`data\mirror.db`), **Start with Windows** (v0.1.15 — see the next
+section), and **Quit Hibana** — the real exit. If the tray ever
 fails to start (it is the first thing in the log), the ✕ falls back to
 quitting so a hidden window is never stranded.
+
+## Quick access — Start Menu + Start with Windows (v0.1.15)
+
+A portable zip ships **no installer**, so out of the box Windows could not
+find Hibana anywhere. On first launch (and after every move of the folder)
+the app now takes care of that itself, per-user, no admin prompt:
+
+- a **Start Menu shortcut** (`Hibana Kanban`) — Windows "All apps", Search,
+  and the taskbar's pin flow all see it; launching it opens the board as
+  normal;
+- a **Startup shortcut** with the *start hidden* argument — **the next time
+  Windows runs, Hibana boots itself to the tray** (icon by the clock, one
+  left-click and the board is back) instead of appearing nowhere until you
+  remember the folder you unzipped it to.
+
+Both are idempotent: a `data\shortcuts.marker` note records what was
+written, so a normal boot re-checks quietly and only rewrites when the .exe
+moved or the preference changed. Move the whole `hibana\` folder and the
+next launch rebuilds both shortcuts at the new path automatically.
+
+Don't want it at boot? The tray menu's **Start with Windows** (checked by
+default) removes/recreates the Startup shortcut — your Start Menu entry
+stays either way, and the choice is remembered in `data\mirror.db`.
 
 ## Dark mode (and its toggle)
 
@@ -44,10 +68,23 @@ teal with a white label; it is the one filled button in the toolbar row)
 opens a small window that PROVES a sync live:
 connecting to the Hibana (Cloudflare) server, then uploading any queued
 changes, then re-checking every board — ending on "Everything synced — your
-boards are saved on the Hibana cloud — they will not vanish". If some
-changes are still uploading (a slow line, a rate-limit window) it says so
-by name instead of pretending. Closing the window never cancels the sync;
-the app keeps syncing every 5 minutes anyway.
+boards are saved on the Hibana cloud — they will not vanish". Under each
+step its **live fact** is spelled out in full (v0.1.15: "signed in as …",
+"every board already current · 7 project(s) · 7 board(s)" — the facts wrap
+on their own line and are never cut mid-word; they are the proof the modal
+exists for). If some changes are still uploading (a slow line, a rate-limit
+window) it says so by name instead of pretending. Closing the window never
+cancels the sync; the app keeps syncing every 5 minutes anyway.
+
+## Uploading files (the Upload File button)
+
+The task editor's **Upload File** button (images, video, PDF/Excel/Word/
+Markdown/text) uploads to the SAME cloud storage the web app uses, with the
+round's three verdicts (v0.1.15): the per-file **progress bar fills with the
+real bytes on the wire**, the row ends on **✓** and a green **"Screenshot
+uploaded"** toast, and the **thumbnail appears in the grid** — pictures and
+their tiles load through the app's own authed media proxy, so the tile you
+just uploaded is visible exactly like on the web.
 
 ## Where your data lives
 
@@ -59,6 +96,7 @@ hibana\
 ├── PORTABLE.md          ← this file
 └── data\                ← created on first launch
     ├── mode.lock        ← "portable" — locks this data dir to portable mode
+    ├── shortcuts.marker ← v0.1.15: the Start Menu/Startup shortcuts' state note
     ├── mirror.db        ← the SQLite mirror (a CACHE of your cloud data + offline edits)
     ├── session.bin      ← your session token (0600; DPAPI-encrypted from M5)
     └── logs\

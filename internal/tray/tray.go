@@ -53,6 +53,14 @@ type Config struct {
 	// OnBeforeClose (its quitRequested flag) and call runtime.Quit.
 	OnQuit func()
 
+	// THE QUICK-ACCESS TOGGLE (the owner's taskbar ask): "Start with
+	// Windows" — a checkable item under the close-to-tray one, default
+	// ON. Both hooks are optional like the theme pair: the item is only
+	// appended when both are wired (the non-Windows ladder never builds
+	// the menu at all).
+	StartupIsOn func() bool   // the current preference (the check state)
+	OnStartup   func(on bool) // a flip made from the menu
+
 	// THE THEME SUBMENU (S216 — v0.1.5): "Theme" → Light / Dark / Follow
 	// system, radio-checked on the current choice. Both hooks are
 	// optional — the submenu is only appended when both are wired; the
@@ -68,12 +76,13 @@ type Config struct {
 type action int
 
 const (
-	actNone   action = iota
-	actShow          // restore the window
-	actMenu          // show the context menu
-	actToggle        // flip the close-to-tray preference
-	actQuit          // exit the app
-	actTheme         // pick a theme preference (see commandThemePref)
+	actNone    action = iota
+	actShow           // restore the window
+	actMenu           // show the context menu
+	actToggle         // flip the close-to-tray preference
+	actQuit           // exit the app
+	actTheme          // pick a theme preference (see commandThemePref)
+	actStartup        // flip the start-with-Windows preference (quick access)
 )
 
 // The popup-menu command ids (TrackPopupMenuEx with TPM_RETURNCMD returns
@@ -89,6 +98,10 @@ const (
 	cmdThemeLight  = int32(1004) // "Light"
 	cmdThemeDark   = int32(1005) // "Dark" (claude-dark — the web's own dark look)
 	cmdThemeSystem = int32(1006) // "Follow system"
+
+	// The quick-access toggle ("Start with Windows" — checkable; the
+	// startup .lnk + the boot-hidden tray presence).
+	cmdStartup = int32(1007) // "Start with Windows"
 )
 
 // The classic (pre-NIF_VERSION_4) Shell_NotifyIcon mouse messages the tray
@@ -122,6 +135,8 @@ func commandAction(id int32) action {
 		return actToggle
 	case cmdQuit:
 		return actQuit
+	case cmdStartup:
+		return actStartup
 	default:
 		if _, ok := commandThemePref(id); ok {
 			return actTheme

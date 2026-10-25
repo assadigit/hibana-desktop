@@ -1131,8 +1131,10 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
 //      err.status keep working (devboard.js:54-63).
 //   2. window.hibanaXHR    — the XMLHttpRequest-compatible upload proxy for the S208
 //      uploader (devboard.js:337/:367). The Go streaming upload is spec'd in guide
-//      §5.4; implemented in M4 — until the Upload bridge exists, send() fails fast
-//      and LOUD with a named not-implemented error instead of a silent hang.
+//      §5.4; v0.1.15 wires it LIVE — the bound Upload call rides the same session/
+//      Origin machinery as the fetch seam, and real byte progress flows back through
+//      the hibana:upload-progress events (a dev island without the binding still
+//      fails fast and LOUD with a named not-wired error).
 //   3. window.hibana.toast — the app.js toast component contract (app.js:243-323 @
 //      e6661c8), reimplemented 1:1 as WEB TOASTS (identical in WebView2 —
 //      UI-UX-REPLICATION-SPEC.md §7.2). ZERO network use.
@@ -1243,10 +1245,32 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
   // 'new XMLHttpRequest()' sites, devboard.js:337/:367 at the pin). Implements
   // exactly the surface the uploader touches: open/send/setRequestHeader/abort,
   // upload.onprogress, onload/onerror/onabort/onreadystatechange, status,
-  // responseText, readyState. The Go streaming upload is spec'd in guide §5.4;
-  // implemented in M4. Until the Upload bridge exists, send() fires onerror
-  // (async, like a real XHR) with a clearly-NAMED not-implemented error so the
-  // uploader's progress rows show a real failure instead of a silent hang.
+  // responseText, readyState.
+  //
+  // v0.1.15 — THE M4 BRIDGE IS LIVE (guide §5.4; the owner's dogfood: "upload
+  // file button exists and it shows a loading as well, but after the loading
+  // ends, it doesn't show whether it was successful or not, because it doesn't
+  // show the thumbnail of the uploaded picture"). send() calls the bound Go
+  // Upload(callID, method, path, body, headers) → {status, body} — the SAME
+  // session/Origin machinery the fetch seam rides — and the Go side STREAMS the
+  // body with real byte progress: every 'hibana:upload-progress' Wails event
+  // {id, loaded, total} is routed to the matching instance's upload.onprogress
+  // (the per-request callID keys the registry — the uploader can run several
+  // files in parallel against the SAME path, so the events cannot be addressed
+  // by path). Without the bound method (a dev island, a stubbed runtime) send()
+  // still fails fast and LOUD with the named not-wired error.
+  var hibanaXHRSeq = 0
+  var hibanaXHRLive = {} // callID → the in-flight instance (progress routing)
+  if (window.runtime && typeof window.runtime.EventsOn === 'function') {
+    window.runtime.EventsOn('hibana:upload-progress', function (p) {
+      if (!p || typeof p !== 'object') return
+      const x = hibanaXHRLive[p.id]
+      if (!x || x._aborted) return
+      if (typeof x.upload.onprogress === 'function') {
+        try { x.upload.onprogress({ lengthComputable: true, loaded: p.loaded || 0, total: p.total || 0, type: 'progress' }) } catch (e) { /* a handler must never throw back into the uploader */ }
+      }
+    })
+  }
   function HibanaXHR() {
     this.readyState = 0
     this.status = 0
@@ -1255,6 +1279,7 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
     this.onload = null
     this.onerror = null
     this.onabort = null
+    this._id = 'up' + (++hibanaXHRSeq) + '-' + Date.now() // the progress event's correlation key
     this._method = null
     this._url = null
     this._headers = {}
@@ -1268,9 +1293,11 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
     this.readyState = 1
   }
   HibanaXHR.prototype.setRequestHeader = function (k, v) { this._headers[k] = v }
+  HibanaXHR.prototype._drop = function () { delete hibanaXHRLive[this._id] }
   HibanaXHR.prototype.abort = function () {
     if (this._aborted) return
     this._aborted = true
+    this._drop()
     this.readyState = 0
     if (typeof this.onabort === 'function') { try { this.onabort({ type: 'abort' }) } catch (e) { /* a handler must never throw back into the uploader */ } }
   }
@@ -1281,25 +1308,29 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
     if (this._aborted) return
     const bridge = resolveBoundMethod('Upload')
     if (!bridge) {
-      // M4 not here yet (guide §5.4). Fire onerror asynchronously, like a real XHR —
-      // devboard.js assigns its handlers BEFORE send() but real XHR events are tasks.
+      // The bridge is not wired (a dev island outside the shell). Fire onerror
+      // asynchronously, like a real XHR — devboard.js assigns its handlers BEFORE
+      // send() but real XHR events are tasks.
       queueMicrotask(function () {
         self.readyState = 4
         self.status = 0
-        const err = new Error('hibanaXHR: the streaming upload bridge (window.gohibana.api.Upload — guide §5.4) is not implemented until M4; the desktop board cannot upload attachments yet.')
-        err.name = 'NotImplementedUntilM4'
+        const err = new Error('hibanaXHR: the streaming upload bridge (window.gohibana.api.Upload — guide §5.4) is not wired in this runtime; the desktop board cannot upload attachments here.')
+        err.name = 'HibanaUploadBridgeNotWired'
         self._error = err
         if (typeof self.onerror === 'function') { try { self.onerror({ type: 'error', error: err }) } catch (e) { /* ditto */ } }
         if (typeof self.onreadystatechange === 'function') { try { self.onreadystatechange() } catch (e) { /* ditto */ } }
       })
       return
     }
-    // M4 path (guide §5.4): upload(method, url, body, headers) → { status, body }.
-    // Progress events need the streaming contract M4 will define — extended there.
+    // The M4 contract (guide §5.4): Upload(callID, method, path, body, headers)
+    // → { status, body } — the callID routes the Go-side progress events back
+    // to THIS instance through the registry above.
+    hibanaXHRLive[self._id] = self
     Promise.resolve()
-      .then(function () { return bridge(self._method || 'POST', self._url, body, self._headers) })
+      .then(function () { return bridge(self._id, self._method || 'POST', self._url, body, self._headers) })
       .then(function (res) {
         if (self._aborted) return
+        self._drop()
         self.readyState = 4
         self.status = res && typeof res.status === 'number' ? res.status : 0
         self.responseText = res && res.body != null ? String(res.body) : ''
@@ -1310,6 +1341,7 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
       })
       .catch(function () {
         if (self._aborted) return
+        self._drop()
         self.readyState = 4
         self.status = 0
         if (typeof self.onerror === 'function') { try { self.onerror({ type: 'error' }) } catch (e) { /* ditto */ } }
@@ -2202,13 +2234,23 @@ const DESKTOP_SYNC_CSS = `/* desktop-sync.css — the manual sync modal's step r
    twin sizing — the owner ask: "a sync button on the header of app, next to
    sprints and labels, but colored. (fill colored)" + "sprints and labels need
    to be same size").
+   v0.1.15 grew it again — the COMPLETE-facts fix (the owner ask: "when you
+   sync using Hibana Desktop, the modal is not complete and needs fix"): the
+   step notes are the round's LIVE FACTS ("signed in as aliassadi@live.com",
+   "every board already current · 7 project(s) · 7 board(s)") and the old
+   side-by-side 60%-cap ellipsis cut them mid-word — the modal looked done
+   but PROVED nothing readable. The rows are now a mark + (label, note)
+   grid: the note owns its own full-width line UNDER the label and WRAPS.
    GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
    into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
    The dialog + .modal card are the island's own (components.css) — this sheet
    starts INSIDE the card. */
 
 /* The three step rows: pending (muted ring) → active (the accent ring spins)
-   → done (the green check) / failed (the red cross). */
+   → done (the green check) / failed (the red cross). v0.1.15: the row is a
+   GRID — the mark in column one, the label + its live fact stacked in
+   column two — so the note can take the FULL card width and wrap instead
+   of ellipsizing at 60%. */
 .db-sync-steps {
   list-style: none;
   margin: 0;
@@ -2217,20 +2259,23 @@ const DESKTOP_SYNC_CSS = `/* desktop-sync.css — the manual sync modal's step r
   gap: 0.8rem;
 }
 .db-sync-steps li {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  column-gap: 0.65rem;
+  row-gap: 0.15rem;
   color: var(--muted);
   font-size: var(--fs-md);
   transition: color 0.18s ease;
 }
-.db-sync-steps li .db-sync-label { flex: 1 1 auto; }
+.db-sync-steps li .db-sync-label { grid-column: 2; }
 .db-sync-steps li[data-state='active'] { color: var(--fg); }
 .db-sync-steps li[data-state='done'] { color: var(--fg); }
 .db-sync-steps li[data-state='failed'] { color: var(--err); }
 
 .db-sync-mark {
-  flex: none;
+  grid-column: 1;
+  margin-block-start: 0.05rem; /* optical: the ring centers on the label's cap height, not the taller note */
   inline-size: 1.4rem;
   block-size: 1.4rem;
   border-radius: 50%;
@@ -2270,15 +2315,19 @@ const DESKTOP_SYNC_CSS = `/* desktop-sync.css — the manual sync modal's step r
   .db-sync-spin { animation-duration: 1.6s; }
 }
 
-/* The live fact under a step ("hibana.ir reached", "3 change(s) uploaded"…). */
+/* The live fact under its step ("hibana.ir reached", "signed in as …", "7
+   project(s) · 7 board(s)") — v0.1.15: the note is the REASON the modal
+   exists (the round's proof), so it takes the row's full second column on
+   its own line, wraps to as many lines as the truth needs, and never
+   ellipsizes. overflow-wrap:anywhere keeps a long email or a no-break
+   token inside the card instead of stretching it. */
 .db-sync-note {
-  flex: none;
+  grid-column: 2;
   font-size: 0.82em;
   color: var(--muted);
-  max-inline-size: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
 }
 
 /* The result panel (one element, three kinds): ok = the green "Everything
@@ -3853,6 +3902,18 @@ function verifyDist(outDir, fileMap) {
   if ((devboard.match(bareFetchRe) || []).length !== 0) problems.push('devboard.js: bare fetch( calls remain')
   if ((boardPage.match(bareFetchRe) || []).length !== 0) problems.push('board-page.js: bare fetch( calls remain')
 
+  // (1b) THE v0.1.15 UPLOAD BRIDGE (the owner's dogfood: "it doesn't show
+  // whether it was successful or not"): the XHR proxy must call the bound
+  // Upload with the callID FIRST (the progress events are addressed by id —
+  // parallel uploads share one path), register in the live map, and route the
+  // hibana:upload-progress events to upload.onprogress with the standard
+  // ProgressEvent shape (lengthComputable + loaded/total).
+  const shimJs = fileMap['js/desktop-shim.js'] || ''
+  if (!shimJs.includes("resolveBoundMethod('Upload')")) problems.push('js/desktop-shim.js: the XHR upload proxy must resolve the Go Upload binding at SEND time')
+  if (!shimJs.includes('bridge(self._id, self._method')) problems.push('js/desktop-shim.js: the Upload call must carry the callID (progress correlation key) first')
+  if (!shimJs.includes("EventsOn('hibana:upload-progress'")) problems.push('js/desktop-shim.js: the hibana:upload-progress listener is missing')
+  if (!shimJs.includes('lengthComputable: true')) problems.push('js/desktop-shim.js: the synthetic progress event must be lengthComputable (the uploader gates on it)')
+
   // (2) the HTML adaptation (guide §3.2)
   for (const banned of ['htmx', 'idiomorph', 'boot.js', 'app.js', 'hib-init', 'touch-drag', 'nav.js', 'command-palette',
     'mobile-nav', 'zen-mode', 'micro-interactions', 'go-to.js', 'alpine', 'hibana-page-loader', 'data-nav']) {
@@ -3948,6 +4009,13 @@ function verifyDist(outDir, fileMap) {
   const syncCss = fileMap['css/desktop-sync.css'] || ''
   if (!syncCss.includes('#db-sprint-link')) problems.push('css/desktop-sync.css: the Sprints/Labels twin-sizing rule is missing (the v0.1.8 "same size" ask)')
   if (!syncCss.includes('#db-sync-button')) problems.push('css/desktop-sync.css: the toolbar Sync CTA pill rule is missing (the v0.1.8 fill-colored ask)')
+  // THE v0.1.15 COMPLETE-FACTS FIX (the owner ask: "the modal is not complete
+  // and needs fix"): the step notes are the round's LIVE PROOF ("signed in as
+  // …", "7 project(s) · 7 board(s)") — they must OWN a full-width line under
+  // the label and WRAP. The old 60%-cap ellipsis cut every fact mid-word.
+  if (!syncCss.includes('grid-template-columns: auto 1fr')) problems.push('css/desktop-sync.css: the step row must be the mark + (label, note) grid (the v0.1.15 complete-facts fix)')
+  if (!syncCss.includes('overflow-wrap: anywhere')) problems.push('css/desktop-sync.css: the step note must wrap anywhere (the v0.1.15 complete-facts fix — an email must never stretch or clip the card)')
+  if (syncCss.includes('text-overflow: ellipsis')) problems.push('css/desktop-sync.css: the step note must NEVER ellipsize (the v0.1.15 complete-facts fix — the facts are the proof)')
   if (!fs.existsSync(path.join(outDir, 'css/desktop-sync.css'))) problems.push('css/desktop-sync.css: missing from dist')
 
   // The v0.1.9 sign-out round (the owner ask: "It must also have option of logout

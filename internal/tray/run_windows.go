@@ -403,6 +403,16 @@ func (s *trayState) showMenu(hwnd uintptr) {
 		toggle |= mfChecked
 	}
 	appendMenu(toggle, cmdToggle, "Hide to tray on close")
+
+	// THE QUICK-ACCESS TOGGLE (the owner's taskbar ask): "Start with
+	// Windows" — checkable, default ON, the startup .lnk's visible face.
+	if s.cfg.StartupIsOn != nil && s.cfg.OnStartup != nil {
+		startup := uintptr(mfString)
+		if s.cfg.StartupIsOn() {
+			startup |= mfChecked
+		}
+		appendMenu(startup, cmdStartup, "Start with Windows")
+	}
 	appendMenu(mfSeparator, 0, "")
 	appendMenu(mfString, cmdQuit, "Quit Hibana")
 
@@ -432,6 +442,10 @@ func (s *trayState) showMenu(hwnd uintptr) {
 	case actTheme:
 		if pref, ok := commandThemePref(int32(cmd)); ok {
 			s.cfg.OnTheme(pref)
+		}
+	case actStartup:
+		if s.cfg.StartupIsOn != nil && s.cfg.OnStartup != nil {
+			s.cfg.OnStartup(!s.cfg.StartupIsOn())
 		}
 	}
 }

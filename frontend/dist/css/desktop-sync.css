@@ -3,13 +3,23 @@
    twin sizing — the owner ask: "a sync button on the header of app, next to
    sprints and labels, but colored. (fill colored)" + "sprints and labels need
    to be same size").
+   v0.1.15 grew it again — the COMPLETE-facts fix (the owner ask: "when you
+   sync using Hibana Desktop, the modal is not complete and needs fix"): the
+   step notes are the round's LIVE FACTS ("signed in as aliassadi@live.com",
+   "every board already current · 7 project(s) · 7 board(s)") and the old
+   side-by-side 60%-cap ellipsis cut them mid-word — the modal looked done
+   but PROVED nothing readable. The rows are now a mark + (label, note)
+   grid: the note owns its own full-width line UNDER the label and WRAPS.
    GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
    into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
    The dialog + .modal card are the island's own (components.css) — this sheet
    starts INSIDE the card. */
 
 /* The three step rows: pending (muted ring) → active (the accent ring spins)
-   → done (the green check) / failed (the red cross). */
+   → done (the green check) / failed (the red cross). v0.1.15: the row is a
+   GRID — the mark in column one, the label + its live fact stacked in
+   column two — so the note can take the FULL card width and wrap instead
+   of ellipsizing at 60%. */
 .db-sync-steps {
   list-style: none;
   margin: 0;
@@ -18,20 +28,23 @@
   gap: 0.8rem;
 }
 .db-sync-steps li {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  column-gap: 0.65rem;
+  row-gap: 0.15rem;
   color: var(--muted);
   font-size: var(--fs-md);
   transition: color 0.18s ease;
 }
-.db-sync-steps li .db-sync-label { flex: 1 1 auto; }
+.db-sync-steps li .db-sync-label { grid-column: 2; }
 .db-sync-steps li[data-state='active'] { color: var(--fg); }
 .db-sync-steps li[data-state='done'] { color: var(--fg); }
 .db-sync-steps li[data-state='failed'] { color: var(--err); }
 
 .db-sync-mark {
-  flex: none;
+  grid-column: 1;
+  margin-block-start: 0.05rem; /* optical: the ring centers on the label's cap height, not the taller note */
   inline-size: 1.4rem;
   block-size: 1.4rem;
   border-radius: 50%;
@@ -71,15 +84,19 @@
   .db-sync-spin { animation-duration: 1.6s; }
 }
 
-/* The live fact under a step ("hibana.ir reached", "3 change(s) uploaded"…). */
+/* The live fact under its step ("hibana.ir reached", "signed in as …", "7
+   project(s) · 7 board(s)") — v0.1.15: the note is the REASON the modal
+   exists (the round's proof), so it takes the row's full second column on
+   its own line, wraps to as many lines as the truth needs, and never
+   ellipsizes. overflow-wrap:anywhere keeps a long email or a no-break
+   token inside the card instead of stretching it. */
 .db-sync-note {
-  flex: none;
+  grid-column: 2;
   font-size: 0.82em;
   color: var(--muted);
-  max-inline-size: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-inline-size: 0;
 }
 
 /* The result panel (one element, three kinds): ok = the green "Everything

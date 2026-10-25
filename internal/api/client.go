@@ -244,6 +244,7 @@ func (c *Client) get(ctx context.Context, method, path string) (*Response, error
 	return c.absorb(method, path, resp)
 }
 
+// write executes one write round-trip (the shared Request/RequestFresh path).
 func (c *Client) write(ctx context.Context, method, path string, body []byte) (*Response, error) {
 	resp, err := c.do(ctx, method, path, body, "", 0)
 	if err != nil {
@@ -251,6 +252,145 @@ func (c *Client) write(ctx context.Context, method, path string, body []byte) (*
 	}
 	return c.absorb(method, path, resp)
 }
+
+// UploadResult is one streamed upload's wire outcome: the same status/body
+// pair write returns, plus the response's Content-Type (the media proxy
+// needs it; the upload POST itself answers JSON).
+type UploadResult struct {
+	Status      int
+	Body        []byte
+	ContentType string
+}
+
+// progressReader counts bytes AS THE SOCKET ACCEPTS THEM (net/http reads the
+// request body through this wrapper while writing it to the wire), so the
+// callback reports REAL network progress, not a simulation. The callback is
+// throttled to one call per 120ms (plus the final call) so a multi-megabyte
+// upload cannot flood the event relay.
+type progressReader struct {
+	r        io.Reader
+	total    int64
+	sent     int64
+	fn       func(sent, total int64)
+	lastTick time.Time
+}
+
+func (pr *progressReader) Read(p []byte) (int, error) {
+	n, err := pr.r.Read(p)
+	pr.sent += int64(n)
+	if pr.fn != nil {
+		now := time.Now()
+		if pr.sent >= pr.total || now.Sub(pr.lastTick) >= 120*time.Millisecond {
+			pr.lastTick = now
+			pr.fn(pr.sent, pr.total)
+		}
+	}
+	return n, err
+}
+
+// WriteStream is the UPLOAD round-trip (guide §5.4's M4 contract): a write
+// with a KNOWN body length (never chunked — the server's 413 boundary reads
+// Content-Length) whose bytes-in-flight report through progress as the
+// transport accepts them. The Origin stamp, the cookie jar and the no-blind-
+// retry rule are byte-identical to write(); the ETag store is untouched (an
+// upload response carries no validator).
+func (c *Client) WriteStream(ctx context.Context, method, path string, body []byte, progress func(sent, total int64)) (*UploadResult, error) {
+	method = strings.ToUpper(method)
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+	default:
+		return nil, fmt.Errorf("hibana api: method not allowed: %s", method)
+	}
+	if !strings.HasPrefix(path, "/") {
+		return nil, fmt.Errorf("hibana api: path must be root-relative, got %q", path)
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, uploadDeadline)
+	defer cancel()
+	req, err := http.NewRequestWithContext(callCtx, method, c.base.String()+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.ContentLength = int64(len(body))
+		rdr := &progressReader{r: bytes.NewReader(body), total: int64(len(body)), fn: progress, lastTick: time.Now()}
+		req.Body = io.NopCloser(rdr)
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(body)), nil
+		}
+	}
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	// T6 gate: headerless writers are 403'd — the desktop presents the origin.
+	req.Header.Set("Origin", c.origin)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("hibana api: reading %s %s: %w", method, path, err)
+	}
+	return &UploadResult{Status: resp.StatusCode, Body: b, ContentType: resp.Header.Get("Content-Type")}, nil
+}
+
+// uploadDeadline bounds one streamed upload: a 5MB image on a slow uplink is
+// tens of seconds, not the 3s GET window — a media-rich round must finish.
+const uploadDeadline = 10 * time.Minute
+
+// MediaResult is one media GET's outcome: the raw bytes plus the response's
+// Content-Type and Cache-Control (the desktop's media proxy forwards them so
+// the WebView caches exactly like the browser would on the web).
+type MediaResult struct {
+	Status       int
+	ContentType  string
+	CacheControl string
+	Body         []byte
+}
+
+// Media fetches one authed media object (GET /api/media/… — screenshots and
+// their ?variant=thumb tiles, avatars). It rides the SAME cookie jar as every
+// other call (the route is authed), never stores ETags (media is not a
+// conditional-poll surface), and carries the media deadline — a few MB of
+// image must not die on the interactive GET window.
+func (c *Client) Media(ctx context.Context, path string) (*MediaResult, error) {
+	if !strings.HasPrefix(path, "/") {
+		return nil, fmt.Errorf("hibana api: path must be root-relative, got %q", path)
+	}
+	callCtx, cancel := context.WithTimeout(ctx, mediaDeadline)
+	defer cancel()
+	req, err := http.NewRequestWithContext(callCtx, http.MethodGet, c.base.String()+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "image/avif,image/webp,image/*,video/*;q=0.9,*/*;q=0.8")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxMediaBytes))
+	if err != nil {
+		return nil, fmt.Errorf("hibana api: reading media %s: %w", path, err)
+	}
+	return &MediaResult{
+		Status:       resp.StatusCode,
+		ContentType:  resp.Header.Get("Content-Type"),
+		CacheControl: resp.Header.Get("Cache-Control"),
+		Body:         b,
+	}, nil
+}
+
+// mediaDeadline bounds one media GET (screenshots are ≤5MB uploads).
+const mediaDeadline = 45 * time.Second
+
+// maxMediaBytes caps media reads at 16MB — a screenshot can never exceed the
+// server's own 5MB upload cap, so this is a generous belt against a runaway
+// object, not a real ceiling.
+const maxMediaBytes = 16 << 20
 
 // wireResult is the fully-buffered outcome of one round-trip: the body is
 // read to EOF INSIDE do, before the request context's cancel runs — the Go

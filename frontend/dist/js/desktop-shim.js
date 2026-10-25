@@ -12,8 +12,10 @@
 //      err.status keep working (devboard.js:54-63).
 //   2. window.hibanaXHR    — the XMLHttpRequest-compatible upload proxy for the S208
 //      uploader (devboard.js:337/:367). The Go streaming upload is spec'd in guide
-//      §5.4; implemented in M4 — until the Upload bridge exists, send() fails fast
-//      and LOUD with a named not-implemented error instead of a silent hang.
+//      §5.4; v0.1.15 wires it LIVE — the bound Upload call rides the same session/
+//      Origin machinery as the fetch seam, and real byte progress flows back through
+//      the hibana:upload-progress events (a dev island without the binding still
+//      fails fast and LOUD with a named not-wired error).
 //   3. window.hibana.toast — the app.js toast component contract (app.js:243-323 @
 //      e6661c8), reimplemented 1:1 as WEB TOASTS (identical in WebView2 —
 //      UI-UX-REPLICATION-SPEC.md §7.2). ZERO network use.
@@ -124,10 +126,32 @@
   // 'new XMLHttpRequest()' sites, devboard.js:337/:367 at the pin). Implements
   // exactly the surface the uploader touches: open/send/setRequestHeader/abort,
   // upload.onprogress, onload/onerror/onabort/onreadystatechange, status,
-  // responseText, readyState. The Go streaming upload is spec'd in guide §5.4;
-  // implemented in M4. Until the Upload bridge exists, send() fires onerror
-  // (async, like a real XHR) with a clearly-NAMED not-implemented error so the
-  // uploader's progress rows show a real failure instead of a silent hang.
+  // responseText, readyState.
+  //
+  // v0.1.15 — THE M4 BRIDGE IS LIVE (guide §5.4; the owner's dogfood: "upload
+  // file button exists and it shows a loading as well, but after the loading
+  // ends, it doesn't show whether it was successful or not, because it doesn't
+  // show the thumbnail of the uploaded picture"). send() calls the bound Go
+  // Upload(callID, method, path, body, headers) → {status, body} — the SAME
+  // session/Origin machinery the fetch seam rides — and the Go side STREAMS the
+  // body with real byte progress: every 'hibana:upload-progress' Wails event
+  // {id, loaded, total} is routed to the matching instance's upload.onprogress
+  // (the per-request callID keys the registry — the uploader can run several
+  // files in parallel against the SAME path, so the events cannot be addressed
+  // by path). Without the bound method (a dev island, a stubbed runtime) send()
+  // still fails fast and LOUD with the named not-wired error.
+  var hibanaXHRSeq = 0
+  var hibanaXHRLive = {} // callID → the in-flight instance (progress routing)
+  if (window.runtime && typeof window.runtime.EventsOn === 'function') {
+    window.runtime.EventsOn('hibana:upload-progress', function (p) {
+      if (!p || typeof p !== 'object') return
+      const x = hibanaXHRLive[p.id]
+      if (!x || x._aborted) return
+      if (typeof x.upload.onprogress === 'function') {
+        try { x.upload.onprogress({ lengthComputable: true, loaded: p.loaded || 0, total: p.total || 0, type: 'progress' }) } catch (e) { /* a handler must never throw back into the uploader */ }
+      }
+    })
+  }
   function HibanaXHR() {
     this.readyState = 0
     this.status = 0
@@ -136,6 +160,7 @@
     this.onload = null
     this.onerror = null
     this.onabort = null
+    this._id = 'up' + (++hibanaXHRSeq) + '-' + Date.now() // the progress event's correlation key
     this._method = null
     this._url = null
     this._headers = {}
@@ -149,9 +174,11 @@
     this.readyState = 1
   }
   HibanaXHR.prototype.setRequestHeader = function (k, v) { this._headers[k] = v }
+  HibanaXHR.prototype._drop = function () { delete hibanaXHRLive[this._id] }
   HibanaXHR.prototype.abort = function () {
     if (this._aborted) return
     this._aborted = true
+    this._drop()
     this.readyState = 0
     if (typeof this.onabort === 'function') { try { this.onabort({ type: 'abort' }) } catch (e) { /* a handler must never throw back into the uploader */ } }
   }
@@ -162,25 +189,29 @@
     if (this._aborted) return
     const bridge = resolveBoundMethod('Upload')
     if (!bridge) {
-      // M4 not here yet (guide §5.4). Fire onerror asynchronously, like a real XHR —
-      // devboard.js assigns its handlers BEFORE send() but real XHR events are tasks.
+      // The bridge is not wired (a dev island outside the shell). Fire onerror
+      // asynchronously, like a real XHR — devboard.js assigns its handlers BEFORE
+      // send() but real XHR events are tasks.
       queueMicrotask(function () {
         self.readyState = 4
         self.status = 0
-        const err = new Error('hibanaXHR: the streaming upload bridge (window.gohibana.api.Upload — guide §5.4) is not implemented until M4; the desktop board cannot upload attachments yet.')
-        err.name = 'NotImplementedUntilM4'
+        const err = new Error('hibanaXHR: the streaming upload bridge (window.gohibana.api.Upload — guide §5.4) is not wired in this runtime; the desktop board cannot upload attachments here.')
+        err.name = 'HibanaUploadBridgeNotWired'
         self._error = err
         if (typeof self.onerror === 'function') { try { self.onerror({ type: 'error', error: err }) } catch (e) { /* ditto */ } }
         if (typeof self.onreadystatechange === 'function') { try { self.onreadystatechange() } catch (e) { /* ditto */ } }
       })
       return
     }
-    // M4 path (guide §5.4): upload(method, url, body, headers) → { status, body }.
-    // Progress events need the streaming contract M4 will define — extended there.
+    // The M4 contract (guide §5.4): Upload(callID, method, path, body, headers)
+    // → { status, body } — the callID routes the Go-side progress events back
+    // to THIS instance through the registry above.
+    hibanaXHRLive[self._id] = self
     Promise.resolve()
-      .then(function () { return bridge(self._method || 'POST', self._url, body, self._headers) })
+      .then(function () { return bridge(self._id, self._method || 'POST', self._url, body, self._headers) })
       .then(function (res) {
         if (self._aborted) return
+        self._drop()
         self.readyState = 4
         self.status = res && typeof res.status === 'number' ? res.status : 0
         self.responseText = res && res.body != null ? String(res.body) : ''
@@ -191,6 +222,7 @@
       })
       .catch(function () {
         if (self._aborted) return
+        self._drop()
         self.readyState = 4
         self.status = 0
         if (typeof self.onerror === 'function') { try { self.onerror({ type: 'error' }) } catch (e) { /* ditto */ } }
