@@ -56,7 +56,7 @@ import (
 //	wails build -platform windows/amd64 -ldflags \
 //	  "-s -w -X main.Version=0.1.4 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.16-dev"
+	Version = "0.1.17-dev"
 	WebRef  = "unpinned"
 )
 
@@ -421,6 +421,19 @@ func main() {
 		return updater.Check(ctx)
 	})
 	bridge.SetUpdateEmit(func(name string, payload map[string]any) {
+		if c, ok := appCtxVal.Load().(context.Context); ok {
+			wailsruntime.EventsEmit(c, name, payload)
+		}
+	})
+	// THE SETTINGS ROUND (the settings page plan, §2.2): the language
+	// write's event relay — SetLanguage's 2xx path emits hibana:lang
+	// {lang} so the live surfaces (the settings sheet's segmented control,
+	// any future tray surface) follow a language change without a reload.
+	// Serve-time, the document's own <html lang dir> stamping rides the
+	// same live a.me the binding un-stales (InjectShellState →
+	// LanguagePref), so the post-flip reload paints the new language at
+	// the FIRST frame — no EN/LTR flash, ever.
+	bridge.SetLanguageEmit(func(name string, payload map[string]any) {
 		if c, ok := appCtxVal.Load().(context.Context); ok {
 			wailsruntime.EventsEmit(c, name, payload)
 		}

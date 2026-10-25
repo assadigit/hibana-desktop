@@ -71,7 +71,13 @@ const MOCK_RUNTIME_JS = [
   '  AuthState: function () { return Promise.resolve({ authenticated: window.__probe.authed, user: null }) },',
   '  Request: function (method, p, body) { return window.__probeRequest(method, p, body) },',
   '} } }',
-  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {})[name] = cb } }',
+  // The Wails EventsOn contract is MULTI-LISTENER (every registered callback
+  // fires per emit) — the v0.1.17 settings round co-listens on
+  // hibana:update-available / hibana:theme, so the probe registry models
+  // the real runtime faithfully (the single-slot registry silently
+  // dropped the earlier registrant).
+  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {}); (window.__probeEvents[name] = window.__probeEvents[name] || []).push(cb) } },',
+  'window.__probeEmit = function (name, payload) { ((window.__probeEvents || {})[name] || []).forEach(function (cb) { try { cb(payload) } catch (e) {} }) },',
   'window.__probe = ' + JSON.stringify({ authed: false }) + ';',
 ].join('\n') + '\n'
 

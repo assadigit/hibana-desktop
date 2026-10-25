@@ -9,9 +9,10 @@ import (
 
 // htmlOpenTag is the generated island's exact <html> open tag (sync-island.mjs
 // emits it verbatim from board.html @ pin). The auth state AND the theme
-// preference ride on it as data- attributes so the login card's visibility
-// AND the look resolve from CSS at FIRST PAINT — no JS round-trip, no flash
-// in either direction:
+// preference AND the language ride on it as data- attributes so the login
+// card's visibility AND the look AND the direction resolve from CSS/at the
+// document itself at FIRST PAINT — no JS round-trip, no flash in either
+// direction:
 //
 //   - a live restored session → data-desktop-authed="true" → the card never
 //     appears, the board boots straight in;
@@ -24,6 +25,16 @@ import (
 //     runs. 'system' deliberately carries NO data-theme: the OS scheme must
 //     resolve pre-paint exactly the way boot.js does it for the web (S87
 //     parity — a stale hardcoded look would flash on every dark-mode OS).
+//   - the language (the settings round, §2.4 of the plan): lang + dir +
+//     data-desktop-lang stamped from the LIVE session's language_pref. The
+//     web solved the FA first-paint flash with boot.js's hibana-lang
+//     localStorage read, but boot.js is STRIPPED from the island — FA users
+//     got an EN/LTR flash on every boot until the async i18n.apply()
+//     resolved. Stamping the tag serve-time kills the flash the same way
+//     theme got its zero-JS first paint, and makes the settings round's
+//     reload reflex seamless: the post-flip reload paints FA/RTL at the
+//     FIRST frame. data-desktop-lang also hands the settings controller its
+//     boot-time active state for the segmented control.
 const htmlOpenTag = `<html lang="en">`
 
 // wailsRuntimeScripts is byte-equivalent to what the Wails asset server itself
@@ -50,19 +61,28 @@ const htmlOpenTag = `<html lang="en">`
 const wailsRuntimeScripts = `<script src="/wails/ipc.js"></script><script src="/wails/runtime.js"></script>`
 
 // InjectShellState rewrites the island's index.html bytes with the live
-// auth state AND the theme preference (the v0.1.5 evolution of the v0.1.1
-// InjectAuthAttr — one <html> tag, one rewrite, zero JS either way):
+// auth state, the theme preference AND the session language (the v0.1.5
+// evolution of the v0.1.1 InjectAuthAttr; the settings round grew the
+// language stamp — one <html> tag, one rewrite, zero JS either way):
 //
-//	<html lang="en" data-desktop-authed="true|false"
-//	     data-desktop-theme="light|claude-dark|system"
-//	     data-theme="light|claude-dark">   <- explicit prefs ONLY
+//	<html lang="en|fa" dir="ltr|rtl" data-desktop-lang="en|fa"
+//	      data-desktop-authed="true|false"
+//	      data-desktop-theme="light|claude-dark|system"
+//	      data-theme="light|claude-dark">   <- explicit prefs ONLY
+//
+// The language is stamped from the LIVE session (a.me.language_pref,
+// normalized): an FA session paints lang="fa" dir="rtl" at the FIRST frame —
+// no EN/LTR flash while the async i18n.apply() resolves (the FA FOUC the
+// desktop lived with since v0.1.0, killed the same way theme got its
+// zero-JS first paint).
 //
 // Fail-open by design: if the marker drifted (an island re-pin), the bytes
 // pass through untouched — the login JS then resolves visibility via the
-// AuthState bridge call and js/desktop-theme.js reads a missing
-// data-desktop-theme as 'system' (a one-frame flash at worst, never a
-// lockout, never a wrong-look lock).
-func InjectShellState(body []byte, authed bool, themePref string) []byte {
+// AuthState bridge call, js/desktop-theme.js reads a missing
+// data-desktop-theme as 'system', and i18n.js's own async apply() resolves
+// the language (a one-frame flash at worst, never a lockout, never a
+// wrong-look lock, never a wrong-direction lock).
+func InjectShellState(body []byte, authed bool, themePref, lang string) []byte {
 	attr := "false"
 	if authed {
 		attr = "true"
@@ -71,11 +91,16 @@ func InjectShellState(body []byte, authed bool, themePref string) []byte {
 		return body
 	}
 	pref := NormalizeTheme(themePref)
-	replacement := `<html lang="en" data-desktop-authed="` + attr + `" data-desktop-theme="` + pref + `">`
+	l := NormalizeLanguage(lang)
+	dir := "ltr"
+	if l == LangFa {
+		dir = "rtl"
+	}
+	replacement := `<html lang="` + l + `" dir="` + dir + `" data-desktop-lang="` + l + `" data-desktop-authed="` + attr + `" data-desktop-theme="` + pref + `">`
 	if pref == ThemeLight || pref == ThemeDark {
 		// Explicit look: paint it with ZERO JS (the token swap is a
 		// data-theme attribute the CSS already branches on).
-		replacement = `<html lang="en" data-desktop-authed="` + attr + `" data-desktop-theme="` + pref + `" data-theme="` + pref + `">`
+		replacement = `<html lang="` + l + `" dir="` + dir + `" data-desktop-lang="` + l + `" data-desktop-authed="` + attr + `" data-desktop-theme="` + pref + `" data-theme="` + pref + `">`
 	}
 	return bytes.Replace(body, []byte(htmlOpenTag), []byte(replacement), 1)
 }
@@ -144,7 +169,11 @@ func (a *API) indexMiddleware(next http.Handler, injectWailsRuntime bool) http.H
 			h[k] = v
 		}
 		if strings.Contains(cw.hdr.Get("Content-Type"), "text/html") {
-			body = InjectShellState(body, a.AuthState().Authenticated, a.ThemePref())
+			// The language rides the same live rewrite (the settings round's
+			// serve-time stamping): the injected <html lang dir> pair comes
+			// from the session's language_pref, so an FA account paints
+			// FA/RTL at first paint — the FOUC-free boot.
+			body = InjectShellState(body, a.AuthState().Authenticated, a.ThemePref(), a.LanguagePref())
 			if injectWailsRuntime {
 				body = InjectWailsRuntime(body)
 			}

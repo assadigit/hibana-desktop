@@ -104,7 +104,13 @@ const mockRuntimeJs = () => [
   "  SetTheme: function (pref) { return Promise.resolve({ ok: true, pref: pref }) },",
   '  SyncNow: function () { return window.__probeSyncNow() },',
   '} } }',
-  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {})[name] = cb } }',
+  // The Wails EventsOn contract is MULTI-LISTENER (every registered callback
+  // fires per emit) — the v0.1.17 settings round co-listens on
+  // hibana:update-available / hibana:theme, so the probe registry models
+  // the real runtime faithfully (the single-slot registry silently
+  // dropped the earlier registrant).
+  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {}); (window.__probeEvents[name] = window.__probeEvents[name] || []).push(cb) } },',
+  'window.__probeEmit = function (name, payload) { ((window.__probeEvents || {})[name] || []).forEach(function (cb) { try { cb(payload) } catch (e) {} }) },',
   'window.__probe = ' + JSON.stringify({ authed: probe.authed, lang: probe.lang }) + ';',
 ].join('\n') + '\n'
 

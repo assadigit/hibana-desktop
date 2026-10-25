@@ -104,7 +104,13 @@ const mockRuntimeJs = () => [
   '  SyncNow: function () { return window.__probeSyncNow() },',
   '  Upload: function (callID, method, p, body, headers) { return window.__probeUpload(callID, method, p, body, headers) },',
   '} } }',
-  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {})[name] = cb } }',
+  // The Wails EventsOn contract is MULTI-LISTENER (every registered callback
+  // fires per emit) — the v0.1.17 settings round co-listens on
+  // hibana:update-available / hibana:theme, so the probe registry models
+  // the real runtime faithfully (the single-slot registry silently
+  // dropped the earlier registrant).
+  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {}); (window.__probeEvents[name] = window.__probeEvents[name] || []).push(cb) } },',
+  'window.__probeEmit = function (name, payload) { ((window.__probeEvents || {})[name] || []).forEach(function (cb) { try { cb(payload) } catch (e) {} }) },',
   'window.__probe = ' + JSON.stringify({ authed: probe.authed, lang: probe.lang, facts: FACTS }) + ';',
 ].join('\n') + '\n'
 
@@ -219,7 +225,7 @@ async function main() {
     window.__probeUploadLog = []
     window.go.desktop.API.Upload = function (callID, method, p, body, headers) {
       window.__probeUploadLog.push({ callID, method, p, argCount: arguments.length, headers: typeof headers })
-      const ev = (window.__probeEvents || {})['hibana:upload-progress']
+      const ev = (e) => window.__probeEmit('hibana:upload-progress', e)
       const total = String(body || '').length
       ;[0.25, 0.5, 0.75].forEach((f, i) => {
         setTimeout(function () { try { ev({ id: callID, loaded: Math.round(total * f), total }) } catch (e) { /* the handler is defensive */ } }, 40 * (i + 1))
@@ -238,7 +244,7 @@ async function main() {
   // screenshot's exact facts, then resolves the ok outcome.
   const installSyncDriver = () => page.evaluate(() => {
     const facts = window.__probe.facts
-    const ev = (window.__probeEvents || {})['hibana:sync-progress']
+    const ev = (e) => window.__probeEmit('hibana:sync-progress', e)
     const seq = [
       { step: 'connect', state: 'active', detail: '' },
       { step: 'connect', state: 'done', detail: facts.connect },
@@ -267,7 +273,7 @@ async function main() {
       window.__probeSyncRounds = 0
       window.go.desktop.API.SyncNow = function () {
         const facts = window.__probe.facts
-        const ev = (window.__probeEvents || {})['hibana:sync-progress']
+        const ev = (e) => window.__probeEmit('hibana:sync-progress', e)
         const seq = [
           { step: 'connect', state: 'active', detail: '' },
           { step: 'connect', state: 'done', detail: facts.connect },

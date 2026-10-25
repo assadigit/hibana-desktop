@@ -1,0 +1,151 @@
+/* desktop-settings.css — the settings page (v0.1.17 — the owner ask: "Plan
+   for a settings page for hibana's desktop" with four sections: 1. Sync
+   2. Update app 3. Login/logout 4. fa/en + dark mode/light mode).
+   GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
+   into frontend/dist/css/ and checksummed in frontend/island.checksums.json.
+   The dialog + .modal card are the island's own (components.css — including
+   the dialog-wide variant's roomier padding); this sheet starts INSIDE the
+   card. */
+
+/* The toolbar's gear — the theme toggle's OWN icon-only grammar (base.css's
+   [data-theme-toggle] rule: the 1.75rem square, the centered glyph, and the
+   ≥40px hit ring via the inset pseudo), replicated here because the pin's
+   sheet is untouchable — the gear and the toggle read as one family of
+   chrome controls. Ghost on purpose: Settings is chrome, not a CTA — Sync
+   stays the row's ONE colored action. */
+#db-settings-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  padding: 0;
+  line-height: 1;
+}
+#db-settings-button::after {
+  content: "";
+  position: absolute;
+  inset: -0.55rem;
+}
+#db-settings-button .icon { flex: none; }
+
+/* The sheet — a touch narrower than the capture dialogs' 46rem: the four
+   sections read best at a page-like measure, still comfortably wide. */
+#db-settings-dialog {
+  inline-size: min(36rem, 94vw);
+  max-inline-size: min(36rem, 94vw);
+}
+.db-settings-modal h2 { margin: 0; }
+
+/* The four sections: hairline-separated, each carrying its own heading +
+   copy + action. The LAST section (Appearance) carries the label/control
+   rows instead of a trailing action, so its padding-end is trimmed by the
+   footer's own border. */
+.db-settings-section {
+  padding-block: 0.85rem 0.2rem;
+  border-block-start: 1px solid var(--line);
+  display: grid;
+  gap: 0.45rem;
+}
+.db-settings-section:first-of-type { border-block-start: 0; padding-block-start: 0.35rem; }
+.db-settings-heading {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: var(--text-label-weight, 600);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The version line + the account line — the section's ONE fact each, so they
+   carry the body weight, not the muted smalls under them. */
+.db-settings-version,
+.db-settings-account {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--text-label-weight, 500);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+/* The action rows — the .db-sync-actions grammar (right-aligned, mirrored
+   under RTL). */
+.db-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+[dir='rtl'] .db-settings-actions { justify-content: flex-start; }
+.db-settings-actions .btn,
+.db-settings-actions .db-update-cta { display: inline-flex; align-items: center; gap: 0.4rem; }
+.db-settings-actions .icon { flex: none; }
+
+/* The footer — the sheet's own exit, set off from the sections. */
+.db-settings-footer {
+  margin-block-start: 0.35rem;
+  padding-block-start: 0.85rem;
+  border-block-start: 1px solid var(--line);
+}
+
+/* The Appearance rows: label column + control column (the web's own
+   settings-page grammar — a fixed label rail, the control at the inline
+   end; RTL mirrors the whole row for free through the logical template). */
+.db-settings-row {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, auto) 1fr;
+  align-items: center;
+  column-gap: 1rem;
+}
+.db-settings-row-label {
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+/* The segmented control — the tray-radio grammar as a pill group: a
+   hairline pill holding the options, the ACTIVE option painted with the
+   soft accent fill (the active rail item's own recipe — a soft FILLED tint,
+   one rung under the CTA). aria-pressed is the state (the controller keeps
+   it truthful); hover/focus ride the ghost grammar's own affordances. */
+.db-settings-seg {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.2rem;
+  gap: 0.2rem;
+  justify-self: start;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+.db-settings-seg-btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.35rem 0.95rem;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--text-label-weight, 500);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.db-settings-seg-btn:hover { color: var(--fg); }
+.db-settings-seg-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.db-settings-seg-btn[aria-pressed='true'] {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent) 16%, var(--card));
+  font-weight: var(--text-label-weight, 600);
+}
+
+/* The update-now CTA in the sheet reuses the Update pill's own solid --ok
+   grammar (class db-update-cta, desktop-update.css) — the twin fill so both
+   surfaces of the same action read as one. */
+#db-settings-update-now[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .db-settings-seg-btn { transition: none; }
+}

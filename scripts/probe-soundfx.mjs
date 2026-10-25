@@ -127,7 +127,13 @@ const mockRuntimeJs = () => [
   "  SetTheme: function (pref) { return Promise.resolve({ ok: true, pref: pref }) },",
   '  SyncNow: function () { return window.__probeSyncNow() },',
   '} } }',
-  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {})[name] = cb } }',
+  // The Wails EventsOn contract is MULTI-LISTENER (every registered callback
+  // fires per emit) — the v0.1.17 settings round co-listens on
+  // hibana:update-available / hibana:theme, so the probe registry models
+  // the real runtime faithfully (the single-slot registry silently
+  // dropped the earlier registrant).
+  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {}); (window.__probeEvents[name] = window.__probeEvents[name] || []).push(cb) } },',
+  'window.__probeEmit = function (name, payload) { ((window.__probeEvents || {})[name] || []).forEach(function (cb) { try { cb(payload) } catch (e) {} }) },',
   'window.__probe = ' + JSON.stringify({ authed: probe.authed, lang: probe.lang }) + ';',
 ].join('\n') + '\n'
 
@@ -444,7 +450,7 @@ async function main() {
     await page.screenshot({ path: path.join(args.out, '03-hero-connect.png') })
 
     const emit = (step, state, detail) => page.evaluate(({ step, state, detail }) => {
-      window.__probeEvents['hibana:sync-progress']({ step, state, detail })
+      window.__probeEmit('hibana:sync-progress', { step, state, detail })
     }, { step, state, detail })
     // The glyph morph is a 280ms CSS transition — let each stage settle before
     // its computed state is read (the first run read mid-morph and saw both
@@ -557,8 +563,8 @@ async function main() {
     await page.waitForSelector('.pd-task', { timeout: 10000 })
     await page.click('#db-sync-button')
     await page.waitForSelector('#db-sync-dialog[open]', { timeout: 5000 })
-    await page.evaluate(() => window.__probeEvents['hibana:sync-progress']({ step: 'connect', state: 'active', detail: 'hibana.ir reached' }))
-    await page.evaluate(() => window.__probeEvents['hibana:sync-progress']({ step: 'upload', state: 'active', detail: '1 change(s) uploaded' }))
+    await page.evaluate(() => window.__probeEmit('hibana:sync-progress', { step: 'connect', state: 'active', detail: 'hibana.ir reached' }))
+    await page.evaluate(() => window.__probeEmit('hibana:sync-progress', { step: 'upload', state: 'active', detail: '1 change(s) uploaded' }))
     await settle()
     const reduced = await page.evaluate(() => {
       const hero = document.getElementById('db-sync-hero')

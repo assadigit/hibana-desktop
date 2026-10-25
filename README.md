@@ -10,13 +10,13 @@ The full specification pack lives in the web repo:
 (ten documents; the operator's manual is `GO-DESKTOP-IMPLEMENTATION-GUIDE.md`).
 This repo is the **build** — the decision record is ADR-001 in that guide.
 
-## Status (M1 + M2, sessions S211–S221)
+## Status (M1 + M2, sessions S211–S227)
 
 | Milestone (port plan §8) | State |
 |---|---|
 | **M0** — Worker contract hardening (`API-AND-SYNC-CONTRACT.md` §7a-7e) | **NOT STARTED — awaiting the owner's go** (it is hibana-source work, not this repo; this build targets the already-deployed contract) |
 | **M1** — Go API client + auth, no UI | **DONE + live-accepted** (`cmd/acceptance`: login → pull 2 boards → create/move/archive → verified via the web client's API, against prod, self-cleaning) |
-| **M2** — the Wails shell + read-only board | **groundwork done + the login-first boot landed (v0.1.1) + the v0.1.2 dogfood fixes + the v0.1.3 tray + the v0.1.5 dark mode + the v0.1.6 sync button**: a live stored session boots straight to the board; otherwise the island-rendered sign-in card opens first — the WEB LOGIN PAGE'S OWN SPLIT LAYOUT (the Login.webp photo panel) (guide §5.5's pick) — sign in against hibana.ir, the kanban loads; a mid-session 401 reopens the card and a re-login wakes the outbox's retry-once. The S214 minimize-to-tray option (notification-area icon, ✕-hides-to-tray with a persisted toggle, second-launch restore) landed in v0.1.3; the S216 dark-mode round (the web's own claude-dark look + light, a persisted ui.theme preference, toggle surfaces on the board toolbar, the sign-in card, and the tray's Theme submenu, zero-JS first paint, follows-the-OS 'system' default) landed in v0.1.5; the S217 manual-sync round (a physical, visible Sync button in the board toolbar whose modal proves the round live — connecting to the Cloudflare server > upload > sync > the 'Everything synced — will not vanish' success panel, honest outcome codes, EN/FA + RTL-native) landed in v0.1.6; the S220 visibility round (the owner: "There is still No Sync button" — the v0.1.6 ghost icon did not read as one) landed in v0.1.8: the Sync button is now a LABELED, FILL-COLORED CTA pill right after Labels (the bare-button solid-primary grammar, theme-native teal/terracotta, EN/FA label), and Sprints + Labels are twin-sized (the <a> vs <button> box divergence normalized — all three 41px). The S221 sign-out round (the owner: "It must also have option of logout and enter with a new account") landed in v0.1.9: a LABELED ghost **Sign out** button closes the toolbar row (the pin's own nav.signout label, twin-sized with its neighbors), a native confirm dialog (S186 bare-button CTA) guards the click, and ui.API.Logout — the §5.5 login surface's counterpart — kills the server session best-effort, then the cookie + the ETag cache + the session file + the mirror's account-scoped rows together (the theme + close-to-tray device prefs survive); the reload opens the login card at first paint, where signing in with a NEW account boots its kanban. The windowed side-by-side pixel acceptance still needs the owner's dogfooding on a real Windows host |
+| **M2** — the Wails shell + read-only board | **groundwork done + the login-first boot landed (v0.1.1) + the v0.1.2 dogfood fixes + the v0.1.3 tray + the v0.1.5 dark mode + the v0.1.6 sync button**: a live stored session boots straight to the board; otherwise the island-rendered sign-in card opens first — the WEB LOGIN PAGE'S OWN SPLIT LAYOUT (the Login.webp photo panel) (guide §5.5's pick) — sign in against hibana.ir, the kanban loads; a mid-session 401 reopens the card and a re-login wakes the outbox's retry-once. The S214 minimize-to-tray option (notification-area icon, ✕-hides-to-tray with a persisted toggle, second-launch restore) landed in v0.1.3; the S216 dark-mode round (the web's own claude-dark look + light, a persisted ui.theme preference, toggle surfaces on the board toolbar, the sign-in card, and the tray's Theme submenu, zero-JS first paint, follows-the-OS 'system' default) landed in v0.1.5; the S217 manual-sync round (a physical, visible Sync button in the board toolbar whose modal proves the round live — connecting to the Cloudflare server > upload > sync > the 'Everything synced — will not vanish' success panel, honest outcome codes, EN/FA + RTL-native) landed in v0.1.6; the S220 visibility round (the owner: "There is still No Sync button" — the v0.1.6 ghost icon did not read as one) landed in v0.1.8: the Sync button is now a LABELED, FILL-COLORED CTA pill right after Labels (the bare-button solid-primary grammar, theme-native teal/terracotta, EN/FA label), and Sprints + Labels are twin-sized (the <a> vs <button> box divergence normalized — all three 41px). The S221 sign-out round (the owner: "It must also have option of logout and enter with a new account") landed in v0.1.9: a LABELED ghost **Sign out** button closes the toolbar row (the pin's own nav.signout label, twin-sized with its neighbors), a native confirm dialog (S186 bare-button CTA) guards the click, and ui.API.Logout — the §5.5 login surface's counterpart — kills the server session best-effort, then the cookie + the ETag cache + the session file + the mirror's account-scoped rows together (the theme + close-to-tray device prefs survive); the reload opens the login card at first paint, where signing in with a NEW account boots its kanban. The S228 SETTINGS PAGE (the owner ask: "Plan for a settings page for hibana's desktop" — docs/SETTINGS-PAGE-PLAN.md) landed in v0.1.17: a ghost gear in the toolbar's account zone (between the theme toggle and Sign out) opens ONE wide native sheet with the owner's four sections in order — **1. Sync** (the cadence copy + a Sync-now CTA that delegates to the proven sync modal), **2. Update app** (the AppInfo version line `Hibana 0.1.16 · island e6661c8 (v0.4.1.35)`, the manual Check-for-updates verdict paint over the untouched boot+2h loop — none/available/busy/unreachable each honest, the revealed Update-now delegating to the proven update modal), **3. Account** (the AuthState identity line + the Sign-out delegation to the existing confirm), and **4. Appearance** (the Language segmented control `English | فارسی` through the round's ONE new Go binding — **SetLanguage** (internal/ui/settings.go): a `{en,fa}` allow-list, PATCH /api/settings Go-side through the same session/Origin machinery, the a.me snapshot un-staled under the same mutex AuthState reads, the `hibana:lang` emit; the live chrome flip (html[lang]/dir + hibanaI18n.apply()) then a ~700ms reload so the BOARD re-renders in the new language, offline resolving `{ok:false}` honestly — plus the Theme segmented control `Light | Dark | System` through the existing SetTheme with the tray's full 3-state vocabulary). Serve-time lang/dir stamping (InjectShellState's new lang param — `<html lang dir data-desktop-lang>` from the live session) kills the EN/LTR first-paint flash every FA boot had since v0.1.0. The windowed side-by-side pixel acceptance still needs the owner's dogfooding on a real Windows host |
 | M3-M5 | not started (outbox drain engine exists + is table-tested; the offline mutation UI, media pipeline, installer + auto-update follow) |
 
 ## Layout
@@ -61,15 +61,24 @@ internal/ui/                the JS↔Go bridge: ONE bound Request method + the �
                             ONCE for the login POST; the cookie never returns to JS) +
                             its Logout counterpart (best-effort server kill → cookie +
                             ETag cache + session file + mirror wipe together → silent
-                            state flip; the island reloads into the gate, S221),
+                            state flip; the island reloads into the gate, S221) + the
+                            SetLanguage binding (the settings round's one new
+                            capability: {en,fa} allow-list, PATCH /api/settings
+                            Go-side, the a.me un-stale, the hibana:lang emit, S228),
                             method/path allow-lists, 7MB body cap, and the
                             IndexMiddleware that serves index.html with the live
-                            auth state on the <html> tag (first-paint card visibility)
+                            auth state + theme + language on the <html> tag
+                            (first-paint card visibility, zero-JS look, FOUC-free
+                            lang/dir — S216 + S228)
 frontend/dist/              THE ISLAND — a checksum-pinned snapshot of the web /kanban
                             board surface + the desktop-owned login layer (js/desktop-login.js,
                             css/desktop-login.css, the gate markup) + the theme/sync/
-                            sign-out layers (js/desktop-theme.js, js/desktop-sync.js +
-                            css/desktop-sync.css, js/desktop-logout.js + css/desktop-logout.css)
+                            sign-out/new-project/refresh/sound/update/settings layers
+                            (js/desktop-theme.js, js/desktop-sync.js + css/desktop-sync.css,
+                            js/desktop-logout.js + css/desktop-logout.css, js/desktop-newproject.js,
+                            js/desktop-refresh.js, js/desktop-audio.js, js/desktop-update.js,
+                            js/desktop-settings.js + css/desktop-settings.css — the wide
+                            four-section settings sheet + its controller, S228)
                             — all generated by scripts/sync-island.mjs. NEVER hand-edit; re-sync instead.
 scripts/sync-island.mjs     the island sync: content-addressed reads from hibana-source
                             at the pinned ref, the strip list, the 12 seam patches,
@@ -110,6 +119,17 @@ adds the icon/VERSIONINFO resources and can emit the NSIS installer (`-nsis`).
 go vet ./internal/... && go test ./internal/...     # the pure-Go core (runs anywhere)
 GOOS=windows go vet ./...                            # the full app, windows target
 node scripts/sync-island.mjs --ref e6661c8 --check   # the island drift gate
+
+# THE island probes (Chromium via the hibana-source checkout's playwright —
+# the mock bridge sits at the exact Wails boundary; every round has its own):
+node scripts/probe-login.mjs --src ../hibana-source        # the gate + the reload
+node scripts/probe-logout.mjs --src ../hibana-source       # the sign-out + the new account
+node scripts/probe-newproject.mjs --src ../hibana-source   # the live cloud create
+node scripts/probe-refresh.mjs --src ../hibana-source      # the pulled-truth reflex
+node scripts/probe-soundfx.mjs --src ../hibana-source      # the five synthesized cues
+node scripts/probe-completefacts.mjs --src ../hibana-source # the sync modal's full facts
+node scripts/probe-update.mjs --src ../hibana-source       # the auto-update round
+node scripts/probe-settings.mjs --src ../hibana-source     # the settings page (S228)
 
 # THE M1 acceptance (live round-trip; env-only credentials, self-cleaning):
 HIBANA_LOGIN=… HIBANA_PASSWORD=… HIBANA_BASE=https://hibana.ir go run ./cmd/acceptance

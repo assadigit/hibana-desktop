@@ -141,14 +141,15 @@ func TestInjectShellStateAuthAndTheme(t *testing.T) {
 	for _, tc := range []struct {
 		authed bool
 		pref   string
+		lang   string
 		attrs  string
 	}{
-		{true, ThemeSystem, `data-desktop-authed="true" data-desktop-theme="system"`},
-		{false, ThemeSystem, `data-desktop-authed="false" data-desktop-theme="system"`},
-		{true, ThemeDark, `data-desktop-authed="true" data-desktop-theme="claude-dark" data-theme="claude-dark"`},
-		{false, ThemeLight, `data-desktop-authed="false" data-desktop-theme="light" data-theme="light"`},
+		{true, ThemeSystem, LangEn, `dir="ltr" data-desktop-lang="en" data-desktop-authed="true" data-desktop-theme="system"`},
+		{false, ThemeSystem, LangEn, `dir="ltr" data-desktop-lang="en" data-desktop-authed="false" data-desktop-theme="system"`},
+		{true, ThemeDark, LangFa, `lang="fa" dir="rtl" data-desktop-lang="fa" data-desktop-authed="true" data-desktop-theme="claude-dark" data-theme="claude-dark"`},
+		{false, ThemeLight, LangEn, `dir="ltr" data-desktop-lang="en" data-desktop-authed="false" data-desktop-theme="light" data-theme="light"`},
 	} {
-		out := string(InjectShellState([]byte(cannedIndex), tc.authed, tc.pref))
+		out := string(InjectShellState([]byte(cannedIndex), tc.authed, tc.pref, tc.lang))
 		if !strings.Contains(out, tc.attrs) {
 			t.Fatalf("authed=%v pref=%s: %q missing in %q", tc.authed, tc.pref, tc.attrs, out)
 		}
@@ -159,12 +160,12 @@ func TestInjectShellStateAuthAndTheme(t *testing.T) {
 }
 
 func TestInjectShellStateSystemCarriesNoDataTheme(t *testing.T) {
-	out := string(InjectShellState([]byte(cannedIndex), true, ThemeSystem))
+	out := string(InjectShellState([]byte(cannedIndex), true, ThemeSystem, LangEn))
 	if strings.Contains(out, "data-theme=") {
 		t.Fatalf("'system' must NOT carry data-theme (the OS resolves pre-paint): %q", out)
 	}
 	// A garbage pref normalizes to system → also no data-theme.
-	out = string(InjectShellState([]byte(cannedIndex), true, "junk"))
+	out = string(InjectShellState([]byte(cannedIndex), true, "junk", "fa"))
 	if strings.Contains(out, "data-theme=") {
 		t.Fatalf("garbage pref must normalize to system (no data-theme): %q", out)
 	}
@@ -178,7 +179,7 @@ func TestInjectShellStateFailOpenOnMarkerDrift(t *testing.T) {
 	// pass through UNTOUCHED (fail-open; desktop-theme.js reads a missing
 	// data-desktop-theme as 'system').
 	drifted := []byte("<!doctype html>\n<html lang=\"en\" data-x=\"pin-drift\">\n</html>\n")
-	out := InjectShellState(drifted, true, ThemeDark)
+	out := InjectShellState(drifted, true, ThemeDark, LangFa)
 	if string(out) != string(drifted) {
 		t.Fatalf("marker drift must pass through, got %q", out)
 	}

@@ -115,7 +115,13 @@ const mockRuntimeJs = () => [
   '  CheckForUpdates: function () { return Promise.resolve({ available: false }) },',
   '  ApplyUpdate: function () { return window.__probeApplyUpdate() },',
   '} } }',
-  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {})[name] = cb } }',
+  // The Wails EventsOn contract is MULTI-LISTENER (every registered callback
+  // fires per emit) — the v0.1.17 settings round co-listens on
+  // hibana:update-available / hibana:theme, so the probe registry models
+  // the real runtime faithfully (the single-slot registry silently
+  // dropped the earlier registrant).
+  'window.runtime = { EventsOn: function (name, cb) { (window.__probeEvents = window.__probeEvents || {}); (window.__probeEvents[name] = window.__probeEvents[name] || []).push(cb) } },',
+  'window.__probeEmit = function (name, payload) { ((window.__probeEvents || {})[name] || []).forEach(function (cb) { try { cb(payload) } catch (e) {} }) },',
   'window.__probe = ' + JSON.stringify({ authed: probe.authed, lang: probe.lang }) + ';',
 ].join('\n') + '\n'
 
@@ -212,14 +218,13 @@ async function main() {
     if (!cond) failures.push(name)
   }
   // The available/progress relays: the probe drives them through the SAME
-  // EventsOn registry the real Go EventsEmit reaches.
+  // EventsOn registry the real Go EventsEmit reaches (every registered
+  // listener fires — the update controller AND the settings sheet).
   const emitAvailable = () => page.evaluate((payload) => {
-    const cb = (window.__probeEvents || {})['hibana:update-available']
-    if (typeof cb === 'function') cb(payload)
+    window.__probeEmit('hibana:update-available', payload)
   }, AVAILABLE)
   const emitProgress = (stage, pct, received, total) => page.evaluate(([s, p, r, t]) => {
-    const cb = (window.__probeEvents || {})['hibana:update-progress']
-    if (typeof cb === 'function') cb({ stage: s, pct: p, received: r, total: t })
+    window.__probeEmit('hibana:update-progress', { stage: s, pct: p, received: r, total: t })
   }, [stage, pct, received, total])
 
   try {
@@ -511,8 +516,7 @@ async function main() {
     await rmPage.goto(base + '/kanban', { waitUntil: 'load' })
     await rmPage.waitForFunction(() => document.querySelectorAll('.pd-task').length === 1, null, { timeout: 8000 })
     await rmPage.evaluate((payload) => {
-      const cb = (window.__probeEvents || {})['hibana:update-available']
-      if (typeof cb === 'function') cb(payload)
+      window.__probeEmit('hibana:update-available', payload)
     }, AVAILABLE)
     await rmPage.waitForFunction(() => {
       const b = document.getElementById('db-update-button')

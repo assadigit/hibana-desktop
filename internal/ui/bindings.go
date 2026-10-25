@@ -160,6 +160,13 @@ type API struct {
 	updateEmit    func(name string, payload map[string]any)
 	updateLast    update.CheckResult
 	updateHasLast bool
+
+	// THE SETTINGS ROUND (the language binding — the settings page's one new
+	// capability): the emit hook relay (main.go wires it to EventsEmit
+	// "hibana:lang" so the live surfaces follow a language change without a
+	// reload). The write itself rides the shared client + a.mu (settings.go).
+	settingsMu sync.Mutex
+	langEmit   func(name string, payload map[string]any)
 }
 
 // New wires the bridge. The client is the cloud client (cookie jar, Origin

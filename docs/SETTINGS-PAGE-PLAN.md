@@ -1,6 +1,13 @@
 # The Settings Page Plan (the desktop's one settings surface)
 
-Status: PLANNED — not started. Target release: the next semver after the
+Status: SHIPPED — implemented as the v0.1.17 round (S228): internal/ui/settings.go
+(SetLanguage + settings_test.go), the InjectShellState lang/dir stamping, the
+js/desktop-settings.js + css/desktop-settings.css island layer + the three seam
+ops through scripts/sync-island.mjs (65-file checksums), and
+scripts/probe-settings.mjs (69/69 green). The session log below is the plan as
+committed (e7525a8), kept verbatim for the record.
+
+Target release was the next semver after the
 current working tree (≥ 0.1.16; bump `main.Version` + `main.WebRef` together,
 hard rule 9).
 
