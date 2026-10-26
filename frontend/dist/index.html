@@ -238,6 +238,13 @@
         <div><strong id="db-update-panel-title">Update ready — restarting…</strong><p class="small muted" id="db-update-panel-body"></p></div>
       </div>
       <p id="db-update-error" class="error" role="alert" hidden></p>
+      <!-- v0.1.19 (the owner ask: "auto-open release page when an apply
+           fails"): the Go bridge opens the release's human page in the
+           system browser on EVERY failed apply verdict and flags the
+           resolve {pageOpened:true}; this line says so — and only shows
+           when the flag is true, so a machine where the open could not
+           happen never claims a page nobody saw. -->
+      <p class="small muted" id="db-update-fallback" hidden></p>
       <div class="db-sync-actions">
         <button type="button" class="btn ghost small" id="db-update-later">Later</button>
         <button type="button" id="db-update-go">Update now</button>
@@ -317,11 +324,18 @@
              never submits the dialog form); only the ghp_…ABCD hint ever
              crosses back (GithubTokenState). A saved token immediately
              re-checks (js/desktop-settings.js clicks #db-settings-check)
-             — the owner's connect-now ask. -->
+             — the owner's connect-now ask. v0.1.19 adds the TEST button
+             (the owner ask: "Yes add a test connection"): one cheap
+             GET /repos/<repo> through the Go TestGithubConnection binding —
+             with the field's value when one is typed, else the stored
+             token, else the honest anonymous round — and NOTHING is
+             written: the verdict tells the row whether the next check
+             will see the repository before anything is saved or spent. -->
         <div class="db-settings-row db-settings-token-row">
           <span class="db-settings-row-label" id="db-settings-token-label">GitHub access</span>
           <div class="db-settings-token">
             <input type="password" id="db-settings-token-input" autocomplete="off" spellcheck="false" placeholder="ghp_… (optional)" aria-label="GitHub personal access token" />
+            <button type="button" class="btn ghost small" id="db-settings-token-test"><span id="db-settings-token-test-label">Test</span></button>
             <button type="button" class="btn ghost small" id="db-settings-token-save"><span id="db-settings-token-save-label">Save</span></button>
             <button type="button" class="btn ghost small" id="db-settings-token-clear" hidden><span id="db-settings-token-clear-label">Remove</span></button>
           </div>

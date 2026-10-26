@@ -158,6 +158,7 @@
 .db-settings-token {
   display: flex;
   align-items: center;
+  flex-wrap: wrap; /* v0.1.19: the row grew a third button (Test) — a narrow sheet wraps the buttons instead of crushing the field */
   gap: 0.5rem;
   min-inline-size: 0;
 }

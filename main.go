@@ -56,7 +56,7 @@ import (
 //	wails build -platform windows/amd64 -ldflags \
 //	  "-s -w -X main.Version=0.1.4 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.18-dev"
+	Version = "0.1.19-dev"
 	WebRef  = "unpinned"
 )
 
@@ -435,6 +435,19 @@ func main() {
 	bridge.SetUpdateEmit(func(name string, payload map[string]any) {
 		if c, ok := appCtxVal.Load().(context.Context); ok {
 			wailsruntime.EventsEmit(c, name, payload)
+		}
+	})
+	// THE MANUAL-FALLBACK OPEN (v0.1.19 — the owner ask: "auto-open release
+	// page when an apply fails"): the bridge's openReleasePage reflex rides
+	// the Wails browser open over the same appCtx the emit/quit relays use.
+	// Every FAILED apply verdict — a download that died, a checksum refusal,
+	// a machine with no shell interpreter for the swap helper — opens the
+	// release's human page in the default browser, so the round always has
+	// a human exit even where the automatic one cannot finish. busy and
+	// no-update are not failures and open nothing.
+	bridge.SetUpdateOpenURL(func(url string) {
+		if c, ok := appCtxVal.Load().(context.Context); ok {
+			wailsruntime.BrowserOpenURL(c, url)
 		}
 	})
 	// THE SETTINGS ROUND (the settings page plan, §2.2): the language

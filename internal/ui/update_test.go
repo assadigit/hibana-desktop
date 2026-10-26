@@ -212,3 +212,179 @@ func TestNotifyUpdateAvailableRefusesSilence(t *testing.T) {
 		t.Fatalf("a not-available verdict must never fire the event (fired %d)", fired)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// The v0.1.19 manual-fallback reflex (the owner ask: "auto-open release page
+// when an apply fails"): every FAILED apply verdict opens the cached check's
+// release page through the wired browser hook and flags PageOpened so the
+// island can say so honestly; busy / no-update / the ok verdict never open
+// anything; an unwired hook degrades to PageOpened:false with the verdict
+// still the truth.
+// ---------------------------------------------------------------------------
+
+func TestUpdateApplyFailureOpensTheReleasePage(t *testing.T) {
+	a, _ := newBridge(t)
+	var mu sync.Mutex
+	var opened []string
+	a.SetUpdateOpenURL(func(url string) {
+		mu.Lock()
+		defer mu.Unlock()
+		opened = append(opened, url)
+	})
+	a.NotifyUpdateAvailable(update.CheckResult{
+		Available: true, Current: "0.1.13", Latest: "0.1.14",
+		URL: "https://github.com/assadigit/hibana-desktop/releases/latest",
+	})
+	a.SetUpdateApply(func(context.Context, func(update.Progress)) (update.ApplyResult, error) {
+		return update.ApplyResult{Message: "update: apply: spawning the helper: exec: \"powershell.exe\": executable file not found in %PATH%"}, nil
+	})
+	out, err := a.ApplyUpdate()
+	if err != nil {
+		t.Fatalf("a failing apply resolves as a verdict: %v", err)
+	}
+	if out.OK || out.Message == "" {
+		t.Fatalf("out=%+v — the message must carry the error for the modal", out)
+	}
+	if !out.PageOpened {
+		t.Fatalf("out=%+v — a failed apply must flag PageOpened", out)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(opened) != 1 || opened[0] != "https://github.com/assadigit/hibana-desktop/releases/latest" {
+		t.Fatalf("the failure must open the cached check's release page exactly once, opened=%v", opened)
+	}
+}
+
+func TestUpdateApplyTimeoutOpensTheReleasePage(t *testing.T) {
+	a, _ := newBridge(t)
+	var mu sync.Mutex
+	opened := 0
+	a.SetUpdateOpenURL(func(string) {
+		mu.Lock()
+		defer mu.Unlock()
+		opened++
+	})
+	a.NotifyUpdateAvailable(update.CheckResult{
+		Available: true, Current: "0.1.13", Latest: "0.1.14",
+		URL: "https://github.com/assadigit/hibana-desktop/releases/latest",
+	})
+	old := updateDeadline
+	updateDeadline = 40 * time.Millisecond
+	defer func() { updateDeadline = old }()
+	a.SetUpdateApply(func(ctx context.Context, _ func(update.Progress)) (update.ApplyResult, error) {
+		<-ctx.Done() // a download that outlives its window
+		return update.ApplyResult{}, ctx.Err()
+	})
+	out, err := a.ApplyUpdate()
+	if err != nil {
+		t.Fatalf("the timeout resolves as a verdict: %v", err)
+	}
+	if out.OK || !out.PageOpened {
+		t.Fatalf("out=%+v — the timeout is a failure: the page must open", out)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if opened != 1 {
+		t.Fatalf("the timeout must open the release page once (opened %d)", opened)
+	}
+}
+
+func TestUpdateApplyBusyNoUpdateAndOkNeverOpenThePage(t *testing.T) {
+	a, _ := newBridge(t)
+	var mu sync.Mutex
+	opened := 0
+	a.SetUpdateOpenURL(func(string) {
+		mu.Lock()
+		defer mu.Unlock()
+		opened++
+	})
+	a.NotifyUpdateAvailable(update.CheckResult{
+		Available: true, Current: "0.1.13", Latest: "0.1.14",
+		URL: "https://github.com/assadigit/hibana-desktop/releases/latest",
+	})
+	// Wire the hook up front: the busy and no-update legs never REACH it
+	// (the guard and the cached-verdict gate both return first), and the
+	// not-wired check would otherwise mask the no-update verdict under
+	// test.
+	a.SetUpdateApply(func(context.Context, func(update.Progress)) (update.ApplyResult, error) {
+		return update.ApplyResult{OK: true}, nil
+	})
+
+	// busy: hold the guard, call in, verdict "busy" — nothing opens.
+	if !a.updateBusy.CompareAndSwap(false, true) {
+		t.Fatal("the guard must be free at boot")
+	}
+	out, err := a.ApplyUpdate()
+	a.updateBusy.Store(false)
+	if err != nil || out.OK || out.Message != "busy" || out.PageOpened {
+		t.Fatalf("busy verdict = %+v, %v — no page on busy", out, err)
+	}
+
+	// no-update: clear the cached verdict, verdict "no update" — nothing opens.
+	a.updateMu.Lock()
+	a.updateHasLast = false
+	a.updateMu.Unlock()
+	out, err = a.ApplyUpdate()
+	if err != nil || out.OK || out.PageOpened {
+		t.Fatalf("no-update verdict = %+v, %v — no page on no-update", out, err)
+	}
+
+	// ok: the round SUCCEEDED — a page would be noise.
+	a.NotifyUpdateAvailable(update.CheckResult{
+		Available: true, Current: "0.1.13", Latest: "0.1.14",
+		URL: "https://github.com/assadigit/hibana-desktop/releases/latest",
+	})
+	a.SetUpdateApply(func(context.Context, func(update.Progress)) (update.ApplyResult, error) {
+		return update.ApplyResult{OK: true}, nil
+	})
+	out, err = a.ApplyUpdate()
+	if err != nil || !out.OK || out.PageOpened {
+		t.Fatalf("ok verdict = %+v, %v — no page on success", out, err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if opened != 0 {
+		t.Fatalf("busy/no-update/ok must never open the page (opened %d)", opened)
+	}
+}
+
+func TestUpdateApplyFailureWithoutTheOpenHookStaysHonest(t *testing.T) {
+	// No SetUpdateOpenURL wiring: the verdict still resolves, and the
+	// PageOpened flag stays FALSE — the island must never claim a browser
+	// page the machine never saw.
+	a, _ := newBridge(t)
+	a.NotifyUpdateAvailable(update.CheckResult{
+		Available: true, Current: "0.1.13", Latest: "0.1.14",
+		URL: "https://github.com/assadigit/hibana-desktop/releases/latest",
+	})
+	a.SetUpdateApply(func(context.Context, func(update.Progress)) (update.ApplyResult, error) {
+		return update.ApplyResult{Message: "update: download: github answered 502"}, nil
+	})
+	out, err := a.ApplyUpdate()
+	if err != nil {
+		t.Fatalf("a failing apply resolves as a verdict: %v", err)
+	}
+	if out.OK || out.Message == "" || out.PageOpened {
+		t.Fatalf("out=%+v — no hook means no page claim", out)
+	}
+}
+
+func TestUpdateApplyFailureWithoutACachedURLOpensNothing(t *testing.T) {
+	// A cached verdict without a URL (a hostile/edge shape) degrades
+	// quietly — never a panic, never a false page claim.
+	a, _ := newBridge(t)
+	var opened int
+	a.SetUpdateOpenURL(func(string) { opened++ })
+	a.NotifyUpdateAvailable(update.CheckResult{Available: true, Current: "0.1.13", Latest: "0.1.14"})
+	a.SetUpdateApply(func(context.Context, func(update.Progress)) (update.ApplyResult, error) {
+		return update.ApplyResult{Message: "update: download: github answered 502"}, nil
+	})
+	out, err := a.ApplyUpdate()
+	if err != nil || out.OK || out.PageOpened {
+		t.Fatalf("out=%+v, %v — a missing URL must not open or claim a page", out, err)
+	}
+	if opened != 0 {
+		t.Fatalf("a missing URL must never call the opener (called %d)", opened)
+	}
+}

@@ -875,6 +875,13 @@ const HTML_UPDATE_OPS = [
         <div><strong id="db-update-panel-title">Update ready — restarting…</strong><p class="small muted" id="db-update-panel-body"></p></div>
       </div>
       <p id="db-update-error" class="error" role="alert" hidden></p>
+      <!-- v0.1.19 (the owner ask: "auto-open release page when an apply
+           fails"): the Go bridge opens the release's human page in the
+           system browser on EVERY failed apply verdict and flags the
+           resolve {pageOpened:true}; this line says so — and only shows
+           when the flag is true, so a machine where the open could not
+           happen never claims a page nobody saw. -->
+      <p class="small muted" id="db-update-fallback" hidden></p>
       <div class="db-sync-actions">
         <button type="button" class="btn ghost small" id="db-update-later">Later</button>
         <button type="button" id="db-update-go">Update now</button>
@@ -1038,11 +1045,18 @@ const HTML_SETTINGS_OPS = [
              never submits the dialog form); only the ghp_…ABCD hint ever
              crosses back (GithubTokenState). A saved token immediately
              re-checks (js/desktop-settings.js clicks #db-settings-check)
-             — the owner's connect-now ask. -->
+             — the owner's connect-now ask. v0.1.19 adds the TEST button
+             (the owner ask: "Yes add a test connection"): one cheap
+             GET /repos/<repo> through the Go TestGithubConnection binding —
+             with the field's value when one is typed, else the stored
+             token, else the honest anonymous round — and NOTHING is
+             written: the verdict tells the row whether the next check
+             will see the repository before anything is saved or spent. -->
         <div class="db-settings-row db-settings-token-row">
           <span class="db-settings-row-label" id="db-settings-token-label">GitHub access</span>
           <div class="db-settings-token">
             <input type="password" id="db-settings-token-input" autocomplete="off" spellcheck="false" placeholder="ghp_… (optional)" aria-label="GitHub personal access token" />
+            <button type="button" class="btn ghost small" id="db-settings-token-test"><span id="db-settings-token-test-label">Test</span></button>
             <button type="button" class="btn ghost small" id="db-settings-token-save"><span id="db-settings-token-save-label">Save</span></button>
             <button type="button" class="btn ghost small" id="db-settings-token-clear" hidden><span id="db-settings-token-clear-label">Remove</span></button>
           </div>
@@ -3444,7 +3458,12 @@ const DESKTOP_UPDATE_JS = `// desktop-update.js — the auto-update round (v0.1.
       errTitle: 'Update failed',
       notWired: 'The desktop bridge is not wired — restart the app.',
       busy: 'An update is already in progress.',
-      noUpdate: 'No update is available right now.'
+      noUpdate: 'No update is available right now.',
+      // v0.1.19 — the manual-fallback note (the owner ask: "auto-open
+      // release page when an apply fails"): the Go bridge opened the
+      // release's human page in the system browser and flagged the resolve
+      // {pageOpened:true}; this line says so, and paints ONLY on that flag.
+      pageOpened: 'The release page opened in your browser — you can download and install this version by hand.'
     },
     fa: {
       btn: 'بروزرسانی هیبانا',
@@ -3463,7 +3482,9 @@ const DESKTOP_UPDATE_JS = `// desktop-update.js — the auto-update round (v0.1.
       errTitle: 'بروزرسانی ناموفق بود',
       notWired: 'پل دسکتاپ وصل نیست — برنامه را دوباره باز کنید.',
       busy: 'یک بروزرسانی دیگر در جریان است.',
-      noUpdate: 'در حال حاضر بروزرسانی‌ای در دسترس نیست.'
+      noUpdate: 'در حال حاضر بروزرسانی‌ای در دسترس نیست.',
+      // v0.1.19 — the manual-fallback note's FA twin.
+      pageOpened: 'صفحهٔ انتشار در مرورگر شما باز شد — می‌توانید این نسخه را دستی دانلود و نصب کنید.'
     }
   }
 
@@ -3532,6 +3553,9 @@ const DESKTOP_UPDATE_JS = `// desktop-update.js — the auto-update round (v0.1.
     var panelTitle = document.getElementById('db-update-panel-title')
     var panelBody = document.getElementById('db-update-panel-body')
     var errEl = document.getElementById('db-update-error')
+    // v0.1.19 — the manual-fallback line under the error (the release page
+    // the Go bridge opened in the browser on a failed apply).
+    var fallEl = document.getElementById('db-update-fallback')
     var laterBtn = document.getElementById('db-update-later')
     var goBtn = document.getElementById('db-update-go')
 
@@ -3566,6 +3590,7 @@ const DESKTOP_UPDATE_JS = `// desktop-update.js — the auto-update round (v0.1.
       if (progress) progress.hidden = true
       if (panel) panel.hidden = true
       if (errEl) errEl.hidden = true
+      if (fallEl) fallEl.hidden = true // a fresh intro never carries a stale fallback note
       if (laterBtn) laterBtn.hidden = false
       if (goBtn) { goBtn.hidden = false; goBtn.disabled = false }
     }
@@ -3599,9 +3624,15 @@ const DESKTOP_UPDATE_JS = `// desktop-update.js — the auto-update round (v0.1.
       }
     }
 
-    function showError(msg) {
+    function showError(msg, pageOpened) {
       if (progress) progress.hidden = true
       if (errEl) { errEl.textContent = t('errTitle') + ' — ' + msg; errEl.hidden = false }
+      // The fallback note paints ONLY on the resolve's own pageOpened flag —
+      // a machine where the open could not happen never hears that it did.
+      if (fallEl) {
+        if (pageOpened) { fallEl.textContent = t('pageOpened'); fallEl.hidden = false }
+        else fallEl.hidden = true
+      }
       if (laterBtn) laterBtn.hidden = false
       if (goBtn) { goBtn.hidden = false; goBtn.disabled = false }
     }
@@ -3616,6 +3647,7 @@ const DESKTOP_UPDATE_JS = `// desktop-update.js — the auto-update round (v0.1.
         // dir (session + mirror) rides through untouched.
         if (progress) progress.hidden = true
         if (errEl) errEl.hidden = true
+        if (fallEl) fallEl.hidden = true
         if (laterBtn) laterBtn.hidden = true
         if (goBtn) goBtn.hidden = true
         if (panel) {
@@ -3627,22 +3659,27 @@ const DESKTOP_UPDATE_JS = `// desktop-update.js — the auto-update round (v0.1.
         return
       }
       // The honest verdicts: busy / no-update / a real Go error message.
+      // A FAILURE carries the Go resolve's own pageOpened flag (v0.1.19 —
+      // the bridge opened the release page in the browser; the note says
+      // so), while busy and no-update resolve Go-side without the flag and
+      // never paint it.
       var msg = out.message || ''
       if (msg === 'busy') msg = t('busy')
       else if (msg.indexOf('no update') === 0) msg = t('noUpdate')
       else if (!msg) msg = t('notWired')
-      showError(msg)
+      showError(msg, !!(out && out.pageOpened))
     }
 
     function onReject() {
       applying = false
-      showError(t('notWired'))
+      showError(t('notWired'), false)
     }
 
     function run() {
       if (applying) return
       applying = true
       if (errEl) errEl.hidden = true
+      if (fallEl) fallEl.hidden = true // every fresh round starts with a clean slate
       if (laterBtn) laterBtn.hidden = false
       if (goBtn) goBtn.disabled = true
       setStage('download', 0) // visible from the first frame of the round
@@ -3801,28 +3838,31 @@ html[data-theme='claude-dark'] #db-update-button:focus-visible {
 // with four sections: 1. Sync 2. Update app 3. Login/logout 4. fa/en + dark
 // mode/light mode; v0.1.18 grows section 2 with the GitHub-access row — the
 // owner ask: "hibana desktop might be a private repo so in setting, add a
-// github credentials so it can connect to the private repo"). A COMPOSITION
-// controller: three of the four sections delegate to the PROVEN toolbar
-// flows (Sync now / Update now / Sign out are programmatic clicks on the
-// existing buttons — this sheet closes itself first so the modals never
+// github credentials so it can connect to the private repo"; v0.1.19 adds
+// the row's TEST button — the owner ask: "Yes add a test connection"). A
+// COMPOSITION controller: three of the four sections delegate to the PROVEN
+// toolbar flows (Sync now / Update now / Sign out are programmatic clicks on
+// the existing buttons — this sheet closes itself first so the modals never
 // stack), the update row adds the manual CheckForUpdates trigger over the
 // untouched boot+2h loop AND the credentials row (SetGithubToken /
 // GithubTokenState — the token crosses the bridge once, the hint crosses
-// back, a save immediately re-checks), the theme segmented control rides
-// SetTheme (the tray's full 3-state vocabulary), and the language segmented
-// control rides the SetLanguage binding — whose 2xx resolve flips the chrome
-// LIVE (html[lang]/dir + hibanaI18n.apply(), which re-reads the Go-side
-// un-staled __hibanaMe) and schedules the ~700ms reload reflex (i18n.js's
-// dynamic-markup law: a live-only flip would leave the BOARD's rendered
-// titles in the old language). The PIN_PACKAGE_VERSION constant is the ONE
-// interpolation in this template — the sync script knows the sealed pin's
-// package version at emit time, so the version line never needs a fetch or
-// a binding change.
+// back, a save immediately re-checks) AND the test-connection round
+// (TestGithubConnection — verify the typed candidate / the stored token /
+// the anonymous round WITHOUT writing anything), the theme segmented control
+// rides SetTheme (the tray's full 3-state vocabulary), and the language
+// segmented control rides the SetLanguage binding — whose 2xx resolve flips
+// the chrome LIVE (html[lang]/dir + hibanaI18n.apply(), which re-reads the
+// Go-side un-staled __hibanaMe) and schedules the ~700ms reload reflex
+// (i18n.js's dynamic-markup law: a live-only flip would leave the BOARD's
+// rendered titles in the old language). The PIN_PACKAGE_VERSION constant is
+// the ONE interpolation in this template — the sync script knows the sealed
+// pin's package version at emit time, so the version line never needs a
+// fetch or a binding change.
 // Written without template literals/backticks so it nests in this literal.
 // ---------------------------------------------------------------------------
 const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page controller (v0.1.17 + the
-// v0.1.18 GitHub-access row — the owner asks: "Plan for a settings page for
-// hibana's desktop" with four sections:
+// v0.1.18 GitHub-access row + the v0.1.19 test-connection round — the owner
+// asks: "Plan for a settings page for hibana's desktop" with four sections:
 // 1. Sync 2. Update app ("check the latest release of github, if there were
 // newer version. update.") 3. Login/logout 4. fa/en + dark mode/light mode).
 // The settings page is a COMPOSITION: one wide native dialog opened from the
@@ -3830,7 +3870,9 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
 // controller owns: the gear → showModal wiring, the live facts (AppInfo's
 // version line, AuthState's account line, GithubTokenState's hint line), the
 // manual Check-for-updates verdict paint, the GitHub-access row (v0.1.18 —
-// Save/Remove over SetGithubToken, Enter-to-save, the connect-now re-check),
+// Save/Remove over SetGithubToken, Enter-to-save, the connect-now re-check;
+// v0.1.19 — the Test button over TestGithubConnection: verify the typed
+// candidate / the stored token / the anonymous round, nothing written),
 // the two segmented controls (Language through the Go SetLanguage binding;
 // Theme through the existing SetTheme with the tray's full 3-state
 // vocabulary), the delegation clicks (Sync now / Update now / Sign out → the
@@ -3886,6 +3928,21 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       tokenCleared: 'Token removed — release checks are anonymous again.',
       tokenInvalid: 'That does not look like a GitHub token (ghp_…).',
       tokenSaveFailed: "Couldn't save the token — try again.",
+      // v0.1.19 — the TEST-CONNECTION row (the owner ask: "Yes add a test
+      // connection"): one cheap GET /repos/<repo> through the Go
+      // TestGithubConnection binding — the typed candidate, the stored
+      // token, or the honest anonymous round — with NOTHING written. The
+      // using field on the resolve picks the line.
+      tokenTest: 'Test',
+      tokenTesting: 'Testing…',
+      testOkTyped: 'GitHub accepted the token — the repository is visible.',
+      testOkSaved: 'The saved token works — GitHub sees the repository.',
+      testOkAnon: 'GitHub is reachable and the repository is public — no token needed.',
+      testInvalidTyped: 'GitHub rejected this token.',
+      testInvalidSaved: 'GitHub rejected the saved token — remove it or paste a new one.',
+      testNoAccessToken: 'The token cannot see this repository — check its repository access.',
+      testNoAccessAnon: "GitHub can't see the repository without credentials — if it's private, save a token with access.",
+      testUnreachable: "Couldn't reach GitHub — check your connection and try again.",
       accountHeading: 'Account',
       accountBody: 'Your boards live safe on the Hibana cloud — sign in again any time.',
       appearanceHeading: 'Appearance',
@@ -3929,6 +3986,17 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       tokenCleared: 'توکن حذف شد — بررسی بروزرسانی دوباره ناشناس است.',
       tokenInvalid: 'این شبیه توکن گیت‌هاب نیست (ghp_…).',
       tokenSaveFailed: 'ذخیره توکن ممکن نشد — دوباره تلاش کنید.',
+      // v0.1.19 — the TEST-CONNECTION row's FA twins.
+      tokenTest: 'تست',
+      tokenTesting: 'در حال تست…',
+      testOkTyped: 'گیت‌هاب این توکن را پذیرفت — مخزن قابل مشاهده است.',
+      testOkSaved: 'توکن ذخیره‌شده کار می‌کند — گیت‌هاب مخزن را می‌بیند.',
+      testOkAnon: 'گیت‌هاب در دسترس است و مخزن عمومی است — نیازی به توکن نیست.',
+      testInvalidTyped: 'گیت‌هاب این توکن را نپذیرفت.',
+      testInvalidSaved: 'گیت‌هاب توکن ذخیره‌شده را نپذیرفت — حذفش کنید یا توکن جدیدی جای آن بگذارید.',
+      testNoAccessToken: 'این توکن به این مخزن دسترسی ندارد — دسترسی مخزن آن را بررسی کنید.',
+      testNoAccessAnon: 'گیت‌هاب بدون اعتبارنامه مخزن را نمی‌بیند — اگر خصوصی است، توکنی با دسترسی ذخیره کنید.',
+      testUnreachable: 'اتصال به گیت‌هاب برقرار نشد — اینترنت خود را بررسی کنید و دوباره تلاش کنید.',
       accountHeading: 'حساب',
       accountBody: 'تخته‌های شما در ابر هیبانا امن هستند — هر وقت خواستید دوباره وارد شوید.',
       appearanceHeading: 'ظاهر',
@@ -4006,6 +4074,7 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       updateNow: document.getElementById('db-settings-update-now'),
       check: document.getElementById('db-settings-check'),
       tokenInput: document.getElementById('db-settings-token-input'),
+      tokenTest: document.getElementById('db-settings-token-test'),
       tokenSave: document.getElementById('db-settings-token-save'),
       tokenRemove: document.getElementById('db-settings-token-clear'),
       tokenStatus: document.getElementById('db-settings-token-status'),
@@ -4049,6 +4118,7 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       setText('db-settings-update-now-label', t('updateNow'))
       setText('db-settings-token-label', t('tokenLabel'))
       setText('db-settings-token-save-label', t('tokenSave'))
+      setText('db-settings-token-test-label', t('tokenTest'))
       setText('db-settings-token-clear-label', t('tokenRemove'))
       if (els.tokenInput) {
         els.tokenInput.setAttribute('placeholder', t('tokenPlaceholder'))
@@ -4236,6 +4306,7 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
 
     function setTokenBusy(on) {
       tokenBusy = on
+      if (els.tokenTest) els.tokenTest.disabled = on
       if (els.tokenSave) els.tokenSave.disabled = on
       if (els.tokenRemove) els.tokenRemove.disabled = on
     }
@@ -4315,6 +4386,61 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       try {
         Promise.resolve(save('')).then(onTokenSaveDone, onTokenSaveFail) // "" = the Go clear contract
       } catch (e) { onTokenSaveFail() }
+    })
+
+    // ---- THE TEST-CONNECTION ROUND (v0.1.19 — the owner ask: "Yes add a
+    //      test connection"). One cheap GET /repos/<repo> through the Go
+    //      TestGithubConnection binding: the FIELD's value when one is
+    //      typed (verify-before-save — nothing is written), else the
+    //      STORED token, else the honest anonymous round — the exact
+    //      credential mix the next release check would ride. The field is
+    //      NEVER cleared by a test (only Save clears it — the value stays
+    //      for the Save click the verdict invites); no connect-now re-check
+    //      either (a test changes no state). The resolve's using field
+    //      picks the line: typed / saved / anonymous. ----
+    function onTestDone(res) {
+      setTokenBusy(false)
+      hideTokenError()
+      if (!res || typeof res !== 'object') res = {}
+      var using = String(res.using || (tokenState && tokenState.set ? 'saved' : 'anonymous'))
+      if (res.ok) {
+        if (els.tokenStatus) {
+          els.tokenStatus.textContent = using === 'typed' ? t('testOkTyped')
+            : using === 'saved' ? t('testOkSaved')
+            : t('testOkAnon')
+        }
+        return
+      }
+      // The failure verdicts: the stored truth restores on the status line
+      // (a test never changed it) and the error line carries the verdict.
+      paintToken()
+      var code = String(res.code || '')
+      if (code === 'invalid') showTokenError(using === 'saved' ? t('testInvalidSaved') : t('testInvalidTyped'))
+      else if (code === 'no_access') showTokenError(using === 'anonymous' ? t('testNoAccessAnon') : t('testNoAccessToken'))
+      else if (code === 'not_wired') showTokenError(t('notWired'))
+      else showTokenError(t('testUnreachable'))
+    }
+
+    // The only rejected promise is the malformed-shape refusal — the catch
+    // paints the shape line (the SetGithubToken discipline).
+    function onTestFail() {
+      setTokenBusy(false)
+      hideTokenError()
+      paintToken()
+      showTokenError(t('tokenInvalid'))
+    }
+
+    if (els.tokenTest) els.tokenTest.addEventListener('click', function () {
+      if (tokenBusy) return
+      var test = resolveBoundMethod('TestGithubConnection')
+      if (!test) { showTokenError(t('notWired')); return }
+      hideTokenError()
+      var value = els.tokenInput ? String(els.tokenInput.value || '') : ''
+      setTokenBusy(true)
+      if (els.tokenStatus) els.tokenStatus.textContent = t('tokenTesting')
+      try {
+        Promise.resolve(test(value)).then(onTestDone, onTestFail)
+      } catch (e) { onTestFail() }
     })
 
     // Enter in the field SAVES — a method="dialog" form would otherwise
@@ -4643,6 +4769,7 @@ const DESKTOP_SETTINGS_CSS = `/* desktop-settings.css — the settings page (v0.
 .db-settings-token {
   display: flex;
   align-items: center;
+  flex-wrap: wrap; /* v0.1.19: the row grew a third button (Test) — a narrow sheet wraps the buttons instead of crushing the field */
   gap: 0.5rem;
   min-inline-size: 0;
 }
@@ -5261,7 +5388,7 @@ function verifyDist(outDir, fileMap) {
   // ok with NO reload (the Go process restarts the island).
   for (const kept of ['id="db-update-button"', 'class="small db-update-cta"', 'id="db-update-btn-label"', 'id="db-update-dialog"', 'id="db-update-version"',
     'id="db-update-kind"', 'id="db-update-progress"', 'id="db-update-fill"', 'id="db-update-note"', 'id="db-update-panel"', 'id="db-update-later"', 'id="db-update-go"',
-    'aria-label="Update Hibana now"']) {
+    'aria-label="Update Hibana now"', 'id="db-update-fallback"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the auto-update round is missing "' + kept + '" (the owner ask: a button for update)')
   }
   if (!indexHtml.includes('id="db-update-button" hidden')) problems.push('index.html: the Update pill must be HIDDEN at boot — no update = no button (the honest default)')
@@ -5283,6 +5410,14 @@ function verifyDist(outDir, fileMap) {
   if (updateJs.includes('location.reload')) problems.push('js/desktop-update.js: NO reload on ok — the Go process restarts the whole island (a reload would race the quit)')
   if (!updateJs.includes('Update now')) problems.push('js/desktop-update.js: the EN label pair is missing')
   if (!updateJs.includes('نسخهٔ جدید')) problems.push('js/desktop-update.js: the FA label pair is missing')
+  // The v0.1.19 manual-fallback reflex (the owner ask: "auto-open release page
+  // when an apply fails"): the failure branch must pass the resolve's own
+  // pageOpened flag to the error paint (never a guess), the fallback line
+  // must carry BOTH language pairs, and every fresh round must hide it.
+  if (!updateJs.includes('showError(msg, !!(out && out.pageOpened))')) problems.push('js/desktop-update.js: a failed apply must forward the Go resolve\'s pageOpened flag to the error paint (v0.1.19 — the release-page reflex)')
+  if (!updateJs.includes('The release page opened in your browser')) problems.push('js/desktop-update.js: the EN manual-fallback line is missing (v0.1.19)')
+  if (!updateJs.includes('صفحهٔ انتشار در مرورگر شما باز شد')) problems.push('js/desktop-update.js: the FA manual-fallback line is missing (v0.1.19)')
+  if (!updateJs.includes('if (fallEl) fallEl.hidden = true')) problems.push('js/desktop-update.js: every fresh round must hide the fallback note (a stale page-open claim is a lie)')
   const updateCss = fileMap['css/desktop-update.css'] || ''
   for (const kept of ['#db-update-button', '#db-update-button[hidden]', 'background: var(--ok)', 'html[data-theme=', '.db-update-fill', 'prefers-reduced-motion: reduce']) {
     if (!updateCss.includes(kept)) problems.push('css/desktop-update.css: the auto-update style layer is missing "' + kept + '"')
@@ -5310,7 +5445,7 @@ function verifyDist(outDir, fileMap) {
     'id="db-settings-theme-seg"', 'data-seg-theme="light"', 'data-seg-theme="claude-dark"', 'data-seg-theme="system"',
     'id="db-settings-done"', 'css/desktop-settings.css',
     'id="db-settings-token-input"', 'type="password"', 'id="db-settings-token-save"', 'id="db-settings-token-clear"',
-    'id="db-settings-token-status"', 'id="db-settings-token-error"']) {
+    'id="db-settings-token-test"', 'id="db-settings-token-status"', 'id="db-settings-token-error"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the settings round is missing "' + kept + '"')
   }
   {
@@ -5344,6 +5479,13 @@ function verifyDist(outDir, fileMap) {
   if (!settingsJs.includes("resolveBoundMethod('AuthState')")) problems.push('js/desktop-settings.js: the account line must resolve the Go AuthState binding at OPEN time')
   if (!settingsJs.includes("resolveBoundMethod('SetGithubToken')")) problems.push("js/desktop-settings.js: the GitHub-access row must resolve the Go SetGithubToken binding at CLICK time (v0.1.18 — the owner's credentials ask)")
   if (!settingsJs.includes("resolveBoundMethod('GithubTokenState')")) problems.push('js/desktop-settings.js: the GitHub-access row must resolve the Go GithubTokenState binding at OPEN time')
+  if (!settingsJs.includes("resolveBoundMethod('TestGithubConnection')")) problems.push("js/desktop-settings.js: the GitHub-access row must resolve the Go TestGithubConnection binding at CLICK time (v0.1.19 — the owner's test-connection ask)")
+  if (!settingsJs.includes("test(value)")) problems.push('js/desktop-settings.js: the Test round must send the FIELD\'s value (empty = the stored-or-anonymous round Go-side decides)')
+  if (!settingsJs.includes('els.tokenTest.disabled = on')) problems.push('js/desktop-settings.js: the busy guard must cover the Test button (a round in flight refuses a second test)')
+  if (!settingsJs.includes('the repository is public — no token needed')) problems.push("js/desktop-settings.js: the EN anonymous-test verdict line is missing (the row must say the tokenless round WORKS)")
+  if (!settingsJs.includes('نیازی به توکن نیست')) problems.push('js/desktop-settings.js: the FA anonymous-test verdict line is missing')
+  if (!settingsJs.includes("GitHub can't see the repository without credentials")) problems.push("js/desktop-settings.js: the EN private-repo signal line is missing (the anonymous 404 — the owner's exact scenario)")
+  if (!settingsJs.includes('بدون اعتبارنامه مخزن را نمی‌بیند')) problems.push('js/desktop-settings.js: the FA private-repo signal line is missing')
   if (!settingsJs.includes("save('')")) problems.push("js/desktop-settings.js: Remove must ride SetGithubToken('') — the Go binding's explicit-clear contract")
   if (!settingsJs.includes('els.check.click()')) problems.push('js/desktop-settings.js: a SAVED token must immediately re-check (the connect-now reflex — the row\'s whole point)')
   if (!settingsJs.includes("ev.key === 'Enter'")) problems.push('js/desktop-settings.js: Enter in the token field must SAVE, never submit the method=dialog form (the sheet would close mid-save)')
@@ -5586,7 +5728,7 @@ function main() {
   for (const line of adapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
   process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-audio.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + js/desktop-update.js + css/desktop-update.css + js/desktop-settings.js + css/desktop-settings.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the five synthesized cues + the seam observer, the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines), no-storage), no-404 asset loop, node --check\n')
+  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the five synthesized cues + the seam observer, the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines) + the v0.1.19 test-connection button (TestGithubConnection, the typed/saved/anonymous verdict lines, the private-repo signal) + the apply-failure release-page note (#db-update-fallback, the pageOpened flag, both language pairs), no-storage), no-404 asset loop, node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }

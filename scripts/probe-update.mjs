@@ -26,9 +26,15 @@
 //      island itself ~1.5s later — a JS reload would race the quit).
 //   5. THE HONEST VERDICTS: {message:'busy'} → the busy line; a real Go
 //      error message → the error line with the actions restored; a rejected
-//      promise → the not-wired line. Nothing breaks, nothing lies.
+//      promise → the not-wired line. Nothing breaks, nothing lies. Since
+//      v0.1.19 a FAILED apply also carries {pageOpened:true} (the Go bridge
+//      opened the release page in the browser — the owner ask: "auto-open
+//      release page when an apply fails") and the modal paints the
+//      manual-fallback note under the error; busy / no-update / ok / a
+//      rejected promise never paint it.
 //   6. THE FA/RTL DARK MIRROR: the fa boot paints 'نسخهٔ جدید' + the FA modal
-//      copy, mirrors the row, and the dark look carries the olive fill.
+//      copy, mirrors the row, and the dark look carries the olive fill; a
+//      failed FA round paints the FA manual-fallback note.
 //   7. REDUCED MOTION: the bar's transition stills (the STATE stays, the
 //      tween goes).
 //
@@ -394,6 +400,7 @@ async function main() {
     await page.waitForTimeout(400)
     check('NO reload on ok — the Go process restarts the island (the marker survives)', await page.evaluate(() => !!window.__probeMarker))
     check('the mocked Go ApplyUpdate binding was exercised once', probe.applyCalls === 1, 'calls=' + probe.applyCalls)
+    check('the ok round never paints the release-page note (success is not a failure)', await page.evaluate(() => (document.getElementById('db-update-fallback') || {}).hidden === true))
 
     await page.screenshot({ path: path.join(args.out, 'update-restarting.png') })
 
@@ -413,6 +420,8 @@ async function main() {
       return e && !e.hidden && /An update is already in progress/.test(e.textContent)
     }, null, { timeout: 5000 })
     check('the busy verdict paints its own honest line', true)
+    // v0.1.19: busy is NOT a failure — the manual-fallback note stays hidden.
+    check('the busy verdict never paints the release-page note (busy is not a failure)', await page.evaluate(() => (document.getElementById('db-update-fallback') || {}).hidden === true))
     const restored = await page.evaluate(() => ({
       goHidden: (document.getElementById('db-update-go') || {}).hidden,
       goDisabled: (document.getElementById('db-update-go') || {}).disabled,
@@ -420,8 +429,10 @@ async function main() {
     }))
     check('a failed verdict RESTORES the actions (Update now re-enabled for the retry)', restored.goHidden === false && restored.goDisabled === false && restored.laterHidden === false, JSON.stringify(restored))
 
-    // a real Go error message (the sha256 chain refusing a tampered release)
-    probe.applyOutcome = { ok: false, message: 'update: hibana-portable-0.1.14.zip failed verification (want abcd…, got ef01…)' }
+    // a real Go error message (the sha256 chain refusing a tampered release) —
+    // v0.1.19: the failure carries pageOpened (the Go bridge opened the
+    // release page in the browser) and the modal says so.
+    probe.applyOutcome = { ok: false, message: 'update: hibana-portable-0.1.14.zip failed verification (want abcd…, got ef01…)', pageOpened: true }
     probe.applyRelease = true
     await page.click('#db-update-go')
     await page.waitForFunction(() => {
@@ -429,6 +440,11 @@ async function main() {
       return e && !e.hidden && /Update failed/.test(e.textContent) && /failed verification/.test(e.textContent)
     }, null, { timeout: 5000 })
     check('a Go error message rides the localized error title verbatim', true)
+    const failFallback = await page.evaluate(() => {
+      const f = document.getElementById('db-update-fallback')
+      return { hidden: f ? f.hidden : null, text: (f || {}).textContent || '' }
+    })
+    check('a failed apply paints the release-page note (the browser opened, the modal says so)', failFallback.hidden === false && /opened in your browser/.test(failFallback.text), JSON.stringify(failFallback))
     await page.screenshot({ path: path.join(args.out, 'update-error.png') })
 
     // a rejected promise (the bridge not wired — the honest v0.1.1 lesson)
@@ -439,6 +455,7 @@ async function main() {
       return e && !e.hidden && /bridge is not wired/.test(e.textContent)
     }, null, { timeout: 5000 })
     check('a rejected promise paints the not-wired line (the modal never lies)', true)
+    check('a rejected promise never paints the release-page note (no page was opened)', await page.evaluate(() => (document.getElementById('db-update-fallback') || {}).hidden === true))
 
     // ---- 6. the FA/RTL mirror in the dark look ----
     probe.lang = 'fa'
@@ -505,6 +522,18 @@ async function main() {
       return e && !e.hidden && /بروزرسانی‌ای در دسترس نیست/.test(e.textContent)
     }, null, { timeout: 5000 })
     check('the FA no-update verdict paints its own honest line', true)
+    check('the FA no-update verdict never paints the release-page note', await page.evaluate(() => (document.getElementById('db-update-fallback') || {}).hidden === true))
+
+    // The FA failure mirror carries the v0.1.19 manual-fallback note's FA
+    // twin (the Go bridge opened the page; the modal says so in Persian).
+    probe.applyOutcome = { ok: false, message: 'update: download: github answered 502', pageOpened: true }
+    await page.click('#db-update-go')
+    await page.waitForFunction(() => {
+      const e = document.getElementById('db-update-error')
+      const f = document.getElementById('db-update-fallback')
+      return e && !e.hidden && /ناموفق/.test(e.textContent) && f && !f.hidden && /صفحهٔ انتشار در مرورگر شما باز شد/.test(f.textContent)
+    }, null, { timeout: 5000 })
+    check('the FA failed apply paints the FA release-page note', true)
 
     await page.screenshot({ path: path.join(args.out, 'update-fa-dark.png') })
 

@@ -17,11 +17,11 @@ import (
 // cached check verdict; the download/verify/replace core lives in
 // internal/update, the shell's wiring in main.go:
 //
-//	SetUpdateCheck → updater.Check (GitHub /releases/latest vs main.Version)
-//	SetUpdateEmit  → EventsEmit "hibana:update-available" {…CheckResult} +
-//	                 EventsEmit "hibana:update-progress" {stage,received,total,pct}
-//	SetUpdateApply → updater.Prepare + updater.Apply, then the shell's
-//	                 restart (quitRequested + Quit — the close-to-tray
+//      SetUpdateCheck → updater.Check (GitHub /releases/latest vs main.Version)
+//      SetUpdateEmit  → EventsEmit "hibana:update-available" {…CheckResult} +
+//                       EventsEmit "hibana:update-progress" {stage,received,total,pct}
+//      SetUpdateApply → updater.Prepare + updater.Apply, then the shell's
+//                       restart (quitRequested + Quit — the close-to-tray
 //                 contract must NOT intercept an update restart)
 //
 // The island half (js/desktop-update.js via the island sync) listens for
@@ -68,6 +68,20 @@ func (a *API) SetUpdateApply(fn func(ctx context.Context, progress func(update.P
 func (a *API) SetUpdateEmit(fn func(name string, payload map[string]any)) {
 	a.updateMu.Lock()
 	a.updateEmit = fn
+	a.updateMu.Unlock()
+}
+
+// SetUpdateOpenURL wires the MANUAL-FALLBACK browser open (v0.1.19 — the
+// owner ask: "auto-open release page when an apply fails": main.go passes
+// wailsruntime.BrowserOpenURL over the same appCtx the emit/quit relays
+// ride). Every FAILED apply verdict opens the release's human page, so a
+// machine the auto-round cannot finish on — no shell interpreter for the
+// swap helper, a link that died mid-download, a tamper refusal — still
+// gets the human path with zero extra clicks. Without the hook the reflex
+// degrades quietly (the verdict is the truth; the page claim stays false).
+func (a *API) SetUpdateOpenURL(fn func(url string)) {
+	a.updateMu.Lock()
+	a.updateOpenURL = fn
 	a.updateMu.Unlock()
 }
 
@@ -178,9 +192,41 @@ func (a *API) ApplyUpdate() (update.ApplyResult, error) {
 		if ctx.Err() == context.DeadlineExceeded {
 			// The honest timeout: the download ran out of its window
 			// (nothing was applied; the staged bytes clean themselves).
-			return update.ApplyResult{Message: "the update download timed out — try again"}, nil
+			res := update.ApplyResult{Message: "the update download timed out — try again"}
+			res.PageOpened = a.openReleasePage(last)
+			return res, nil
 		}
-		return update.ApplyResult{Message: err.Error()}, nil
+		res := update.ApplyResult{Message: err.Error()}
+		res.PageOpened = a.openReleasePage(last)
+		return res, nil
+	}
+	if !out.OK {
+		// A failure verdict the hook resolved (the shipped hook wraps every
+		// Prepare/Apply failure into a message) — the same manual-fallback
+		// reflex fires; the busy and no-update verdicts above are NOT
+		// failures and never open anything.
+		out.PageOpened = a.openReleasePage(last)
 	}
 	return out, nil
+}
+
+// openReleasePage is the v0.1.19 manual-fallback reflex: every FAILED apply
+// verdict opens the cached check's release page (the CheckResult's own
+// deep link — ReleasePageURL(repo), no network needed) through the wired
+// browser hook. Reports whether the open actually happened, so the verdict
+// never claims a page the machine never saw. A missing URL or an unwired
+// hook degrades to false — the error message still names the release page
+// (the v0.1.18 apply errors already do).
+func (a *API) openReleasePage(res update.CheckResult) bool {
+	if !res.Available || res.URL == "" {
+		return false
+	}
+	a.updateMu.Lock()
+	open := a.updateOpenURL
+	a.updateMu.Unlock()
+	if open == nil {
+		return false
+	}
+	open(res.URL)
+	return true
 }

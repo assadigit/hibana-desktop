@@ -37,7 +37,12 @@
       errTitle: 'Update failed',
       notWired: 'The desktop bridge is not wired — restart the app.',
       busy: 'An update is already in progress.',
-      noUpdate: 'No update is available right now.'
+      noUpdate: 'No update is available right now.',
+      // v0.1.19 — the manual-fallback note (the owner ask: "auto-open
+      // release page when an apply fails"): the Go bridge opened the
+      // release's human page in the system browser and flagged the resolve
+      // {pageOpened:true}; this line says so, and paints ONLY on that flag.
+      pageOpened: 'The release page opened in your browser — you can download and install this version by hand.'
     },
     fa: {
       btn: 'بروزرسانی هیبانا',
@@ -56,7 +61,9 @@
       errTitle: 'بروزرسانی ناموفق بود',
       notWired: 'پل دسکتاپ وصل نیست — برنامه را دوباره باز کنید.',
       busy: 'یک بروزرسانی دیگر در جریان است.',
-      noUpdate: 'در حال حاضر بروزرسانی‌ای در دسترس نیست.'
+      noUpdate: 'در حال حاضر بروزرسانی‌ای در دسترس نیست.',
+      // v0.1.19 — the manual-fallback note's FA twin.
+      pageOpened: 'صفحهٔ انتشار در مرورگر شما باز شد — می‌توانید این نسخه را دستی دانلود و نصب کنید.'
     }
   }
 
@@ -125,6 +132,9 @@
     var panelTitle = document.getElementById('db-update-panel-title')
     var panelBody = document.getElementById('db-update-panel-body')
     var errEl = document.getElementById('db-update-error')
+    // v0.1.19 — the manual-fallback line under the error (the release page
+    // the Go bridge opened in the browser on a failed apply).
+    var fallEl = document.getElementById('db-update-fallback')
     var laterBtn = document.getElementById('db-update-later')
     var goBtn = document.getElementById('db-update-go')
 
@@ -159,6 +169,7 @@
       if (progress) progress.hidden = true
       if (panel) panel.hidden = true
       if (errEl) errEl.hidden = true
+      if (fallEl) fallEl.hidden = true // a fresh intro never carries a stale fallback note
       if (laterBtn) laterBtn.hidden = false
       if (goBtn) { goBtn.hidden = false; goBtn.disabled = false }
     }
@@ -192,9 +203,15 @@
       }
     }
 
-    function showError(msg) {
+    function showError(msg, pageOpened) {
       if (progress) progress.hidden = true
       if (errEl) { errEl.textContent = t('errTitle') + ' — ' + msg; errEl.hidden = false }
+      // The fallback note paints ONLY on the resolve's own pageOpened flag —
+      // a machine where the open could not happen never hears that it did.
+      if (fallEl) {
+        if (pageOpened) { fallEl.textContent = t('pageOpened'); fallEl.hidden = false }
+        else fallEl.hidden = true
+      }
       if (laterBtn) laterBtn.hidden = false
       if (goBtn) { goBtn.hidden = false; goBtn.disabled = false }
     }
@@ -209,6 +226,7 @@
         // dir (session + mirror) rides through untouched.
         if (progress) progress.hidden = true
         if (errEl) errEl.hidden = true
+        if (fallEl) fallEl.hidden = true
         if (laterBtn) laterBtn.hidden = true
         if (goBtn) goBtn.hidden = true
         if (panel) {
@@ -220,22 +238,27 @@
         return
       }
       // The honest verdicts: busy / no-update / a real Go error message.
+      // A FAILURE carries the Go resolve's own pageOpened flag (v0.1.19 —
+      // the bridge opened the release page in the browser; the note says
+      // so), while busy and no-update resolve Go-side without the flag and
+      // never paint it.
       var msg = out.message || ''
       if (msg === 'busy') msg = t('busy')
       else if (msg.indexOf('no update') === 0) msg = t('noUpdate')
       else if (!msg) msg = t('notWired')
-      showError(msg)
+      showError(msg, !!(out && out.pageOpened))
     }
 
     function onReject() {
       applying = false
-      showError(t('notWired'))
+      showError(t('notWired'), false)
     }
 
     function run() {
       if (applying) return
       applying = true
       if (errEl) errEl.hidden = true
+      if (fallEl) fallEl.hidden = true // every fresh round starts with a clean slate
       if (laterBtn) laterBtn.hidden = false
       if (goBtn) goBtn.disabled = true
       setStage('download', 0) // visible from the first frame of the round

@@ -1,6 +1,6 @@
 // desktop-settings.js — the settings page controller (v0.1.17 + the
-// v0.1.18 GitHub-access row — the owner asks: "Plan for a settings page for
-// hibana's desktop" with four sections:
+// v0.1.18 GitHub-access row + the v0.1.19 test-connection round — the owner
+// asks: "Plan for a settings page for hibana's desktop" with four sections:
 // 1. Sync 2. Update app ("check the latest release of github, if there were
 // newer version. update.") 3. Login/logout 4. fa/en + dark mode/light mode).
 // The settings page is a COMPOSITION: one wide native dialog opened from the
@@ -8,7 +8,9 @@
 // controller owns: the gear → showModal wiring, the live facts (AppInfo's
 // version line, AuthState's account line, GithubTokenState's hint line), the
 // manual Check-for-updates verdict paint, the GitHub-access row (v0.1.18 —
-// Save/Remove over SetGithubToken, Enter-to-save, the connect-now re-check),
+// Save/Remove over SetGithubToken, Enter-to-save, the connect-now re-check;
+// v0.1.19 — the Test button over TestGithubConnection: verify the typed
+// candidate / the stored token / the anonymous round, nothing written),
 // the two segmented controls (Language through the Go SetLanguage binding;
 // Theme through the existing SetTheme with the tray's full 3-state
 // vocabulary), the delegation clicks (Sync now / Update now / Sign out → the
@@ -64,6 +66,21 @@
       tokenCleared: 'Token removed — release checks are anonymous again.',
       tokenInvalid: 'That does not look like a GitHub token (ghp_…).',
       tokenSaveFailed: "Couldn't save the token — try again.",
+      // v0.1.19 — the TEST-CONNECTION row (the owner ask: "Yes add a test
+      // connection"): one cheap GET /repos/<repo> through the Go
+      // TestGithubConnection binding — the typed candidate, the stored
+      // token, or the honest anonymous round — with NOTHING written. The
+      // using field on the resolve picks the line.
+      tokenTest: 'Test',
+      tokenTesting: 'Testing…',
+      testOkTyped: 'GitHub accepted the token — the repository is visible.',
+      testOkSaved: 'The saved token works — GitHub sees the repository.',
+      testOkAnon: 'GitHub is reachable and the repository is public — no token needed.',
+      testInvalidTyped: 'GitHub rejected this token.',
+      testInvalidSaved: 'GitHub rejected the saved token — remove it or paste a new one.',
+      testNoAccessToken: 'The token cannot see this repository — check its repository access.',
+      testNoAccessAnon: "GitHub can't see the repository without credentials — if it's private, save a token with access.",
+      testUnreachable: "Couldn't reach GitHub — check your connection and try again.",
       accountHeading: 'Account',
       accountBody: 'Your boards live safe on the Hibana cloud — sign in again any time.',
       appearanceHeading: 'Appearance',
@@ -107,6 +124,17 @@
       tokenCleared: 'توکن حذف شد — بررسی بروزرسانی دوباره ناشناس است.',
       tokenInvalid: 'این شبیه توکن گیت‌هاب نیست (ghp_…).',
       tokenSaveFailed: 'ذخیره توکن ممکن نشد — دوباره تلاش کنید.',
+      // v0.1.19 — the TEST-CONNECTION row's FA twins.
+      tokenTest: 'تست',
+      tokenTesting: 'در حال تست…',
+      testOkTyped: 'گیت‌هاب این توکن را پذیرفت — مخزن قابل مشاهده است.',
+      testOkSaved: 'توکن ذخیره‌شده کار می‌کند — گیت‌هاب مخزن را می‌بیند.',
+      testOkAnon: 'گیت‌هاب در دسترس است و مخزن عمومی است — نیازی به توکن نیست.',
+      testInvalidTyped: 'گیت‌هاب این توکن را نپذیرفت.',
+      testInvalidSaved: 'گیت‌هاب توکن ذخیره‌شده را نپذیرفت — حذفش کنید یا توکن جدیدی جای آن بگذارید.',
+      testNoAccessToken: 'این توکن به این مخزن دسترسی ندارد — دسترسی مخزن آن را بررسی کنید.',
+      testNoAccessAnon: 'گیت‌هاب بدون اعتبارنامه مخزن را نمی‌بیند — اگر خصوصی است، توکنی با دسترسی ذخیره کنید.',
+      testUnreachable: 'اتصال به گیت‌هاب برقرار نشد — اینترنت خود را بررسی کنید و دوباره تلاش کنید.',
       accountHeading: 'حساب',
       accountBody: 'تخته‌های شما در ابر هیبانا امن هستند — هر وقت خواستید دوباره وارد شوید.',
       appearanceHeading: 'ظاهر',
@@ -184,6 +212,7 @@
       updateNow: document.getElementById('db-settings-update-now'),
       check: document.getElementById('db-settings-check'),
       tokenInput: document.getElementById('db-settings-token-input'),
+      tokenTest: document.getElementById('db-settings-token-test'),
       tokenSave: document.getElementById('db-settings-token-save'),
       tokenRemove: document.getElementById('db-settings-token-clear'),
       tokenStatus: document.getElementById('db-settings-token-status'),
@@ -227,6 +256,7 @@
       setText('db-settings-update-now-label', t('updateNow'))
       setText('db-settings-token-label', t('tokenLabel'))
       setText('db-settings-token-save-label', t('tokenSave'))
+      setText('db-settings-token-test-label', t('tokenTest'))
       setText('db-settings-token-clear-label', t('tokenRemove'))
       if (els.tokenInput) {
         els.tokenInput.setAttribute('placeholder', t('tokenPlaceholder'))
@@ -414,6 +444,7 @@
 
     function setTokenBusy(on) {
       tokenBusy = on
+      if (els.tokenTest) els.tokenTest.disabled = on
       if (els.tokenSave) els.tokenSave.disabled = on
       if (els.tokenRemove) els.tokenRemove.disabled = on
     }
@@ -493,6 +524,61 @@
       try {
         Promise.resolve(save('')).then(onTokenSaveDone, onTokenSaveFail) // "" = the Go clear contract
       } catch (e) { onTokenSaveFail() }
+    })
+
+    // ---- THE TEST-CONNECTION ROUND (v0.1.19 — the owner ask: "Yes add a
+    //      test connection"). One cheap GET /repos/<repo> through the Go
+    //      TestGithubConnection binding: the FIELD's value when one is
+    //      typed (verify-before-save — nothing is written), else the
+    //      STORED token, else the honest anonymous round — the exact
+    //      credential mix the next release check would ride. The field is
+    //      NEVER cleared by a test (only Save clears it — the value stays
+    //      for the Save click the verdict invites); no connect-now re-check
+    //      either (a test changes no state). The resolve's using field
+    //      picks the line: typed / saved / anonymous. ----
+    function onTestDone(res) {
+      setTokenBusy(false)
+      hideTokenError()
+      if (!res || typeof res !== 'object') res = {}
+      var using = String(res.using || (tokenState && tokenState.set ? 'saved' : 'anonymous'))
+      if (res.ok) {
+        if (els.tokenStatus) {
+          els.tokenStatus.textContent = using === 'typed' ? t('testOkTyped')
+            : using === 'saved' ? t('testOkSaved')
+            : t('testOkAnon')
+        }
+        return
+      }
+      // The failure verdicts: the stored truth restores on the status line
+      // (a test never changed it) and the error line carries the verdict.
+      paintToken()
+      var code = String(res.code || '')
+      if (code === 'invalid') showTokenError(using === 'saved' ? t('testInvalidSaved') : t('testInvalidTyped'))
+      else if (code === 'no_access') showTokenError(using === 'anonymous' ? t('testNoAccessAnon') : t('testNoAccessToken'))
+      else if (code === 'not_wired') showTokenError(t('notWired'))
+      else showTokenError(t('testUnreachable'))
+    }
+
+    // The only rejected promise is the malformed-shape refusal — the catch
+    // paints the shape line (the SetGithubToken discipline).
+    function onTestFail() {
+      setTokenBusy(false)
+      hideTokenError()
+      paintToken()
+      showTokenError(t('tokenInvalid'))
+    }
+
+    if (els.tokenTest) els.tokenTest.addEventListener('click', function () {
+      if (tokenBusy) return
+      var test = resolveBoundMethod('TestGithubConnection')
+      if (!test) { showTokenError(t('notWired')); return }
+      hideTokenError()
+      var value = els.tokenInput ? String(els.tokenInput.value || '') : ''
+      setTokenBusy(true)
+      if (els.tokenStatus) els.tokenStatus.textContent = t('tokenTesting')
+      try {
+        Promise.resolve(test(value)).then(onTestDone, onTestFail)
+      } catch (e) { onTestFail() }
     })
 
     // Enter in the field SAVES — a method="dialog" form would otherwise

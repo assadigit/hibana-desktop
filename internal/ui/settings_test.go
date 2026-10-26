@@ -600,3 +600,172 @@ func TestGithubTokenStateUnset(t *testing.T) {
 		t.Errorf("unset state = %+v, want the zero shape", st)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// The v0.1.19 test-connection binding (the owner ask: "Yes add a test
+// connection"): the typed-candidate round (verify WITHOUT saving), the
+// saved-token round (an empty argument rides the stored token), the
+// anonymous round (nothing in play — the exact next-check credentials), the
+// private-repo signal (an ANONYMOUS 404), the failure verdicts, and the
+// never-leak contract on the wire JSON.
+// ---------------------------------------------------------------------------
+
+func TestTestGithubConnectionNotWired(t *testing.T) {
+	_, _, a, _ := settingsFake(t) // no SetGithubTokenStore call
+	res, err := a.TestGithubConnection(ghTestToken)
+	if err != nil {
+		t.Fatalf("not-wired resolves a verdict, not a rejection: %v", err)
+	}
+	if res.OK || res.Code != "not_wired" {
+		t.Errorf("not-wired verdict = %+v, want {ok:false, code:not_wired}", res)
+	}
+}
+
+func TestTestGithubConnectionShapeRejected(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusOK, &saw)
+	for _, hostile := range []string{"no", "has spaces", "line\nbreak", strings.Repeat("x", 300)} {
+		if _, err := a.TestGithubConnection(hostile); err == nil {
+			t.Errorf("TestGithubConnection(%q) must reject outside the PAT alphabet", hostile)
+		}
+	}
+	if saw != "" {
+		t.Errorf("a malformed candidate must never reach the wire, saw Authorization %q", saw)
+	}
+	if _, err := os.Stat(update.TokenPath(dir)); err == nil {
+		t.Errorf("a test must never write the token file")
+	}
+}
+
+func TestTestGithubConnectionTypedVerifiedAndNeverSaved(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusOK, &saw)
+	res, err := a.TestGithubConnection(ghTestToken)
+	if err != nil {
+		t.Fatalf("TestGithubConnection: %v", err)
+	}
+	if !res.OK || res.Code != "verified" || res.Using != "typed" {
+		t.Fatalf("typed verdict = %+v, want {ok, verified, typed}", res)
+	}
+	if saw != "Bearer "+ghTestToken {
+		t.Errorf("the test round must send the update round's own Bearer header, saw %q", saw)
+	}
+	if res.Hint != "ghp_…stuv" {
+		t.Errorf("the hint = %q, want ghp_…stuv", res.Hint)
+	}
+	// THE WHOLE POINT of a test: nothing is written.
+	if _, err := os.Stat(update.TokenPath(dir)); err == nil {
+		t.Errorf("a verified TEST must never save the token — Save is a separate click")
+	}
+	// The never-leak contract on the wire JSON.
+	blob, _ := json.Marshal(res)
+	if strings.Contains(string(blob), ghTestToken) {
+		t.Errorf("the verdict JSON leaked the secret: %s", blob)
+	}
+}
+
+func TestTestGithubConnectionEmptyRidesTheSavedToken(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusOK, &saw)
+	if err := update.SaveToken(dir, ghTestToken); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.TestGithubConnection("")
+	if err != nil {
+		t.Fatalf("TestGithubConnection(\"\"): %v", err)
+	}
+	if !res.OK || res.Code != "verified" || res.Using != "saved" {
+		t.Fatalf("saved verdict = %+v, want {ok, verified, saved}", res)
+	}
+	if saw != "Bearer "+ghTestToken {
+		t.Errorf("the empty argument must ride the STORED token, saw %q", saw)
+	}
+	if res.Hint != "ghp_…stuv" {
+		t.Errorf("the hint = %q, want ghp_…stuv", res.Hint)
+	}
+}
+
+func TestTestGithubConnectionAnonymousPublicRound(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusOK, &saw)
+	res, err := a.TestGithubConnection("")
+	if err != nil {
+		t.Fatalf("TestGithubConnection(\"\"): %v", err)
+	}
+	if !res.OK || res.Code != "verified" || res.Using != "anonymous" {
+		t.Fatalf("anonymous verdict = %+v, want {ok, verified, anonymous}", res)
+	}
+	if saw != "" {
+		t.Errorf("the anonymous round sends NO Authorization header, saw %q", saw)
+	}
+	if res.Hint != "" {
+		t.Errorf("an anonymous verdict carries no hint, got %q", res.Hint)
+	}
+	if _, err := os.Stat(update.TokenPath(dir)); err == nil {
+		t.Errorf("a test must never write the token file")
+	}
+}
+
+func TestTestGithubConnectionAnonymous404IsThePrivateRepoSignal(t *testing.T) {
+	saw := ""
+	a, _ := ghTokenAPI(t, http.StatusNotFound, &saw)
+	res, err := a.TestGithubConnection("")
+	if err != nil {
+		t.Fatalf("a 404 resolves a verdict, not a rejection: %v", err)
+	}
+	if res.OK || res.Code != "no_access" || res.Using != "anonymous" {
+		t.Fatalf("anonymous 404 = %+v, want {ok:false, no_access, anonymous}", res)
+	}
+	if !strings.Contains(res.Message, "without credentials") {
+		t.Errorf("the anonymous no-access line must name the credential gap: %q", res.Message)
+	}
+}
+
+func TestTestGithubConnectionSavedTokenRejected(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusUnauthorized, &saw)
+	if err := update.SaveToken(dir, ghTestToken); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.TestGithubConnection("")
+	if err != nil {
+		t.Fatalf("TestGithubConnection(\"\"): %v", err)
+	}
+	if res.OK || res.Code != "invalid" || res.Using != "saved" {
+		t.Fatalf("saved-401 verdict = %+v, want {ok:false, invalid, saved}", res)
+	}
+	if res.Hint != "ghp_…stuv" {
+		t.Errorf("the rejected SAVED token still reports its hint, got %q", res.Hint)
+	}
+	// The stored file is untouched — a test NEVER writes.
+	if got := update.LoadToken(dir); got != ghTestToken {
+		t.Errorf("a failed test must leave the stored token alone, got %q", got)
+	}
+}
+
+func TestTestGithubConnectionTypedNoAccess(t *testing.T) {
+	saw := ""
+	a, _ := ghTokenAPI(t, http.StatusNotFound, &saw)
+	res, err := a.TestGithubConnection(ghTestToken)
+	if err != nil {
+		t.Fatalf("a 404 resolves a verdict, not a rejection: %v", err)
+	}
+	if res.OK || res.Code != "no_access" || res.Using != "typed" {
+		t.Fatalf("typed 404 = %+v, want {ok:false, no_access, typed}", res)
+	}
+}
+
+func TestTestGithubConnectionUnreachable(t *testing.T) {
+	saw := ""
+	a, _ := ghTokenAPI(t, http.StatusOK, &saw)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close()
+	a.ghTokens.APIBase = srv.URL
+	res, err := a.TestGithubConnection(ghTestToken)
+	if err != nil {
+		t.Fatalf("unreachable resolves a verdict, not a rejection: %v", err)
+	}
+	if res.OK || res.Code != "unreachable" || res.Using != "typed" {
+		t.Fatalf("unreachable verdict = %+v, want {ok:false, unreachable, typed}", res)
+	}
+}

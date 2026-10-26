@@ -148,9 +148,15 @@ type Progress struct {
 
 // ApplyResult is the apply round's wire outcome: {ok:true} means the helper
 // is spawned and the app is about to quit — the modal paints "restarting…".
+// Since v0.1.19 a FAILED round carries PageOpened:true when the bridge's
+// fallback reflex opened the release page in the system browser (the owner
+// ask: "auto-open release page when an apply fails") — the island paints its
+// "the release page opened in your browser" line ONLY on this flag, so a
+// machine where the open could not happen never claims it did.
 type ApplyResult struct {
-	OK      bool   `json:"ok"`
-	Message string `json:"message,omitempty"`
+	OK         bool   `json:"ok"`
+	Message    string `json:"message,omitempty"`
+	PageOpened bool   `json:"pageOpened,omitempty"`
 }
 
 // ErrNoUpdate is the honest no-op: the release carries no usable asset, or

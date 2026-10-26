@@ -176,7 +176,7 @@ func (*languageError) Error() string { return "bridge: language: unknown prefere
 // might be a private repo so in setting, add a github credentials so it can
 // connect to the private repo").
 //
-// Two bound methods over the wired update.TokenStore (main.go passes the
+// Three bound methods over the wired update.TokenStore (main.go passes the
 // Updater's OWN data dir + repo — one token file, one truth):
 //
 //      SetGithubToken("")        → CLEAR the stored token ({ok, cleared})
@@ -185,6 +185,10 @@ func (*languageError) Error() string { return "bridge: language: unknown prefere
 //      GithubTokenState()        → {set, hint} — the display state (ghp_…ABCD,
 //                                   never the token; the login password's
 //                                   never-crosses-back discipline)
+//      TestGithubConnection(…)   → the v0.1.19 TEST round: verify a typed
+//                                   candidate (or the stored token, or the
+//                                   anonymous round) WITHOUT writing anything
+//                                   — the owner's "test connection" ask
 //
 // THE VERDICT MATRIX (every cell honest):
 //
@@ -305,6 +309,131 @@ func (a *API) GithubTokenState() (GithubTokenStateResult, error) {
 		return GithubTokenStateResult{Set: true, Hint: update.TokenHint(tok)}, nil
 	}
 	return GithubTokenStateResult{}, nil
+}
+
+// ---------------------------------------------------------------------------
+// THE TEST-CONNECTION BINDING (v0.1.19 — the owner ask: "Yes add a test
+// connection"): ONE more bound method over the same store, so the
+// GitHub-access row can ask GitHub "can I actually see the repository?"
+// BEFORE anything is saved or any update round is spent:
+//
+//      TestGithubConnection("ghp_…") → shape-gate → verify THAT token →
+//                                       verdict only, NOTHING is written
+//      TestGithubConnection("")      → verify the STORED token if one is
+//                                       saved, else the ANONYMOUS round —
+//                                       the exact credential mix the next
+//                                       release check would ride
+//
+// The verdict matrix (every cell honest, the SetGithubToken grammar):
+//
+//      200 (verified)      → {ok, code:"verified", using, hint}
+//      401 (invalid)       → {ok:false, code:"invalid"} — for using:"saved"
+//                            the line names the SAVED token (a revoked PAT
+//                            is exactly the fact the user needs)
+//      404 (no access)     → {ok:false, code:"no_access"} — the ANONYMOUS
+//                            404 is the owner's private-repo signal: "GitHub
+//                            can't see the repository without credentials"
+//      unreachable/403/5xx → {ok:false, code:"unreachable"} — never a
+//                            verdict on any token
+//      garbage shape       → a REJECTED promise (errBadGithubToken)
+//      no store wired      → {ok:false, code:"not_wired"}
+//
+// `using` is the island's one branching fact: "typed" (a value crossed the
+// bridge this call), "saved" (the stored token was tested), "anonymous"
+// (nothing is in play — the public-repo round). A pure READ: no file write,
+// no busy guard (the same 10s verify budget SetGithubToken rides; the
+// updateBusy guard would make a settings row wait out a 45-minute download
+// window for nothing).
+// ---------------------------------------------------------------------------
+
+// TestGithubConnectionResult is what the test resolves to JS. The token
+// itself NEVER appears — only the hint, exactly like GithubTokenState.
+type TestGithubConnectionResult struct {
+	OK      bool   `json:"ok"`
+	Code    string `json:"code,omitempty"`    // verified | invalid | no_access | unreachable | not_wired
+	Using   string `json:"using,omitempty"`   // typed | saved | anonymous
+	Hint    string `json:"hint,omitempty"`    // ghp_…ABCD when a token was in play
+	Message string `json:"message,omitempty"` // the honest belt line (the island paints its own)
+}
+
+// TestGithubConnection verifies a candidate token (or the stored one, or the
+// anonymous round) against the repository — one cheap GET /repos/<repo>
+// riding the same Bearer header the update rounds send. Nothing is saved,
+// nothing is cleared: the row's Test button answers "will the next check
+// work with THIS?" before the user commits to anything.
+func (a *API) TestGithubConnection(token string) (TestGithubConnectionResult, error) {
+	token = strings.TrimSpace(token)
+	store := a.ghStore()
+	if store == nil {
+		return TestGithubConnectionResult{
+			Code:    "not_wired",
+			Message: "The update credentials store is not wired — restart the app.",
+		}, nil
+	}
+
+	// The hostile-input law, exactly as SetGithubToken applies it: a
+	// non-empty value outside the PAT alphabet is refused before the wire.
+	if token != "" && !update.ValidTokenShape(token) {
+		return TestGithubConnectionResult{}, errBadGithubToken
+	}
+
+	// WHICH credential is in play: the typed value, else the stored one,
+	// else the honest anonymous round — the exact mix the next release
+	// check would ride, so the verdict transfers one-for-one.
+	using, tested := "anonymous", ""
+	if token != "" {
+		using, tested = "typed", token
+	} else if saved := store.Load(); saved != "" {
+		using, tested = "saved", saved
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), githubTokenDeadline)
+	defer cancel()
+	switch status := store.Verify(ctx, tested); status {
+	case update.TokenVerified:
+		res := TestGithubConnectionResult{OK: true, Code: "verified", Using: using}
+		if tested != "" {
+			res.Hint = update.TokenHint(tested)
+		}
+		return res, nil
+	case update.TokenInvalid:
+		if tested == "" {
+			// An anonymous 401 carries no credentials to reject — GitHub
+			// did not answer a question about any token; the honest
+			// reading is "could not ask".
+			return TestGithubConnectionResult{
+				Code:    "unreachable",
+				Using:   using,
+				Message: "GitHub was unreachable or refused the anonymous ask — try again.",
+			}, nil
+		}
+		return TestGithubConnectionResult{
+			Code:    "invalid",
+			Using:   using,
+			Hint:    update.TokenHint(tested),
+			Message: "GitHub rejected the token.",
+		}, nil
+	case update.TokenNoAccess:
+		res := TestGithubConnectionResult{
+			Code:    "no_access",
+			Using:   using,
+			Message: "The token cannot see this repository.",
+		}
+		if tested != "" {
+			res.Hint = update.TokenHint(tested)
+		} else {
+			// The owner's exact scenario: no credentials in play and the
+			// repo answers 404 — this is what a private flip looks like.
+			res.Message = "GitHub cannot see the repository without credentials — if it is private, save a token with access to it."
+		}
+		return res, nil
+	default: // TokenUnreachable
+		return TestGithubConnectionResult{
+			Code:    "unreachable",
+			Using:   using,
+			Message: "Couldn't reach GitHub — try again.",
+		}, nil
+	}
 }
 
 // errBadGithubToken keeps the malformed-token path out of fmt (and the JS

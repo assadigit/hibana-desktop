@@ -152,12 +152,16 @@ type API struct {
 	// BOTH the check and the apply — they are both live HTTP round-trips
 	// against GitHub) + the three hooks (check runner / apply runner / event
 	// relay) + the cached check verdict (display state for the modal, never
-	// authority — the apply re-fetches). See update.go.
+	// authority — the apply re-fetches). Since v0.1.19 a fourth hook rides
+	// here: the manual-fallback browser open (openReleasePage — every FAILED
+	// apply verdict opens the release page, the owner's "auto-open release
+	// page when an apply fails"). See update.go.
 	updateMu      sync.Mutex
 	updateBusy    atomic.Bool
 	updateCheck   func(ctx context.Context) (update.CheckResult, error)
 	updateApply   func(ctx context.Context, progress func(update.Progress)) (update.ApplyResult, error)
 	updateEmit    func(name string, payload map[string]any)
+	updateOpenURL func(url string)
 	updateLast    update.CheckResult
 	updateHasLast bool
 

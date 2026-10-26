@@ -41,10 +41,17 @@
 //      saved+verified round (field CLEARED, the ghp_…stuv hint, Remove
 //      revealed, and THE CONNECT-NOW RE-CHECK firing through the manual
 //      check's own handler), the 401 rejection (nothing saved), Remove (the
-//      anonymous-again line), and the malformed-shape rejection line.
+//      anonymous-again line), and the malformed-shape rejection line. Since
+//      v0.1.19 the row also carries the TEST button (the owner ask: "Yes add
+//      a test connection") over TestGithubConnection: the anonymous verdict
+//      ("" crossed the bridge, the public-repo line), the typed candidate
+//      (accepted line + the field KEEPS its value — only Save clears), the
+//      401 typed line, the ANONYMOUS 404 private-repo signal, the saved-token
+//      verdict, and the malformed-shape rejection — with NOTHING ever written
+//      and NO re-check fired.
 //   9. THE FA/RTL DARK MIRROR: the FA boot paints the sheet in Persian
 //      (تنظیمات title via the pin's own key, the FA STR pairs), RTL-mirrored,
-//      in the dark look.
+//      in the dark look; the FA test-connection verdict paints its FA twin.
 //   10. REDUCED MOTION: the segment tween stills.
 //
 // The mock bridge sits at the SAME boundary the Wails runtime occupies in
@@ -120,6 +127,11 @@ const probe = {
   token: { set: false, hint: 'ghp_…stuv' },
   tokenOutcome: { ok: true, saved: true, verified: true },
   tokenCalls: [],
+  // v0.1.19 — the test-connection round's mock state: the verdict
+  // TestGithubConnection resolves + the candidates that crossed the bridge
+  // ("" = the stored-or-anonymous round Go-side decides).
+  testOutcome: { ok: true, code: 'verified', using: 'anonymous' },
+  testCalls: [],
 }
 const MOCK_IPC_JS = 'window.WailsInvoke = function (m) { /* probe: no Go backend on the other side */ }\n'
 // The runtime mock is built PER REQUEST from the live probe state (the v0.1.9
@@ -134,6 +146,7 @@ const mockRuntimeJs = () => [
   '  SetTheme: function (pref) { window.__probeThemeCalls.push(pref); return Promise.resolve({ ok: true, pref: pref }) },',
   '  SetLanguage: function (lang) { return window.__probeSetLanguage(lang) },',
   '  SetGithubToken: function (tok) { return window.__probeSetToken(tok) },',
+  '  TestGithubConnection: function (tok) { return window.__probeTestConnection(tok) },',
   '  GithubTokenState: function () { return fetch("/__probe/tokenstate").then(function (r) { return r.json() }) },',
   '  SyncNow: function () { return Promise.resolve({ ok: true, uploaded: 0, pulled: 0, projects: 1, boards: 1, at: new Date().toISOString() }) },',
   '  CheckForUpdates: function () { return window.__probeCheck() },',
@@ -197,6 +210,12 @@ const server = http.createServer((req, res) => {
       '    return body',
       '  })',
       '}',
+      'window.__probeTestConnection = function (tok) {',
+      '  return fetch("/__probe/testconnection", { method: "POST", body: JSON.stringify({ token: tok }) }).then(function (r) { return r.json() }).then(function (body) {',
+      '    if (body && body.reject) return Promise.reject(new Error(body.message || ""))',
+      '    return body',
+      '  })',
+      '}',
       'window.__probeRequest = function (method, p, body) {',
       '  return fetch("/__probe/request", { method: "POST", body: JSON.stringify({ method, p, body }) }).then(function (r) { return r.json() })',
       '}',
@@ -240,6 +259,16 @@ const server = http.createServer((req, res) => {
       if (out.ok && out.saved) probe.token = { set: true, hint: 'ghp_…stuv' }
       if (out.ok && out.cleared) probe.token = { set: false, hint: '' }
       send(200, 'application/json', JSON.stringify(out))
+    })
+  }
+  if (p === '/__probe/testconnection' && req.method === 'POST') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    return req.on('end', () => {
+      const body = JSON.parse(raw || '{}')
+      probe.testCalls.push(String(body.token == null ? '' : body.token))
+      // A pure READ: the verdict resolves and the stored state never moves.
+      send(200, 'application/json', JSON.stringify(Object.assign({}, probe.testOutcome)))
     })
   }
   if (p === '/__probe/request' && req.method === 'POST') {
@@ -588,6 +617,89 @@ async function main() {
     check('Remove hides itself once no token is stored', tokenRow2.removeHidden === true)
     check('Remove rode the empty-string clear contract (the last call is "")', probe.tokenCalls[probe.tokenCalls.length - 1] === '', JSON.stringify(probe.tokenCalls))
 
+    // ---- 5½f. THE TEST-CONNECTION ROUND (v0.1.19 — the owner ask: "Yes add
+    //      a test connection"): verify-before-save over the Go
+    //      TestGithubConnection binding — the field's value when typed, else
+    //      "" (Go picks stored-vs-anonymous) — and NOTHING is ever written. ----
+    const checkCallsBeforeTest = probe.checkCalls
+    const tokenCallsBeforeTest = probe.tokenCalls.length
+    await page.click('#db-settings-token-test')
+    await page.waitForFunction(() => /no token needed/.test((document.getElementById('db-settings-token-status') || {}).textContent || ''), null, { timeout: 5000 })
+    const testRow0 = await page.evaluate(() => {
+      const g = (id) => document.getElementById(id)
+      return {
+        status: (g('db-settings-token-status') || {}).textContent || '',
+        errHidden: (g('db-settings-token-error') || {}).hidden,
+        testLabel: (g('db-settings-token-test-label') || {}).textContent || '',
+        testDisabled: (g('db-settings-token-test') || {}).disabled,
+        saveDisabled: (g('db-settings-token-save') || {}).disabled,
+      }
+    })
+    check('the row renders a Test button (labeled, re-enabled after the round)', testRow0.testLabel === 'Test' && testRow0.testDisabled === false && testRow0.saveDisabled === false, JSON.stringify(testRow0))
+    check('the anonymous test paints the public-repo verdict line', testRow0.status === 'GitHub is reachable and the repository is public — no token needed.', JSON.stringify(testRow0.status))
+    check('the test round stays error-free', testRow0.errHidden === true)
+    check('a test NEVER re-checks (it changes no state)', probe.checkCalls === checkCallsBeforeTest, 'calls=' + probe.checkCalls)
+    check('a test NEVER writes (the save binding is untouched)', probe.tokenCalls.length === tokenCallsBeforeTest, 'calls=' + probe.tokenCalls.length)
+    check('the empty-field test crossed the bridge with "" (Go picks the credential)', probe.testCalls.length === 1 && probe.testCalls[0] === '', JSON.stringify(probe.testCalls))
+
+    // The typed-candidate verdict: paste a token, Test, the accepted line
+    // paints — and the FIELD KEEPS ITS VALUE (only Save clears it; the value
+    // stays for the Save click the verdict invites).
+    probe.testOutcome = { ok: true, code: 'verified', using: 'typed' }
+    await page.fill('#db-settings-token-input', 'ghp_0123456789abcdefghijklmnopqrstuv')
+    await page.click('#db-settings-token-test')
+    await page.waitForFunction(() => /accepted the token/.test((document.getElementById('db-settings-token-status') || {}).textContent || ''), null, { timeout: 5000 })
+    const testRow1 = await page.evaluate(() => ({
+      status: (document.getElementById('db-settings-token-status') || {}).textContent || '',
+      fieldValue: (document.getElementById('db-settings-token-input') || {}).value || '',
+    }))
+    check('the typed test paints the accepted verdict line', testRow1.status === 'GitHub accepted the token — the repository is visible.', JSON.stringify(testRow1.status))
+    check('the test round NEVER clears the field (Save is the clear path)', testRow1.fieldValue === 'ghp_0123456789abcdefghijklmnopqrstuv', JSON.stringify(testRow1.fieldValue))
+    check('the typed candidate crossed the bridge once, verbatim', probe.testCalls.length === 2 && probe.testCalls[1] === 'ghp_0123456789abcdefghijklmnopqrstuv')
+
+    // The 401 typed verdict → its own honest line.
+    probe.testOutcome = { ok: false, code: 'invalid', using: 'typed' }
+    await page.click('#db-settings-token-test')
+    await page.waitForFunction(() => {
+      const e = document.getElementById('db-settings-token-error')
+      return e && !e.hidden && /GitHub rejected this token/i.test(e.textContent)
+    }, null, { timeout: 5000 })
+    check('the 401 typed test paints its own honest line', true)
+
+    // THE OWNER'S PRIVATE-REPO SIGNAL: nothing in play, GitHub 404s the
+    // anonymous ask → the credential-gap line (the exact scenario the
+    // GitHub-access row exists for).
+    probe.testOutcome = { ok: false, code: 'no_access', using: 'anonymous' }
+    await page.fill('#db-settings-token-input', '')
+    await page.click('#db-settings-token-test')
+    await page.waitForFunction(() => {
+      const e = document.getElementById('db-settings-token-error')
+      return e && !e.hidden && /without credentials/i.test(e.textContent)
+    }, null, { timeout: 5000 })
+    check('the anonymous 404 paints the private-repo signal (the credential-gap line)', true)
+
+    // The saved-token verdict: the mock stores one, the field stays empty,
+    // the round rides the STORED token Go-side ("using":"saved").
+    probe.testOutcome = { ok: true, code: 'verified', using: 'saved' }
+    probe.token = { set: true, hint: 'ghp_…stuv' }
+    await page.click('#db-settings-token-test')
+    await page.waitForFunction(() => /saved token works/.test((document.getElementById('db-settings-token-status') || {}).textContent || ''), null, { timeout: 5000 })
+    check('the saved-token test paints its own verdict line (the stored token rode the round)', true)
+
+    // The malformed-shape rejection (the binding's rejected promise).
+    probe.testOutcome = { reject: true }
+    await page.fill('#db-settings-token-input', 'not a token')
+    await page.click('#db-settings-token-test')
+    await page.waitForFunction(() => {
+      const e = document.getElementById('db-settings-token-error')
+      return e && !e.hidden && /does not look like a GitHub token/i.test(e.textContent)
+    }, null, { timeout: 5000 })
+    check('the malformed test candidate paints the shape line (the hostile-input law)', true)
+    await page.screenshot({ path: path.join(args.out, 'settings-token-test.png') })
+    // Restore the no-token state for the FA mirror leg below.
+    probe.token = { set: false, hint: '' }
+    probe.testOutcome = { ok: true, code: 'verified', using: 'anonymous' }
+
     // ---- 6. THE LANGUAGE SEGMENT (the round's one new capability) ----
     // 6a. offline → the honest line, the control STAYS, NO reload.
     probe.langOutcome = { ok: false, message: "Couldn't reach hibana.ir — the language is unchanged." }
@@ -696,6 +808,7 @@ async function main() {
         themeDark: (g('db-settings-theme-claude-dark') || {}).textContent || '',
         done: (g('db-settings-done-label') || {}).textContent || '',
         tokenLabel: (g('db-settings-token-label') || {}).textContent || '',
+        tokenTest: (g('db-settings-token-test-label') || {}).textContent || '',
         tokenSave: (g('db-settings-token-save-label') || {}).textContent || '',
         tokenRemove: (g('db-settings-token-clear-label') || {}).textContent || '',
         tokenStatus: (g('db-settings-token-status') || {}).textContent || '',
@@ -712,10 +825,16 @@ async function main() {
     check('the FA Sign out rides the pin\'s own nav.signout key (خروج)', faSheet.signout === 'خروج', JSON.stringify(faSheet.signout))
     check('the FA labels: Language/Theme + the Dark option', faSheet.langLabel === 'زبان' && faSheet.themeLabel === 'پوسته' && faSheet.themeDark === 'تیره', JSON.stringify({ langLabel: faSheet.langLabel, themeLabel: faSheet.themeLabel, themeDark: faSheet.themeDark }))
     check('the FA Done label', faSheet.done === 'انجام شد', JSON.stringify(faSheet.done))
-    check('the FA GitHub-access row: label + Save/Remove + the placeholder',
-      faSheet.tokenLabel === 'دسترسی گیت‌هاب' && faSheet.tokenSave === 'ذخیره' && faSheet.tokenRemove === 'حذف' && faSheet.tokenPlaceholder === 'ghp_… (اختیاری)',
-      JSON.stringify({ label: faSheet.tokenLabel, save: faSheet.tokenSave, remove: faSheet.tokenRemove, placeholder: faSheet.tokenPlaceholder }))
+    check('the FA GitHub-access row: label + Test/Save/Remove + the placeholder',
+      faSheet.tokenLabel === 'دسترسی گیت‌هاب' && faSheet.tokenTest === 'تست' && faSheet.tokenSave === 'ذخیره' && faSheet.tokenRemove === 'حذف' && faSheet.tokenPlaceholder === 'ghp_… (اختیاری)',
+      JSON.stringify({ label: faSheet.tokenLabel, test: faSheet.tokenTest, save: faSheet.tokenSave, remove: faSheet.tokenRemove, placeholder: faSheet.tokenPlaceholder }))
     check('the FA GitHub-access row paints the no-token honesty line', faSheet.tokenStatus === 'توکنی ذخیره نشده — دسترسی ناشناس به گیت‌هاب (برای مخازن عمومی کافی است).', JSON.stringify(faSheet.tokenStatus))
+
+    // The v0.1.19 test-connection round's FA twin: the anonymous verdict
+    // paints its FA line through the same STR pair the EN round rode.
+    await page.click('#db-settings-token-test')
+    await page.waitForFunction(() => /نیازی به توکن نیست/.test((document.getElementById('db-settings-token-status') || {}).textContent || ''), null, { timeout: 5000 })
+    check('the FA anonymous test verdict paints its FA twin', true)
     check('the FA sheet is RTL (dir=rtl)', faSheet.dir === 'rtl')
     check('the FA/dark serve stamps the active states (fa + claude-dark)', faSheet.faActive === 'true' && faSheet.darkActive === 'true')
 
