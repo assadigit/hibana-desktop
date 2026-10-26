@@ -3,7 +3,7 @@
 # The version comes from the git tag (the CI release step); locally it
 # defaults to the Version stamp in the binary's -X (pass -Version explicitly).
 param(
-    [string]$Version = "0.1.17",
+    [string]$Version = "0.1.18",
     [string]$ExePath = ".\build\bin\hibana.exe"
 )
 
