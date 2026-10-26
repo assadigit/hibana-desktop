@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"hibana/desktop/internal/winshell"
 )
 
 // createNoWindow keeps the PowerShell helper invisible (a console flash on
@@ -37,7 +39,10 @@ $s.Save()
 
 // makeShortcut writes one .lnk through the PowerShell helper. DETACHED from
 // the boot path (Run never waits on it — a slow COM spin can never stall the
-// window); errors surface through the caller's log.
+// window); errors surface through the caller's log. The interpreter is
+// RESOLVED by absolute path first (internal/winshell, v0.1.18) — the same
+// stripped-PATH dogfood that killed the update apply would have killed the
+// Start Menu shortcut too, on the very same machine.
 func makeShortcut(lnkPath, target, args, workDir, description string) error {
 	helper, err := os.CreateTemp("", "hibana-lnk-*.ps1")
 	if err != nil {
@@ -52,7 +57,11 @@ func makeShortcut(lnkPath, target, args, workDir, description string) error {
 	if err := helper.Close(); err != nil {
 		return fmt.Errorf("quickaccess: closing the helper: %w", err)
 	}
-	cmd := exec.Command("powershell.exe",
+	ps, err := winshell.PowerShell()
+	if err != nil {
+		return fmt.Errorf("quickaccess: lnk helper: %w", err)
+	}
+	cmd := exec.Command(ps,
 		"-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
 		"-File", helperName,
 		"-Lnk", lnkPath,

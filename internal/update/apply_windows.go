@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+
+	"hibana/desktop/internal/winshell"
 )
 
 // createNoWindow keeps the helper's console invisible (a PowerShell flash on
@@ -56,7 +58,16 @@ Start-Process -FilePath $Exe
 // apply writes the helper next to the staged asset and spawns it DETACHED —
 // the helper owns everything after this returns; the app then quits (the
 // shell's restart hook) and the helper's Wait-Process observes the exit.
-func apply(assetPath, kind, exePath string, parentPID int) error {
+//
+// The interpreter is RESOLVED through internal/winshell (v0.1.18): the
+// canonical ABSOLUTE path first, the PATH lookup last. The v0.1.17 dogfood
+// proved a by-name spawn dies on any machine whose inherited PATH lacks the
+// WindowsPowerShell directory — "exec: \"powershell.exe\": executable file
+// not found in %PATH%" — while the interpreter sat untouched at
+// %SystemRoot%\System32\WindowsPowerShell\v1.0. When nothing resolves at
+// all the error names the staged zip AND the release page, so a human can
+// always finish the round by hand.
+func apply(assetPath, kind, exePath, releaseURL string, parentPID int) error {
 	if assetPath == "" || exePath == "" {
 		return fmt.Errorf("update: apply: empty asset or exe path")
 	}
@@ -74,9 +85,15 @@ func apply(assetPath, kind, exePath string, parentPID int) error {
 	if kind == KindInstaller {
 		mode = "installer"
 	}
-	// -File (not -Command): the values ride as named script parameters, so
-	// PowerShell itself does the quoting — no injection surface at all.
-	cmd := exec.Command("powershell.exe",
+	// THE INTERPRETER (v0.1.18): resolved by absolute path first — a stripped
+	// PATH must never kill the swap (the v0.1.17 dogfood). -File (not
+	// -Command) keeps the values on named script parameters, so PowerShell
+	// itself does the quoting — no injection surface at all.
+	ps, err := winshell.PowerShell()
+	if err != nil {
+		return fmt.Errorf("update: apply: %v — the verified update is staged at %s; install it manually from %s", err, assetPath, releaseURL)
+	}
+	cmd := exec.Command(ps,
 		"-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
 		"-File", helper,
 		"-Mode", mode,

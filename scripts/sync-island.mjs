@@ -979,6 +979,11 @@ const HTML_SETTINGS_OPS = [
        Check for updates rides the bound CheckForUpdates verdict (the
        auto-update loop keeps checking boot + 2h untouched — this row is
        the manual trigger + the idle-time surface the owner asked for);
+       v0.1.18 adds the GitHub-access row (SetGithubToken /
+       GithubTokenState — an optional PAT stored Go-side in the DATA dir
+       riding every release request as a Bearer header: anonymous stays the
+       default, a private flip keeps updating, and the shared-IP 60/hr
+       budget lifts to 5000/hr);
        the theme segmented control rides SetTheme (the tray's full
        light | claude-dark | system vocabulary — an upgrade over the
        toolbar's binary flip, which stays as the quick flip); the language
@@ -1009,8 +1014,11 @@ const HTML_SETTINGS_OPS = [
 
       <!-- 2. UPDATE APP (the owner's second section — "check the latest
            release of github, if there were newer version. update."): the
-           version line from AppInfo, the manual check verdict, and the
-           Update-now delegation to the proven update modal. -->
+           version line from AppInfo, the manual check verdict, the
+           Update-now delegation to the proven update modal, and (v0.1.18)
+           the GitHub-access row — the owner ask: "hibana desktop might be
+           a private repo so in setting, add a github credentials so it can
+           connect to the private repo". -->
       <section class="db-settings-section">
         <h3 class="db-settings-heading" id="db-settings-update-heading">Update app</h3>
         <p class="db-settings-version" id="db-settings-version">Hibana — island unpinned</p>
@@ -1020,6 +1028,27 @@ const HTML_SETTINGS_OPS = [
           <button type="button" class="btn ghost small" id="db-settings-check"><span id="db-settings-check-label">Check for updates</span></button>
           <button type="button" class="small db-update-cta" id="db-settings-update-now" hidden><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span id="db-settings-update-now-label">Update now</span></button>
         </div>
+        <!-- v0.1.18: the GitHub-access row — a PAT the Go shell stores in
+             the DATA dir (github-token, 0600) and attaches to every
+             release check + asset download + checksums fetch as a Bearer
+             header. Anonymous stays the DEFAULT (the repo is public); the
+             token covers the private flip + the 60/hr → 5000/hr rate
+             budget. The value crosses the bridge ONCE (SetGithubToken —
+             the login password's discipline; Enter in the field saves,
+             never submits the dialog form); only the ghp_…ABCD hint ever
+             crosses back (GithubTokenState). A saved token immediately
+             re-checks (js/desktop-settings.js clicks #db-settings-check)
+             — the owner's connect-now ask. -->
+        <div class="db-settings-row db-settings-token-row">
+          <span class="db-settings-row-label" id="db-settings-token-label">GitHub access</span>
+          <div class="db-settings-token">
+            <input type="password" id="db-settings-token-input" autocomplete="off" spellcheck="false" placeholder="ghp_… (optional)" aria-label="GitHub personal access token" />
+            <button type="button" class="btn ghost small" id="db-settings-token-save"><span id="db-settings-token-save-label">Save</span></button>
+            <button type="button" class="btn ghost small" id="db-settings-token-clear" hidden><span id="db-settings-token-clear-label">Remove</span></button>
+          </div>
+        </div>
+        <p class="small muted" id="db-settings-token-status"></p>
+        <p id="db-settings-token-error" class="error" role="alert" hidden></p>
       </section>
 
       <!-- 3. ACCOUNT (the owner's third section): the identity from
@@ -3770,37 +3799,44 @@ html[data-theme='claude-dark'] #db-update-button:focus-visible {
 // desktop-settings.js — generated below into dist/js/ (the v0.1.17 settings
 // round — the owner ask: "Plan for a settings page for hibana's desktop"
 // with four sections: 1. Sync 2. Update app 3. Login/logout 4. fa/en + dark
-// mode/light mode). A COMPOSITION controller: three of the four sections
-// delegate to the PROVEN toolbar flows (Sync now / Update now / Sign out are
-// programmatic clicks on the existing buttons — this sheet closes itself
-// first so the modals never stack), the update row adds the manual
-// CheckForUpdates trigger over the untouched boot+2h loop, the theme
-// segmented control rides SetTheme (the tray's full 3-state vocabulary), and
-// the language segmented control rides the round's ONE new Go binding,
-// SetLanguage — whose 2xx resolve flips the chrome LIVE (html[lang]/dir +
-// hibanaI18n.apply(), which re-reads the Go-side un-staled __hibanaMe) and
-// schedules the ~700ms reload reflex (i18n.js's dynamic-markup law: a
-// live-only flip would leave the BOARD's rendered titles in the old
-// language). The PIN_PACKAGE_VERSION constant is the ONE interpolation in
-// this template — the sync script knows the sealed pin's package version at
-// emit time, so the version line never needs a fetch or a binding change.
+// mode/light mode; v0.1.18 grows section 2 with the GitHub-access row — the
+// owner ask: "hibana desktop might be a private repo so in setting, add a
+// github credentials so it can connect to the private repo"). A COMPOSITION
+// controller: three of the four sections delegate to the PROVEN toolbar
+// flows (Sync now / Update now / Sign out are programmatic clicks on the
+// existing buttons — this sheet closes itself first so the modals never
+// stack), the update row adds the manual CheckForUpdates trigger over the
+// untouched boot+2h loop AND the credentials row (SetGithubToken /
+// GithubTokenState — the token crosses the bridge once, the hint crosses
+// back, a save immediately re-checks), the theme segmented control rides
+// SetTheme (the tray's full 3-state vocabulary), and the language segmented
+// control rides the SetLanguage binding — whose 2xx resolve flips the chrome
+// LIVE (html[lang]/dir + hibanaI18n.apply(), which re-reads the Go-side
+// un-staled __hibanaMe) and schedules the ~700ms reload reflex (i18n.js's
+// dynamic-markup law: a live-only flip would leave the BOARD's rendered
+// titles in the old language). The PIN_PACKAGE_VERSION constant is the ONE
+// interpolation in this template — the sync script knows the sealed pin's
+// package version at emit time, so the version line never needs a fetch or
+// a binding change.
 // Written without template literals/backticks so it nests in this literal.
 // ---------------------------------------------------------------------------
-const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page controller (v0.1.17 — the owner
-// ask: "Plan for a settings page for hibana's desktop" with four sections:
+const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page controller (v0.1.17 + the
+// v0.1.18 GitHub-access row — the owner asks: "Plan for a settings page for
+// hibana's desktop" with four sections:
 // 1. Sync 2. Update app ("check the latest release of github, if there were
 // newer version. update.") 3. Login/logout 4. fa/en + dark mode/light mode).
 // The settings page is a COMPOSITION: one wide native dialog opened from the
 // toolbar's gear, whose sections delegate to the live, proven rounds. This
 // controller owns: the gear → showModal wiring, the live facts (AppInfo's
-// version line, AuthState's account line), the manual Check-for-updates
-// verdict paint, the two segmented controls (Language through the Go
-// SetLanguage binding — the round's one new capability; Theme through the
-// existing SetTheme with the tray's full 3-state vocabulary), the delegation
-// clicks (Sync now / Update now / Sign out → the toolbar buttons' own flows,
-// this sheet closing FIRST so the modals never stack), and the hibana:lang /
-// hibana:theme / hibana:update-available event listeners so the tray, the
-// toolbar, and this sheet always agree.
+// version line, AuthState's account line, GithubTokenState's hint line), the
+// manual Check-for-updates verdict paint, the GitHub-access row (v0.1.18 —
+// Save/Remove over SetGithubToken, Enter-to-save, the connect-now re-check),
+// the two segmented controls (Language through the Go SetLanguage binding;
+// Theme through the existing SetTheme with the tray's full 3-state
+// vocabulary), the delegation clicks (Sync now / Update now / Sign out → the
+// toolbar buttons' own flows, this sheet closing FIRST so the modals never
+// stack), and the hibana:lang / hibana:theme / hibana:update-available event
+// listeners so the tray, the toolbar, and this sheet always agree.
 // GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
 // into frontend/dist/js/ and checksummed in frontend/island.checksums.json.
 // Loads blocking, right after desktop-update.js, BEFORE every deferred island
@@ -3834,6 +3870,22 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       statusBusy: 'An update is already in progress.',
       statusUnreachable: "Couldn't reach GitHub — check your connection.",
       notWired: 'The desktop bridge is not wired — restart the app.',
+      // v0.1.18 — the GitHub-access row (the owner ask: "hibana desktop
+      // might be a private repo so in setting, add a github credentials
+      // so it can connect to the private repo").
+      tokenLabel: 'GitHub access',
+      tokenPlaceholder: 'ghp_… (optional)',
+      tokenSave: 'Save',
+      tokenRemove: 'Remove',
+      tokenSaving: 'Verifying…',
+      tokenNone: 'No token — anonymous GitHub access (fine for public repos).',
+      tokenSaved: 'Token saved ({hint}) — release checks use it.',
+      tokenSavedUnverified: 'Saved ({hint}) — GitHub was unreachable to verify; the next check uses it.',
+      tokenRejected: 'GitHub rejected the token — nothing was saved.',
+      tokenNoAccess: 'The token cannot see this repository — nothing was saved.',
+      tokenCleared: 'Token removed — release checks are anonymous again.',
+      tokenInvalid: 'That does not look like a GitHub token (ghp_…).',
+      tokenSaveFailed: "Couldn't save the token — try again.",
       accountHeading: 'Account',
       accountBody: 'Your boards live safe on the Hibana cloud — sign in again any time.',
       appearanceHeading: 'Appearance',
@@ -3863,6 +3915,20 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       statusBusy: 'یک بروزرسانی دیگر در جریان است.',
       statusUnreachable: 'اتصال به گیت‌هاب برقرار نشد — اینترنت خود را بررسی کنید.',
       notWired: 'پل دسکتاپ وصل نیست — برنامه را دوباره باز کنید.',
+      // v0.1.18 — the GitHub-access row's FA twins.
+      tokenLabel: 'دسترسی گیت‌هاب',
+      tokenPlaceholder: 'ghp_… (اختیاری)',
+      tokenSave: 'ذخیره',
+      tokenRemove: 'حذف',
+      tokenSaving: 'در حال بررسی…',
+      tokenNone: 'توکنی ذخیره نشده — دسترسی ناشناس به گیت‌هاب (برای مخازن عمومی کافی است).',
+      tokenSaved: 'توکن ذخیره شد ({hint}) — بررسی بروزرسانی از آن استفاده می‌کند.',
+      tokenSavedUnverified: 'ذخیره شد ({hint}) — گیت‌هاب برای تأیید در دسترس نبود؛ بررسی بعدی از آن استفاده می‌کند.',
+      tokenRejected: 'گیت‌هاب این توکن را نپذیرفت — چیزی ذخیره نشد.',
+      tokenNoAccess: 'این توکن به این مخزن دسترسی ندارد — چیزی ذخیره نشد.',
+      tokenCleared: 'توکن حذف شد — بررسی بروزرسانی دوباره ناشناس است.',
+      tokenInvalid: 'این شبیه توکن گیت‌هاب نیست (ghp_…).',
+      tokenSaveFailed: 'ذخیره توکن ممکن نشد — دوباره تلاش کنید.',
       accountHeading: 'حساب',
       accountBody: 'تخته‌های شما در ابر هیبانا امن هستند — هر وقت خواستید دوباره وارد شوید.',
       appearanceHeading: 'ظاهر',
@@ -3939,6 +4005,11 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       updateError: document.getElementById('db-settings-update-error'),
       updateNow: document.getElementById('db-settings-update-now'),
       check: document.getElementById('db-settings-check'),
+      tokenInput: document.getElementById('db-settings-token-input'),
+      tokenSave: document.getElementById('db-settings-token-save'),
+      tokenRemove: document.getElementById('db-settings-token-clear'),
+      tokenStatus: document.getElementById('db-settings-token-status'),
+      tokenError: document.getElementById('db-settings-token-error'),
       account: document.getElementById('db-settings-account'),
       langError: document.getElementById('db-settings-lang-error'),
       langEn: document.getElementById('db-settings-lang-en'),
@@ -3956,6 +4027,13 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
     var checking = false
     var langFlipping = false
 
+    // v0.1.18 — the GitHub-access row's own state: null = the GithubTokenState
+    // round has not landed (the same claim-nothing honesty); {set, hint}
+    // after it does. The token VALUE never lives here — it crosses the
+    // bridge inside the Save click and dies with it.
+    var tokenState = null
+    var tokenBusy = false
+
     function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text }
 
     // ---- localization (every label this controller owns; the title, the
@@ -3969,6 +4047,13 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       setText('db-settings-update-heading', t('updateHeading'))
       setText('db-settings-check-label', t('checkBtn'))
       setText('db-settings-update-now-label', t('updateNow'))
+      setText('db-settings-token-label', t('tokenLabel'))
+      setText('db-settings-token-save-label', t('tokenSave'))
+      setText('db-settings-token-clear-label', t('tokenRemove'))
+      if (els.tokenInput) {
+        els.tokenInput.setAttribute('placeholder', t('tokenPlaceholder'))
+        els.tokenInput.setAttribute('aria-label', t('tokenLabel'))
+      }
       setText('db-settings-account-heading', t('accountHeading'))
       setText('db-settings-account-body', t('accountBody'))
       setText('db-settings-appearance-heading', t('appearanceHeading'))
@@ -4024,6 +4109,9 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
           }, function () {})
         } catch (e) {}
       }
+      // v0.1.18 — the GitHub-access row's display state ({set, hint}); the
+      // verdict's own copy rides the Save resolve.
+      resolveTokenState()
     }
 
     // ---- SECTION 2's status line + the Update-now reveal ----
@@ -4106,6 +4194,136 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       try {
         Promise.resolve(check()).then(onCheckDone, onCheckFail)
       } catch (e) { onCheckFail(e) }
+    })
+
+    // ---- SECTION 2's GitHub-access row (v0.1.18 — the owner ask: "hibana
+    //      desktop might be a private repo so in setting, add a github
+    //      credentials so it can connect to the private repo"). The row is
+    //      a PASSWORD input + Save/Remove over the Go SetGithubToken /
+    //      GithubTokenState bindings: the token crosses the bridge ONCE
+    //      (the login password's discipline — never stored JS-side, never
+    //      in localStorage, the field cleared on every resolve); only the
+    //      ghp_…ABCD hint ever crosses back. A SAVED token immediately
+    //      re-checks (the row's whole point — connect now), riding the
+    //      manual-check flow above through its own click handler. ----
+    function showTokenError(msg) {
+      if (els.tokenError) { els.tokenError.textContent = msg; els.tokenError.hidden = false }
+    }
+    function hideTokenError() { if (els.tokenError) els.tokenError.hidden = true }
+
+    function paintToken() {
+      if (els.tokenStatus) {
+        if (tokenState == null) els.tokenStatus.textContent = ''
+        else if (tokenState.set) els.tokenStatus.textContent = fmt('tokenSaved', { hint: String(tokenState.hint || '') })
+        else els.tokenStatus.textContent = t('tokenNone')
+      }
+      if (els.tokenRemove) els.tokenRemove.hidden = !(tokenState && tokenState.set)
+    }
+
+    function resolveTokenState(after) {
+      var state = resolveBoundMethod('GithubTokenState')
+      if (!state) { if (after) after(); return }
+      try {
+        Promise.resolve(state()).then(function (s) {
+          tokenState = s && typeof s === 'object' && s.set
+            ? { set: true, hint: String(s.hint || '') }
+            : { set: false, hint: '' }
+          paintToken()
+          if (after) after()
+        }, function () { if (after) after() })
+      } catch (e) { if (after) after() }
+    }
+
+    function setTokenBusy(on) {
+      tokenBusy = on
+      if (els.tokenSave) els.tokenSave.disabled = on
+      if (els.tokenRemove) els.tokenRemove.disabled = on
+    }
+
+    function onTokenSaveDone(res) {
+      setTokenBusy(false)
+      hideTokenError()
+      if (!res || typeof res !== 'object') res = {}
+      if (res.cleared) {
+        if (els.tokenInput) els.tokenInput.value = ''
+        tokenState = { set: false, hint: '' }
+        paintToken()
+        if (els.tokenStatus) els.tokenStatus.textContent = t('tokenCleared')
+        return
+      }
+      if (res.ok && res.saved) {
+        // The field never keeps the secret — the value lives Go-side only.
+        if (els.tokenInput) els.tokenInput.value = ''
+        var unverified = !res.verified
+        resolveTokenState(function () {
+          if (unverified && tokenState && tokenState.set && els.tokenStatus) {
+            els.tokenStatus.textContent = fmt('tokenSavedUnverified', { hint: String(tokenState.hint || '') })
+          } else {
+            paintToken()
+          }
+        })
+        // THE CONNECT-NOW REFLEX — the row's whole point: a saved token is
+        // used by the very next check, so fire one immediately through the
+        // manual-check flow's own handler (busy/disable/verdict paint all
+        // reused; a check already in flight is simply left alone).
+        if (els.check && !checking) { try { els.check.click() } catch (e) {} }
+        return
+      }
+      var code = String(res.code || '')
+      // The verdict's failure paths RESTORE the status line to the stored
+      // state's truth (the probe caught the stuck "Verifying…" — a refused
+      // save must never leave the busy line on screen).
+      paintToken()
+      if (code === 'invalid') showTokenError(t('tokenRejected'))
+      else if (code === 'no_access') showTokenError(t('tokenNoAccess'))
+      else if (code === 'not_wired') showTokenError(t('notWired'))
+      else showTokenError(t('tokenSaveFailed'))
+    }
+
+    // The ONLY rejected promise this binding returns is the malformed-shape
+    // refusal (errBadGithubToken) — the catch paints the shape line. The
+    // status line restores the stored truth (nothing was saved).
+    function onTokenSaveFail() {
+      setTokenBusy(false)
+      hideTokenError()
+      paintToken()
+      showTokenError(t('tokenInvalid'))
+    }
+
+    if (els.tokenSave) els.tokenSave.addEventListener('click', function () {
+      if (tokenBusy) return
+      var value = els.tokenInput ? String(els.tokenInput.value || '') : ''
+      hideTokenError()
+      if (!value) return // nothing to save — Remove is the clear path
+      var save = resolveBoundMethod('SetGithubToken')
+      if (!save) { showTokenError(t('notWired')); return }
+      setTokenBusy(true)
+      if (els.tokenStatus) els.tokenStatus.textContent = t('tokenSaving')
+      try {
+        Promise.resolve(save(value)).then(onTokenSaveDone, onTokenSaveFail)
+      } catch (e) { onTokenSaveFail() }
+    })
+
+    if (els.tokenRemove) els.tokenRemove.addEventListener('click', function () {
+      if (tokenBusy) return
+      var save = resolveBoundMethod('SetGithubToken')
+      if (!save) { showTokenError(t('notWired')); return }
+      hideTokenError()
+      if (els.tokenInput) els.tokenInput.value = ''
+      setTokenBusy(true)
+      if (els.tokenStatus) els.tokenStatus.textContent = t('tokenSaving')
+      try {
+        Promise.resolve(save('')).then(onTokenSaveDone, onTokenSaveFail) // "" = the Go clear contract
+      } catch (e) { onTokenSaveFail() }
+    })
+
+    // Enter in the field SAVES — a method="dialog" form would otherwise
+    // swallow the keypress as a submit (closing the sheet mid-save).
+    if (els.tokenInput) els.tokenInput.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault()
+        if (els.tokenSave && !tokenBusy) els.tokenSave.click()
+      }
     })
 
     // ---- SECTION 4's segmented controls ----
@@ -4412,6 +4630,40 @@ const DESKTOP_SETTINGS_CSS = `/* desktop-settings.css — the settings page (v0.
    grammar (class db-update-cta, desktop-update.css) — the twin fill so both
    surfaces of the same action read as one. */
 #db-settings-update-now[hidden] { display: none; }
+
+/* The GitHub-access row (v0.1.18 — the owner ask: "hibana desktop might be
+   a private repo so in setting, add a github credentials so it can connect
+   to the private repo"): the Appearance rows' own label-rail grammar with a
+   PASSWORD input + Save/Remove at the control column. The input is
+   type=password on purpose — the token never renders in clear; the
+   controller clears the field on every resolve, so the value lives
+   Go-side only. RTL mirrors through the logical properties, as everywhere
+   in this sheet. */
+.db-settings-token-row { align-items: center; }
+.db-settings-token {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-inline-size: 0;
+}
+#db-settings-token-input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--fg);
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+}
+#db-settings-token-input::placeholder { color: var(--muted); }
+#db-settings-token-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+#db-settings-token-clear[hidden] { display: none; }
+#db-settings-token-error { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .db-settings-seg-btn { transition: none; }
@@ -5056,7 +5308,9 @@ function verifyDist(outDir, fileMap) {
     'id="db-settings-account-heading"', 'id="db-settings-account"', 'id="db-settings-signout"', 'data-i18n="nav.signout"',
     'id="db-settings-appearance-heading"', 'id="db-settings-lang-seg"', 'data-seg-lang="en"', 'data-seg-lang="fa"',
     'id="db-settings-theme-seg"', 'data-seg-theme="light"', 'data-seg-theme="claude-dark"', 'data-seg-theme="system"',
-    'id="db-settings-done"', 'css/desktop-settings.css']) {
+    'id="db-settings-done"', 'css/desktop-settings.css',
+    'id="db-settings-token-input"', 'type="password"', 'id="db-settings-token-save"', 'id="db-settings-token-clear"',
+    'id="db-settings-token-status"', 'id="db-settings-token-error"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the settings round is missing "' + kept + '"')
   }
   {
@@ -5088,6 +5342,11 @@ function verifyDist(outDir, fileMap) {
   if (!settingsJs.includes("resolveBoundMethod('CheckForUpdates')")) problems.push('js/desktop-settings.js: the manual check must resolve the Go CheckForUpdates binding at CLICK time')
   if (!settingsJs.includes("resolveBoundMethod('AppInfo')")) problems.push('js/desktop-settings.js: the version line must resolve the Go AppInfo binding at OPEN time')
   if (!settingsJs.includes("resolveBoundMethod('AuthState')")) problems.push('js/desktop-settings.js: the account line must resolve the Go AuthState binding at OPEN time')
+  if (!settingsJs.includes("resolveBoundMethod('SetGithubToken')")) problems.push("js/desktop-settings.js: the GitHub-access row must resolve the Go SetGithubToken binding at CLICK time (v0.1.18 — the owner's credentials ask)")
+  if (!settingsJs.includes("resolveBoundMethod('GithubTokenState')")) problems.push('js/desktop-settings.js: the GitHub-access row must resolve the Go GithubTokenState binding at OPEN time')
+  if (!settingsJs.includes("save('')")) problems.push("js/desktop-settings.js: Remove must ride SetGithubToken('') — the Go binding's explicit-clear contract")
+  if (!settingsJs.includes('els.check.click()')) problems.push('js/desktop-settings.js: a SAVED token must immediately re-check (the connect-now reflex — the row\'s whole point)')
+  if (!settingsJs.includes("ev.key === 'Enter'")) problems.push('js/desktop-settings.js: Enter in the token field must SAVE, never submit the method=dialog form (the sheet would close mid-save)')
   if (!settingsJs.includes("delegate('db-sync-button')")) problems.push("js/desktop-settings.js: the Sync-now row must delegate to the proven #db-sync-button flow")
   if (!settingsJs.includes("delegate('db-update-button')")) problems.push("js/desktop-settings.js: the Update-now row must delegate to the proven #db-update-button flow")
   if (!settingsJs.includes("delegate('db-logout-button')")) problems.push("js/desktop-settings.js: the Sign-out row must delegate to the proven #db-logout-button flow")
@@ -5104,8 +5363,12 @@ function verifyDist(outDir, fileMap) {
   if (!settingsJs.includes('زبان تغییر نکرد')) problems.push('js/desktop-settings.js: the FA offline-language honesty line is missing')
   if (!settingsJs.includes("You're on the latest version.")) problems.push("js/desktop-settings.js: the EN latest-version line is missing")
   if (!settingsJs.includes('آخرین نسخه')) problems.push('js/desktop-settings.js: the FA latest-version line is missing')
+  if (!settingsJs.includes('anonymous GitHub access (fine for public repos)')) problems.push("js/desktop-settings.js: the EN no-token honesty line is missing (the anonymous default is a FACT the row must state)")
+  if (!settingsJs.includes('دسترسی ناشناس به گیت‌هاب')) problems.push('js/desktop-settings.js: the FA no-token honesty line is missing')
+  if (!settingsJs.includes('GitHub rejected the token — nothing was saved.')) problems.push('js/desktop-settings.js: the EN token-rejected honesty line is missing')
+  if (!settingsJs.includes('گیت‌هاب این توکن را نپذیرفت')) problems.push('js/desktop-settings.js: the FA token-rejected honesty line is missing')
   const settingsCss = fileMap['css/desktop-settings.css'] || ''
-  for (const kept of ['#db-settings-button', '#db-settings-dialog', '.db-settings-section', '.db-settings-row', '.db-settings-seg', "[aria-pressed='true']", 'prefers-reduced-motion: reduce']) {
+  for (const kept of ['#db-settings-button', '#db-settings-dialog', '.db-settings-section', '.db-settings-row', '.db-settings-seg', "[aria-pressed='true']", 'prefers-reduced-motion: reduce', '#db-settings-token-input', '.db-settings-token']) {
     if (!settingsCss.includes(kept)) problems.push('css/desktop-settings.css: the settings style layer is missing "' + kept + '"')
   }
   if (!fs.existsSync(path.join(outDir, 'css/desktop-settings.css'))) problems.push('css/desktop-settings.css: missing from dist')
@@ -5323,7 +5586,7 @@ function main() {
   for (const line of adapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
   process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-audio.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + js/desktop-update.js + css/desktop-update.css + js/desktop-settings.js + css/desktop-settings.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the five synthesized cues + the seam observer, the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays, no-storage), no-404 asset loop, node --check\n')
+  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the five synthesized cues + the seam observer, the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines), no-storage), no-404 asset loop, node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }

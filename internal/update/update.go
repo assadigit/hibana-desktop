@@ -9,9 +9,14 @@
 // THE DESIGN (honest about every boundary it can control):
 //
 //  1. THE CHECK — GET /repos/<owner>/<repo>/releases/latest against the
-//     public GitHub API (the repo is public since the owner's flip; NO token
-//     is ever embedded in the binary — an anonymous check needs none, and a
-//     leaked PAT in a public app's exe would be a self-inflicted wound).
+//     public GitHub API. Anonymous by DEFAULT (the repo is public, and a PAT
+//     embedded in a public app's exe would be a self-inflicted wound); since
+//     v0.1.18 an OPTIONAL user-supplied token (the settings sheet's
+//     GitHub-access row, stored in the DATA dir — token.go) rides every
+//     request as a Bearer header, so a private flip keeps the app updating
+//     and an authenticated check lifts the anonymous 60/hr shared-IP budget
+//     to 5000/hr. No token, no header: the public round is byte-identical
+//     to the v0.1.14 behavior.
 //     The tag "v0.1.14-desktop" normalizes to "0.1.14" and is compared with
 //     the -X stamped main.Version ("0.1.14"; a dev build "0.1.14-dev" counts
 //     as 0.1.14 — dev builds never self-update to their own tag, only to a
@@ -42,12 +47,16 @@
 //
 //  5. THE RESTART — Windows cannot replace a running exe, so the replace
 //     rides a DETACHED PowerShell helper spawned right before the app quits
-//     (apply_windows.go): it waits for the parent PID to exit, swaps the
-//     file, relaunches the SAME path (the new version), and stages nothing
-//     in the data dir but the downloads themselves. The installer flow runs
-//     the wizard VISIBLE (no /S — a silent NSIS on a machine where it needs
-//     elevation would hang invisibly on a UAC prompt no one can see) and
-//     relaunches the exe after it finishes.
+//     (apply_windows.go — the interpreter RESOLVED BY ABSOLUTE PATH through
+//     internal/winshell, because a stripped PATH must never kill the swap;
+//     the v0.1.17 dogfood: a machine with a healthy PowerShell failed with
+//     exec: "powershell.exe": executable file not found in %PATH%): it waits
+//     for the parent PID to exit, swaps the file, relaunches the SAME path
+//     (the new version), and stages nothing in the data dir but the
+//     downloads themselves. The installer flow runs the wizard VISIBLE (no
+//     /S — a silent NSIS on a machine where it needs elevation would hang
+//     invisibly on a UAC prompt no one can see) and relaunches the exe after
+//     it finishes.
 package update
 
 import (
@@ -239,22 +248,40 @@ type ghRelease struct {
 	Assets      []ghAsset `json:"assets"`
 }
 
+// ghRequest builds one GitHub request with the shared headers: the API's
+// own versioned media type, the descriptive User-Agent GitHub requires, and
+// — since v0.1.18 — the optional stored token's Bearer header (an empty
+// token sends nothing; the anonymous round stays anonymous). Every request
+// the update package makes goes through here, so the authenticated path and
+// the anonymous path can never drift apart.
+func ghRequest(ctx context.Context, method, url, token string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "Hibana-Kanban-Desktop-Updater")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return req, nil
+}
+
 // FetchLatest reads the repo's latest published release and classifies its
 // assets. The Accept header is the API's own versioned media type + a
-// descriptive User-Agent (GitHub requires one).
-func FetchLatest(ctx context.Context, client *http.Client, repo string) (*Release, error) {
+// descriptive User-Agent (GitHub requires one); token ("") rides as a Bearer
+// header when set (token.go — the private-repo / rate-budget path).
+func FetchLatest(ctx context.Context, client *http.Client, repo, token string) (*Release, error) {
 	if client == nil {
 		client = &http.Client{Timeout: checkTimeout}
 	}
 	cctx, cancel := context.WithTimeout(ctx, checkTimeout)
 	defer cancel()
 	url := strings.TrimRight(apiBase, "/") + "/repos/" + repo + "/releases/latest"
-	req, err := http.NewRequestWithContext(cctx, http.MethodGet, url, nil)
+	req, err := ghRequest(cctx, http.MethodGet, url, token)
 	if err != nil {
 		return nil, fmt.Errorf("update: latest release: %w", err)
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "Hibana-Kanban-Desktop-Updater")
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("update: latest release: %w", err)
@@ -407,18 +434,20 @@ func VerifyZipEntry(zipPath, entryName string, sums map[string]string) error {
 // asset — the atomic rename happens only on a complete copy) and relays
 // progress every progressStep bytes plus one final tick. total<=0 means the
 // caller lacked Content-Length; the relay still counts bytes (the modal's
-// bar goes indeterminate then).
-func Download(ctx context.Context, client *http.Client, url, dest string, total int64, progress func(Progress)) (int64, error) {
+// bar goes indeterminate then). The optional token rides as a Bearer header
+// (private-repo asset downloads: GitHub 302s the authorized URL to a signed
+// objects URL, and Go strips Authorization on cross-host redirects, so the
+// signed follow-up needs nothing from us).
+func Download(ctx context.Context, client *http.Client, url, dest string, total int64, progress func(Progress), token string) (int64, error) {
 	if client == nil {
 		client = &http.Client{Timeout: downloadTimeout}
 	}
 	dctx, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(dctx, http.MethodGet, url, nil)
+	req, err := ghRequest(dctx, http.MethodGet, url, token)
 	if err != nil {
 		return 0, fmt.Errorf("update: download: %w", err)
 	}
-	req.Header.Set("User-Agent", "Hibana-Kanban-Desktop-Updater")
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("update: download: %w", err)
@@ -487,8 +516,9 @@ func Download(ctx context.Context, client *http.Client, url, dest string, total 
 	return received, nil
 }
 
-// fetchChecksums reads the release's own checksums.txt (a few hundred bytes).
-func fetchChecksums(ctx context.Context, client *http.Client, c *Asset) (map[string]string, error) {
+// fetchChecksums reads the release's own checksums.txt (a few hundred
+// bytes; the token rides the same Bearer header as every other request).
+func fetchChecksums(ctx context.Context, client *http.Client, c *Asset, token string) (map[string]string, error) {
 	if client == nil {
 		client = &http.Client{Timeout: checkTimeout}
 	}
@@ -497,11 +527,10 @@ func fetchChecksums(ctx context.Context, client *http.Client, c *Asset) (map[str
 	}
 	cctx, cancel := context.WithTimeout(ctx, checkTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(cctx, http.MethodGet, c.URL, nil)
+	req, err := ghRequest(cctx, http.MethodGet, c.URL, token)
 	if err != nil {
 		return nil, fmt.Errorf("update: checksums: %w", err)
 	}
-	req.Header.Set("User-Agent", "Hibana-Kanban-Desktop-Updater")
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("update: checksums: %w", err)
@@ -546,6 +575,18 @@ func (u *Updater) updatesDir() (string, error) {
 	return d, nil
 }
 
+// authToken is the round's optional stored token, read FRESH from the data
+// dir on every check/prepare (a token saved through the settings sheet
+// mid-session is picked up by the very next round — no restart); "" = the
+// honest anonymous round. A hand-mangled file degrades to "" too (LoadToken's
+// shape gate), never a broken header that 401s every check.
+func (u *Updater) authToken() string {
+	if u.DataDir == "" {
+		return ""
+	}
+	return LoadToken(u.DataDir)
+}
+
 // exePath resolves the binary to replace (tests inject; the shell trusts
 // os.Executable()).
 func (u *Updater) exePath() (string, error) {
@@ -555,12 +596,19 @@ func (u *Updater) exePath() (string, error) {
 	return os.Executable()
 }
 
+// ReleasePageURL is the release's human page — the manual-install escape
+// hatch the apply error names when a machine has no shell interpreter at
+// all (the staged zip + this URL = a human can always finish the round).
+func ReleasePageURL(repo string) string {
+	return "https://github.com/" + repo + "/releases/latest"
+}
+
 // Check runs the whole check: fetch the latest release, decide, and report
 // the wire result. An unreachable GitHub is an ERROR (the caller logs it and
 // the island stays quiet — an offline check must never paint "no update";
 // it simply didn't happen).
 func (u *Updater) Check(ctx context.Context) (CheckResult, error) {
-	rel, err := FetchLatest(ctx, u.Client, u.Repo)
+	rel, err := FetchLatest(ctx, u.Client, u.Repo, u.authToken())
 	if err != nil {
 		return CheckResult{Current: u.Current}, err
 	}
@@ -581,7 +629,7 @@ func (u *Updater) Check(ctx context.Context) (CheckResult, error) {
 		Kind:      kind,
 		Size:      asset.Size,
 		Notes:     rel.Notes,
-		URL:       "https://github.com/" + u.Repo + "/releases/latest",
+		URL:       ReleasePageURL(u.Repo),
 	}, nil
 }
 
@@ -593,7 +641,7 @@ func (u *Updater) Check(ctx context.Context) (CheckResult, error) {
 // The verdict is RE-EARNED here: the release may have moved between the
 // check and the click (a re-cut tag, a yanked asset).
 func (u *Updater) Prepare(ctx context.Context, progress func(Progress)) (string, string, error) {
-	rel, err := FetchLatest(ctx, u.Client, u.Repo)
+	rel, err := FetchLatest(ctx, u.Client, u.Repo, u.authToken())
 	if err != nil {
 		return "", "", err
 	}
@@ -606,13 +654,13 @@ func (u *Updater) Prepare(ctx context.Context, progress func(Progress)) (string,
 		return "", "", err
 	}
 	dest := filepath.Join(dir, asset.Name)
-	if _, err := Download(ctx, u.Client, asset.URL, dest, asset.Size, progress); err != nil {
+	if _, err := Download(ctx, u.Client, asset.URL, dest, asset.Size, progress, u.authToken()); err != nil {
 		return "", "", err
 	}
 	if progress != nil {
 		progress(Progress{Stage: "verify", Received: asset.Size, Total: asset.Size, Pct: 100})
 	}
-	sums, err := fetchChecksums(ctx, u.Client, rel.Checksums)
+	sums, err := fetchChecksums(ctx, u.Client, rel.Checksums, u.authToken())
 	if err != nil {
 		os.Remove(dest)
 		return "", "", err
@@ -660,5 +708,5 @@ func (u *Updater) Apply(assetPath, kind string) error {
 	if err != nil {
 		return err
 	}
-	return apply(assetPath, kind, exe, os.Getpid())
+	return apply(assetPath, kind, exe, ReleasePageURL(u.Repo), os.Getpid())
 }

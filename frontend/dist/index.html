@@ -258,6 +258,11 @@
        Check for updates rides the bound CheckForUpdates verdict (the
        auto-update loop keeps checking boot + 2h untouched — this row is
        the manual trigger + the idle-time surface the owner asked for);
+       v0.1.18 adds the GitHub-access row (SetGithubToken /
+       GithubTokenState — an optional PAT stored Go-side in the DATA dir
+       riding every release request as a Bearer header: anonymous stays the
+       default, a private flip keeps updating, and the shared-IP 60/hr
+       budget lifts to 5000/hr);
        the theme segmented control rides SetTheme (the tray's full
        light | claude-dark | system vocabulary — an upgrade over the
        toolbar's binary flip, which stays as the quick flip); the language
@@ -288,8 +293,11 @@
 
       <!-- 2. UPDATE APP (the owner's second section — "check the latest
            release of github, if there were newer version. update."): the
-           version line from AppInfo, the manual check verdict, and the
-           Update-now delegation to the proven update modal. -->
+           version line from AppInfo, the manual check verdict, the
+           Update-now delegation to the proven update modal, and (v0.1.18)
+           the GitHub-access row — the owner ask: "hibana desktop might be
+           a private repo so in setting, add a github credentials so it can
+           connect to the private repo". -->
       <section class="db-settings-section">
         <h3 class="db-settings-heading" id="db-settings-update-heading">Update app</h3>
         <p class="db-settings-version" id="db-settings-version">Hibana — island unpinned</p>
@@ -299,6 +307,27 @@
           <button type="button" class="btn ghost small" id="db-settings-check"><span id="db-settings-check-label">Check for updates</span></button>
           <button type="button" class="small db-update-cta" id="db-settings-update-now" hidden><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg><span id="db-settings-update-now-label">Update now</span></button>
         </div>
+        <!-- v0.1.18: the GitHub-access row — a PAT the Go shell stores in
+             the DATA dir (github-token, 0600) and attaches to every
+             release check + asset download + checksums fetch as a Bearer
+             header. Anonymous stays the DEFAULT (the repo is public); the
+             token covers the private flip + the 60/hr → 5000/hr rate
+             budget. The value crosses the bridge ONCE (SetGithubToken —
+             the login password's discipline; Enter in the field saves,
+             never submits the dialog form); only the ghp_…ABCD hint ever
+             crosses back (GithubTokenState). A saved token immediately
+             re-checks (js/desktop-settings.js clicks #db-settings-check)
+             — the owner's connect-now ask. -->
+        <div class="db-settings-row db-settings-token-row">
+          <span class="db-settings-row-label" id="db-settings-token-label">GitHub access</span>
+          <div class="db-settings-token">
+            <input type="password" id="db-settings-token-input" autocomplete="off" spellcheck="false" placeholder="ghp_… (optional)" aria-label="GitHub personal access token" />
+            <button type="button" class="btn ghost small" id="db-settings-token-save"><span id="db-settings-token-save-label">Save</span></button>
+            <button type="button" class="btn ghost small" id="db-settings-token-clear" hidden><span id="db-settings-token-clear-label">Remove</span></button>
+          </div>
+        </div>
+        <p class="small muted" id="db-settings-token-status"></p>
+        <p id="db-settings-token-error" class="error" role="alert" hidden></p>
       </section>
 
       <!-- 3. ACCOUNT (the owner's third section): the identity from

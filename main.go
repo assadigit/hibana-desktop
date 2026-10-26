@@ -56,7 +56,7 @@ import (
 //	wails build -platform windows/amd64 -ldflags \
 //	  "-s -w -X main.Version=0.1.4 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.17-dev"
+	Version = "0.1.18-dev"
 	WebRef  = "unpinned"
 )
 
@@ -417,6 +417,18 @@ func main() {
 		Current: Version,
 		DataDir: dataDir,
 	}
+	// THE GITHUB CREDENTIALS (v0.1.18 — the owner ask: "hibana desktop
+	// might be a private repo so in setting, add a github credentials so
+	// it can connect to the private repo"): the settings sheet's
+	// GitHub-access row rides the SAME data dir + repo the Updater owns
+	// (one token file, one truth — the rounds read it fresh on every
+	// check, so a token saved mid-session is live on the next round).
+	// The repo is public today and anonymous stays the default; the token
+	// covers the private flip + the 60/hr → 5000/hr rate budget.
+	bridge.SetGithubTokenStore(&update.TokenStore{
+		DataDir: dataDir,
+		Repo:    "assadigit/hibana-desktop",
+	})
 	bridge.SetUpdateCheck(func(ctx context.Context) (update.CheckResult, error) {
 		return updater.Check(ctx)
 	})

@@ -5,12 +5,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
 
 	"hibana/desktop/internal/api"
 	"hibana/desktop/internal/auth"
+	"hibana/desktop/internal/update"
 )
 
 // The settings round's language layer (the plan §5's gate list): the enum,
@@ -407,5 +409,194 @@ func TestLanguagePrefAfterLogoutReadsEn(t *testing.T) {
 	}
 	if got := a.LanguagePref(); got != LangEn {
 		t.Fatalf("the signed-out serve language must read en, got %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The v0.1.18 GitHub-credentials bindings (settings.go's second half): the
+// shape gate (a rejected promise, never a round-trip), the not-wired verdict,
+// the clear path, the verify-then-save verdict matrix (200 → saved+verified,
+// 401 → NOT saved, 404 → NOT saved, unreachable → saved with the honest
+// unverified note), and the state hint's never-leak-the-secret contract.
+// ---------------------------------------------------------------------------
+
+// ghVerifyServer answers GET /repos/assadigit/hibana-desktop with status and
+// captures the Authorization header the binding's verify round sent.
+func ghVerifyServer(t *testing.T, status int, sawAuth *string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/assadigit/hibana-desktop" {
+			http.NotFound(w, r)
+			return
+		}
+		*sawAuth = r.Header.Get("Authorization")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// ghTokenAPI wires a settings-style API with a token store over a temp data
+// dir and a verify server answering status.
+func ghTokenAPI(t *testing.T, status int, sawAuth *string) (*API, string) {
+	t.Helper()
+	srv := ghVerifyServer(t, status, sawAuth)
+	_, _, a, _ := settingsFake(t)
+	dir := t.TempDir()
+	a.SetGithubTokenStore(&update.TokenStore{
+		DataDir: dir,
+		Repo:    "assadigit/hibana-desktop",
+		APIBase: srv.URL,
+	})
+	return a, dir
+}
+
+const ghTestToken = "ghp_0123456789abcdefghijklmnopqrstuv"
+
+func TestSetGithubTokenShapeRejected(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusOK, &saw)
+	for _, hostile := range []string{"no", "has spaces", "line\nbreak", strings.Repeat("x", 300)} {
+		if _, err := a.SetGithubToken(hostile); err == nil {
+			t.Errorf("SetGithubToken(%q) must reject outside the PAT alphabet", hostile)
+		}
+	}
+	if saw != "" {
+		t.Errorf("a malformed token must never reach the wire, saw Authorization %q", saw)
+	}
+	if _, err := os.Stat(update.TokenPath(dir)); err == nil {
+		t.Errorf("a malformed token must never reach the disk")
+	}
+}
+
+func TestSetGithubTokenNotWired(t *testing.T) {
+	_, _, a, _ := settingsFake(t) // no SetGithubTokenStore call
+	res, err := a.SetGithubToken(ghTestToken)
+	if err != nil {
+		t.Fatalf("not-wired resolves a verdict, not a rejection: %v", err)
+	}
+	if res.OK || res.Code != "not_wired" {
+		t.Errorf("not-wired verdict = %+v, want {ok:false, code:not_wired}", res)
+	}
+	if st, _ := a.GithubTokenState(); st.Set || st.Hint != "" {
+		t.Errorf("not-wired state = %+v, want unset", st)
+	}
+}
+
+func TestSetGithubTokenClear(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusOK, &saw)
+	if err := update.SaveToken(dir, ghTestToken); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.SetGithubToken("")
+	if err != nil || !res.OK || !res.Cleared || res.Saved {
+		t.Fatalf("clear verdict = %+v, %v — want {ok, cleared}", res, err)
+	}
+	if _, err := os.Stat(update.TokenPath(dir)); !os.IsNotExist(err) {
+		t.Errorf("the clear must remove the stored token file")
+	}
+	// Trailing whitespace still means clear (the binding trims).
+	if err := update.SaveToken(dir, ghTestToken); err != nil {
+		t.Fatal(err)
+	}
+	if res, _ := a.SetGithubToken("   "); !res.OK || !res.Cleared {
+		t.Errorf("a whitespace-only input must clear: %+v", res)
+	}
+}
+
+func TestSetGithubTokenSaveVerified(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusOK, &saw)
+	res, err := a.SetGithubToken(ghTestToken)
+	if err != nil {
+		t.Fatalf("SetGithubToken: %v", err)
+	}
+	if !res.OK || !res.Saved || !res.Verified || res.Code != "" {
+		t.Fatalf("verified verdict = %+v, want {ok, saved, verified}", res)
+	}
+	if saw != "Bearer "+ghTestToken {
+		t.Errorf("the verify round must send the update round's own Bearer header, saw %q", saw)
+	}
+	if got := update.LoadToken(dir); got != ghTestToken {
+		t.Errorf("the token file = %q", got)
+	}
+	st, err := a.GithubTokenState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.Set || st.Hint != "ghp_…stuv" {
+		t.Errorf("state = %+v, want {set, hint ghp_…stuv}", st)
+	}
+	// The never-leak contract: the full token appears nowhere in the wire JSON.
+	blob, _ := json.Marshal(st)
+	if strings.Contains(string(blob), ghTestToken) || strings.Contains(string(blob), "ghp_0123456789") {
+		t.Errorf("the state JSON leaked the secret: %s", blob)
+	}
+}
+
+func TestSetGithubTokenInvalidNotSaved(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusUnauthorized, &saw)
+	res, err := a.SetGithubToken(ghTestToken)
+	if err != nil {
+		t.Fatalf("a 401 resolves a verdict, not a rejection: %v", err)
+	}
+	if res.OK || res.Code != "invalid" || res.Saved {
+		t.Fatalf("401 verdict = %+v, want {ok:false, code:invalid, nothing saved}", res)
+	}
+	if _, err := os.Stat(update.TokenPath(dir)); err == nil {
+		t.Errorf("a rejected token must never reach the disk")
+	}
+}
+
+func TestSetGithubTokenNoAccessNotSaved(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusNotFound, &saw)
+	res, err := a.SetGithubToken(ghTestToken)
+	if err != nil {
+		t.Fatalf("a 404 resolves a verdict, not a rejection: %v", err)
+	}
+	if res.OK || res.Code != "no_access" || res.Saved {
+		t.Fatalf("404 verdict = %+v, want {ok:false, code:no_access, nothing saved}", res)
+	}
+	if _, err := os.Stat(update.TokenPath(dir)); err == nil {
+		t.Errorf("a no-access token must never reach the disk")
+	}
+}
+
+func TestSetGithubTokenUnreachableStillSaves(t *testing.T) {
+	saw := ""
+	a, dir := ghTokenAPI(t, http.StatusOK, &saw)
+	// A DEAD verify target: the write is local, so the save must stand with
+	// the honest saved-unverified note (the offline discipline).
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close()
+	a.ghTokens.APIBase = srv.URL
+	res, err := a.SetGithubToken(ghTestToken)
+	if err != nil {
+		t.Fatalf("SetGithubToken: %v", err)
+	}
+	if !res.OK || !res.Saved || res.Verified {
+		t.Fatalf("unreachable verdict = %+v, want {ok, saved, NOT verified}", res)
+	}
+	if !strings.Contains(res.Message, "couldn't be reached") {
+		t.Errorf("the saved-unverified note must say why verification didn't happen: %q", res.Message)
+	}
+	if got := update.LoadToken(dir); got != ghTestToken {
+		t.Errorf("the offline save must still land on disk, got %q", got)
+	}
+}
+
+func TestGithubTokenStateUnset(t *testing.T) {
+	saw := ""
+	a, _ := ghTokenAPI(t, http.StatusOK, &saw)
+	st, err := a.GithubTokenState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Set || st.Hint != "" {
+		t.Errorf("unset state = %+v, want the zero shape", st)
 	}
 }

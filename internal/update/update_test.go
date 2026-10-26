@@ -105,7 +105,7 @@ func TestFetchLatestClassifiesAssets(t *testing.T) {
 	apiBase = srv.URL
 	defer func() { apiBase = old }()
 
-	rel, err := FetchLatest(context.Background(), nil, "assadigit/hibana-desktop")
+	rel, err := FetchLatest(context.Background(), nil, "assadigit/hibana-desktop", "")
 	if err != nil {
 		t.Fatalf("FetchLatest: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestDownloadRelaysProgressAndNeverLeavesAPart(t *testing.T) {
 	dest := filepath.Join(t.TempDir(), "asset.zip")
 	var ticks []Progress
 	n, err := Download(context.Background(), srv.Client(), srv.URL+"/asset.zip", dest, int64(len(payload)),
-		func(p Progress) { ticks = append(ticks, p) })
+		func(p Progress) { ticks = append(ticks, p) }, "")
 	if err != nil {
 		t.Fatalf("Download: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestDownloadRelaysProgressAndNeverLeavesAPart(t *testing.T) {
 	}))
 	defer srv2.Close()
 	dest2 := filepath.Join(filepath.Dir(dest), "died.zip")
-	if _, err := Download(context.Background(), srv2.Client(), srv2.URL+"/asset.zip", dest2, int64(len(payload)), nil); err == nil {
+	if _, err := Download(context.Background(), srv2.Client(), srv2.URL+"/asset.zip", dest2, int64(len(payload)), nil, ""); err == nil {
 		t.Errorf("a severed download must error")
 	}
 	if _, err := os.Stat(dest2); !os.IsNotExist(err) {
@@ -470,7 +470,7 @@ func TestApplyStubFailsLoudlyOffWindows(t *testing.T) {
 	// On the Linux test ladder the stub must error (never a fake success);
 	// on Windows this test is vacuous — the real apply's surface is probed
 	// by the vet/build lane, and the PE needles by the release verification.
-	if err := apply("/tmp/asset.zip", KindPortable, "/tmp/hibana.exe", 42); err == nil {
+	if err := apply("/tmp/asset.zip", KindPortable, "/tmp/hibana.exe", "https://github.com/assadigit/hibana-desktop/releases/latest", 42); err == nil {
 		t.Errorf("the non-Windows apply stub must error, never pretend it applied")
 	}
 }

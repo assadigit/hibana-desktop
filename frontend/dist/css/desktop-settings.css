@@ -146,6 +146,40 @@
    surfaces of the same action read as one. */
 #db-settings-update-now[hidden] { display: none; }
 
+/* The GitHub-access row (v0.1.18 — the owner ask: "hibana desktop might be
+   a private repo so in setting, add a github credentials so it can connect
+   to the private repo"): the Appearance rows' own label-rail grammar with a
+   PASSWORD input + Save/Remove at the control column. The input is
+   type=password on purpose — the token never renders in clear; the
+   controller clears the field on every resolve, so the value lives
+   Go-side only. RTL mirrors through the logical properties, as everywhere
+   in this sheet. */
+.db-settings-token-row { align-items: center; }
+.db-settings-token {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-inline-size: 0;
+}
+#db-settings-token-input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font: inherit;
+  font-size: var(--fs-md);
+  color: var(--fg);
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+}
+#db-settings-token-input::placeholder { color: var(--muted); }
+#db-settings-token-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+#db-settings-token-clear[hidden] { display: none; }
+#db-settings-token-error { margin: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .db-settings-seg-btn { transition: none; }
 }

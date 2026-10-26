@@ -34,10 +34,18 @@
 //   7. THE EVENT SYNC: hibana:lang moves the segmented control without a
 //      reload (the tray/sheet agreement); hibana:update-available repaints
 //      the status line live.
-//   8. THE FA/RTL DARK MIRROR: the FA boot paints the sheet in Persian
+//   8. THE GITHUB-ACCESS ROW (v0.1.18 — the owner ask: "hibana desktop
+//      might be a private repo so in setting, add a github credentials so it
+//      can connect to the private repo"): a PASSWORD field + Save/Remove over
+//      SetGithubToken/GithubTokenState — the no-token honesty line, the
+//      saved+verified round (field CLEARED, the ghp_…stuv hint, Remove
+//      revealed, and THE CONNECT-NOW RE-CHECK firing through the manual
+//      check's own handler), the 401 rejection (nothing saved), Remove (the
+//      anonymous-again line), and the malformed-shape rejection line.
+//   9. THE FA/RTL DARK MIRROR: the FA boot paints the sheet in Persian
 //      (تنظیمات title via the pin's own key, the FA STR pairs), RTL-mirrored,
 //      in the dark look.
-//   9. REDUCED MOTION: the segment tween stills.
+//   10. REDUCED MOTION: the segment tween stills.
 //
 // The mock bridge sits at the SAME boundary the Wails runtime occupies in
 // production (window.go/window.runtime — byte-for-byte the same positions);
@@ -106,6 +114,12 @@ const probe = {
   langCalls: [],
   checkOutcome: { available: false, current: '0.1.16', latest: '0.1.16' },
   checkCalls: 0,
+  // v0.1.18 — the GitHub-access row's mock state: the stored-token truth
+  // GithubTokenState reports, the verdict SetGithubToken resolves, and the
+  // calls that crossed the bridge (the LAST one may be "" — the clear).
+  token: { set: false, hint: 'ghp_…stuv' },
+  tokenOutcome: { ok: true, saved: true, verified: true },
+  tokenCalls: [],
 }
 const MOCK_IPC_JS = 'window.WailsInvoke = function (m) { /* probe: no Go backend on the other side */ }\n'
 // The runtime mock is built PER REQUEST from the live probe state (the v0.1.9
@@ -119,6 +133,8 @@ const mockRuntimeJs = () => [
   "  AppInfo: function () { return Promise.resolve({ version: '0.1.16', webRef: 'e6661c8' }) },",
   '  SetTheme: function (pref) { window.__probeThemeCalls.push(pref); return Promise.resolve({ ok: true, pref: pref }) },',
   '  SetLanguage: function (lang) { return window.__probeSetLanguage(lang) },',
+  '  SetGithubToken: function (tok) { return window.__probeSetToken(tok) },',
+  '  GithubTokenState: function () { return fetch("/__probe/tokenstate").then(function (r) { return r.json() }) },',
   '  SyncNow: function () { return Promise.resolve({ ok: true, uploaded: 0, pulled: 0, projects: 1, boards: 1, at: new Date().toISOString() }) },',
   '  CheckForUpdates: function () { return window.__probeCheck() },',
   '  ApplyUpdate: function () { return Promise.resolve({ ok: false, message: \'probe: apply is not this round\\\'s leg\' }) },',
@@ -175,6 +191,12 @@ const server = http.createServer((req, res) => {
       '    return body',
       '  })',
       '}',
+      'window.__probeSetToken = function (tok) {',
+      '  return fetch("/__probe/settoken", { method: "POST", body: JSON.stringify({ token: tok }) }).then(function (r) { return r.json() }).then(function (body) {',
+      '    if (body && body.reject) return Promise.reject(new Error(body.message || ""))',
+      '    return body',
+      '  })',
+      '}',
       'window.__probeRequest = function (method, p, body) {',
       '  return fetch("/__probe/request", { method: "POST", body: JSON.stringify({ method, p, body }) }).then(function (r) { return r.json() })',
       '}',
@@ -202,6 +224,23 @@ const server = http.createServer((req, res) => {
     if (out.reject) send(200, 'application/json', JSON.stringify(out))
     else send(200, 'application/json', JSON.stringify(out))
     return
+  }
+  if (p === '/__probe/tokenstate') {
+    return send(200, 'application/json', JSON.stringify(probe.token.set ? { set: true, hint: probe.token.hint } : { set: false }))
+  }
+  if (p === '/__probe/settoken' && req.method === 'POST') {
+    let raw = ''
+    req.on('data', (c) => (raw += c))
+    return req.on('end', () => {
+      const body = JSON.parse(raw || '{}')
+      probe.tokenCalls.push(String(body.token == null ? '' : body.token))
+      const out = Object.assign({}, probe.tokenOutcome)
+      // The mock's stored state moves exactly the way the Go binding's file
+      // write does: a saved round stores the hint, a cleared round empties it.
+      if (out.ok && out.saved) probe.token = { set: true, hint: 'ghp_…stuv' }
+      if (out.ok && out.cleared) probe.token = { set: false, hint: '' }
+      send(200, 'application/json', JSON.stringify(out))
+    })
   }
   if (p === '/__probe/request' && req.method === 'POST') {
     let raw = ''
@@ -467,6 +506,88 @@ async function main() {
     await page.waitForFunction(() => /0\.1\.17/.test((document.getElementById('db-settings-update-status') || {}).textContent || ''), null, { timeout: 5000 })
     check('the hibana:update-available relay repaints the open sheet\'s status line', true)
 
+    // ---- 5½. THE GITHUB-ACCESS ROW (v0.1.18 — the owner ask: "hibana desktop
+    //      might be a private repo so in setting, add a github credentials so
+    //      it can connect to the private repo") ----
+    // 5½a. the honest default: no token stored → the anonymous line, Remove hidden.
+    const tokenRow0 = await page.evaluate(() => {
+      const g = (id) => document.getElementById(id)
+      const input = g('db-settings-token-input')
+      return {
+        type: input ? input.getAttribute('type') : null,
+        autoComplete: input ? input.getAttribute('autocomplete') : null,
+        status: (g('db-settings-token-status') || {}).textContent || '',
+        removeHidden: (g('db-settings-token-clear') || {}).hidden,
+        label: (g('db-settings-token-label') || {}).textContent || '',
+        saveLabel: (g('db-settings-token-save-label') || {}).textContent || '',
+        removeLabel: (g('db-settings-token-clear-label') || {}).textContent || '',
+        placeholder: input ? input.getAttribute('placeholder') : null,
+      }
+    })
+    check('the GitHub-access field is a PASSWORD input (the token never renders in clear)', tokenRow0.type === 'password', JSON.stringify(tokenRow0.type))
+    check('the field opts out of autocomplete', tokenRow0.autoComplete === 'off')
+    check('the row is labeled GitHub access + Save/Remove', tokenRow0.label === 'GitHub access' && tokenRow0.saveLabel === 'Save' && tokenRow0.removeLabel === 'Remove', JSON.stringify({ label: tokenRow0.label, save: tokenRow0.saveLabel, remove: tokenRow0.removeLabel }))
+    check('no token stored → the anonymous honesty line', tokenRow0.status === 'No token — anonymous GitHub access (fine for public repos).', JSON.stringify(tokenRow0.status))
+    check('Remove stays hidden while no token is stored', tokenRow0.removeHidden === true)
+
+    // 5½b. THE SAVED+VERIFIED ROUND: field cleared, the hint line, Remove
+    //      revealed, and THE CONNECT-NOW RE-CHECK (the row's whole point).
+    const checkCallsBeforeSave = probe.checkCalls
+    await page.fill('#db-settings-token-input', 'ghp_0123456789abcdefghijklmnopqrstuv')
+    await page.click('#db-settings-token-save')
+    await page.waitForFunction(() => /Token saved/.test((document.getElementById('db-settings-token-status') || {}).textContent || ''), null, { timeout: 5000 })
+    const tokenRow1 = await page.evaluate(() => {
+      const g = (id) => document.getElementById(id)
+      return {
+        status: (g('db-settings-token-status') || {}).textContent || '',
+        fieldValue: (g('db-settings-token-input') || {}).value || '',
+        removeHidden: (g('db-settings-token-clear') || {}).hidden,
+        errHidden: (g('db-settings-token-error') || {}).hidden,
+      }
+    })
+    check('the saved round paints the hint line (never the token itself)', tokenRow1.status === 'Token saved (ghp_…stuv) — release checks use it.', JSON.stringify(tokenRow1.status))
+    check('the field is CLEARED on the resolve (the value lives Go-side only)', tokenRow1.fieldValue === '')
+    check('Remove is revealed once a token is stored', tokenRow1.removeHidden === false)
+    check('the saved round stays error-free', tokenRow1.errHidden === true)
+    await page.waitForFunction(() => document.getElementById('db-settings-token-save').disabled === false, null, { timeout: 5000 })
+    check('a SAVED token immediately re-checks (the connect-now reflex)', probe.checkCalls === checkCallsBeforeSave + 1, 'calls=' + probe.checkCalls + ' (was ' + checkCallsBeforeSave + ')')
+    check('the token crossed the bridge exactly once, verbatim', probe.tokenCalls.length === 1 && probe.tokenCalls[0] === 'ghp_0123456789abcdefghijklmnopqrstuv', JSON.stringify(probe.tokenCalls))
+    await page.screenshot({ path: path.join(args.out, 'settings-token-saved.png') })
+
+    // 5½c. the 401 rejection: GitHub refused the token — nothing was saved.
+    probe.tokenOutcome = { ok: false, code: 'invalid', message: 'GitHub rejected the token — nothing was saved.' }
+    await page.fill('#db-settings-token-input', 'ghp_0000000000000000000000000000000000')
+    await page.click('#db-settings-token-save')
+    await page.waitForFunction(() => {
+      const e = document.getElementById('db-settings-token-error')
+      return e && !e.hidden && /GitHub rejected the token/i.test(e.textContent)
+    }, null, { timeout: 5000 })
+    check('the 401 verdict paints the honest rejected line', true)
+    check('the rejected round leaves the stored state untouched (the hint line still paints)', /Token saved/.test(await page.evaluate(() => (document.getElementById('db-settings-token-status') || {}).textContent || '')))
+    check('the rejected round does NOT re-check (nothing changed)', probe.checkCalls === checkCallsBeforeSave + 1, 'calls=' + probe.checkCalls)
+
+    // 5½d. the malformed-shape rejection (the binding's rejected promise).
+    probe.tokenOutcome = { reject: true, message: 'bridge: github token: malformed value' }
+    await page.fill('#db-settings-token-input', 'not a token')
+    await page.click('#db-settings-token-save')
+    await page.waitForFunction(() => {
+      const e = document.getElementById('db-settings-token-error')
+      return e && !e.hidden && /does not look like a GitHub token/i.test(e.textContent)
+    }, null, { timeout: 5000 })
+    check('the malformed shape paints its own line (the hostile-input law)', true)
+
+    // 5½e. REMOVE: the Go clear contract rides SetGithubToken("").
+    probe.tokenOutcome = { ok: true, cleared: true }
+    await page.click('#db-settings-token-clear')
+    await page.waitForFunction(() => /anonymous again/.test((document.getElementById('db-settings-token-status') || {}).textContent || ''), null, { timeout: 5000 })
+    const tokenRow2 = await page.evaluate(() => ({
+      status: (document.getElementById('db-settings-token-status') || {}).textContent || '',
+      removeHidden: (document.getElementById('db-settings-token-clear') || {}).hidden,
+    }))
+    check('Remove paints the anonymous-again line', tokenRow2.status === 'Token removed — release checks are anonymous again.', JSON.stringify(tokenRow2.status))
+    check('Remove hides itself once no token is stored', tokenRow2.removeHidden === true)
+    check('Remove rode the empty-string clear contract (the last call is "")', probe.tokenCalls[probe.tokenCalls.length - 1] === '', JSON.stringify(probe.tokenCalls))
+
     // ---- 6. THE LANGUAGE SEGMENT (the round's one new capability) ----
     // 6a. offline → the honest line, the control STAYS, NO reload.
     probe.langOutcome = { ok: false, message: "Couldn't reach hibana.ir — the language is unchanged." }
@@ -574,6 +695,11 @@ async function main() {
         themeLabel: (g('db-settings-theme-label') || {}).textContent || '',
         themeDark: (g('db-settings-theme-claude-dark') || {}).textContent || '',
         done: (g('db-settings-done-label') || {}).textContent || '',
+        tokenLabel: (g('db-settings-token-label') || {}).textContent || '',
+        tokenSave: (g('db-settings-token-save-label') || {}).textContent || '',
+        tokenRemove: (g('db-settings-token-clear-label') || {}).textContent || '',
+        tokenStatus: (g('db-settings-token-status') || {}).textContent || '',
+        tokenPlaceholder: (g('db-settings-token-input') || {}).getAttribute('placeholder') || '',
         dir: document.documentElement.getAttribute('dir'),
         darkActive: (g('db-settings-theme-claude-dark') || {}).getAttribute('aria-pressed'),
         faActive: (g('db-settings-lang-fa') || {}).getAttribute('aria-pressed'),
@@ -586,6 +712,10 @@ async function main() {
     check('the FA Sign out rides the pin\'s own nav.signout key (خروج)', faSheet.signout === 'خروج', JSON.stringify(faSheet.signout))
     check('the FA labels: Language/Theme + the Dark option', faSheet.langLabel === 'زبان' && faSheet.themeLabel === 'پوسته' && faSheet.themeDark === 'تیره', JSON.stringify({ langLabel: faSheet.langLabel, themeLabel: faSheet.themeLabel, themeDark: faSheet.themeDark }))
     check('the FA Done label', faSheet.done === 'انجام شد', JSON.stringify(faSheet.done))
+    check('the FA GitHub-access row: label + Save/Remove + the placeholder',
+      faSheet.tokenLabel === 'دسترسی گیت‌هاب' && faSheet.tokenSave === 'ذخیره' && faSheet.tokenRemove === 'حذف' && faSheet.tokenPlaceholder === 'ghp_… (اختیاری)',
+      JSON.stringify({ label: faSheet.tokenLabel, save: faSheet.tokenSave, remove: faSheet.tokenRemove, placeholder: faSheet.tokenPlaceholder }))
+    check('the FA GitHub-access row paints the no-token honesty line', faSheet.tokenStatus === 'توکنی ذخیره نشده — دسترسی ناشناس به گیت‌هاب (برای مخازن عمومی کافی است).', JSON.stringify(faSheet.tokenStatus))
     check('the FA sheet is RTL (dir=rtl)', faSheet.dir === 'rtl')
     check('the FA/dark serve stamps the active states (fa + claude-dark)', faSheet.faActive === 'true' && faSheet.darkActive === 'true')
 

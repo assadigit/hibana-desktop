@@ -167,6 +167,18 @@ type API struct {
 	// reload). The write itself rides the shared client + a.mu (settings.go).
 	settingsMu sync.Mutex
 	langEmit   func(name string, payload map[string]any)
+
+	// THE GITHUB CREDENTIALS (v0.1.18 — the owner ask: "hibana desktop
+	// might be a private repo so in setting, add a github credentials so
+	// it can connect to the private repo"): the settings sheet's
+	// GitHub-access row rides update.TokenStore — the SAME data dir + repo
+	// the shell's own Updater reads (one token file, one truth; a token
+	// saved mid-session is picked up by the next check). main.go wires
+	// it; nil = the honest not-wired verdict (the SetUpdateCheck
+	// precedent). The token itself NEVER lives on this struct — it
+	// crosses the bridge once, lands in the data dir, and only the HINT
+	// (ghp_…ABCD) ever crosses back.
+	ghTokens *update.TokenStore
 }
 
 // New wires the bridge. The client is the cloud client (cookie jar, Origin

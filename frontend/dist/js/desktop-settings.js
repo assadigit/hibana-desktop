@@ -1,18 +1,20 @@
-// desktop-settings.js — the settings page controller (v0.1.17 — the owner
-// ask: "Plan for a settings page for hibana's desktop" with four sections:
+// desktop-settings.js — the settings page controller (v0.1.17 + the
+// v0.1.18 GitHub-access row — the owner asks: "Plan for a settings page for
+// hibana's desktop" with four sections:
 // 1. Sync 2. Update app ("check the latest release of github, if there were
 // newer version. update.") 3. Login/logout 4. fa/en + dark mode/light mode).
 // The settings page is a COMPOSITION: one wide native dialog opened from the
 // toolbar's gear, whose sections delegate to the live, proven rounds. This
 // controller owns: the gear → showModal wiring, the live facts (AppInfo's
-// version line, AuthState's account line), the manual Check-for-updates
-// verdict paint, the two segmented controls (Language through the Go
-// SetLanguage binding — the round's one new capability; Theme through the
-// existing SetTheme with the tray's full 3-state vocabulary), the delegation
-// clicks (Sync now / Update now / Sign out → the toolbar buttons' own flows,
-// this sheet closing FIRST so the modals never stack), and the hibana:lang /
-// hibana:theme / hibana:update-available event listeners so the tray, the
-// toolbar, and this sheet always agree.
+// version line, AuthState's account line, GithubTokenState's hint line), the
+// manual Check-for-updates verdict paint, the GitHub-access row (v0.1.18 —
+// Save/Remove over SetGithubToken, Enter-to-save, the connect-now re-check),
+// the two segmented controls (Language through the Go SetLanguage binding;
+// Theme through the existing SetTheme with the tray's full 3-state
+// vocabulary), the delegation clicks (Sync now / Update now / Sign out → the
+// toolbar buttons' own flows, this sheet closing FIRST so the modals never
+// stack), and the hibana:lang / hibana:theme / hibana:update-available event
+// listeners so the tray, the toolbar, and this sheet always agree.
 // GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
 // into frontend/dist/js/ and checksummed in frontend/island.checksums.json.
 // Loads blocking, right after desktop-update.js, BEFORE every deferred island
@@ -46,6 +48,22 @@
       statusBusy: 'An update is already in progress.',
       statusUnreachable: "Couldn't reach GitHub — check your connection.",
       notWired: 'The desktop bridge is not wired — restart the app.',
+      // v0.1.18 — the GitHub-access row (the owner ask: "hibana desktop
+      // might be a private repo so in setting, add a github credentials
+      // so it can connect to the private repo").
+      tokenLabel: 'GitHub access',
+      tokenPlaceholder: 'ghp_… (optional)',
+      tokenSave: 'Save',
+      tokenRemove: 'Remove',
+      tokenSaving: 'Verifying…',
+      tokenNone: 'No token — anonymous GitHub access (fine for public repos).',
+      tokenSaved: 'Token saved ({hint}) — release checks use it.',
+      tokenSavedUnverified: 'Saved ({hint}) — GitHub was unreachable to verify; the next check uses it.',
+      tokenRejected: 'GitHub rejected the token — nothing was saved.',
+      tokenNoAccess: 'The token cannot see this repository — nothing was saved.',
+      tokenCleared: 'Token removed — release checks are anonymous again.',
+      tokenInvalid: 'That does not look like a GitHub token (ghp_…).',
+      tokenSaveFailed: "Couldn't save the token — try again.",
       accountHeading: 'Account',
       accountBody: 'Your boards live safe on the Hibana cloud — sign in again any time.',
       appearanceHeading: 'Appearance',
@@ -75,6 +93,20 @@
       statusBusy: 'یک بروزرسانی دیگر در جریان است.',
       statusUnreachable: 'اتصال به گیت‌هاب برقرار نشد — اینترنت خود را بررسی کنید.',
       notWired: 'پل دسکتاپ وصل نیست — برنامه را دوباره باز کنید.',
+      // v0.1.18 — the GitHub-access row's FA twins.
+      tokenLabel: 'دسترسی گیت‌هاب',
+      tokenPlaceholder: 'ghp_… (اختیاری)',
+      tokenSave: 'ذخیره',
+      tokenRemove: 'حذف',
+      tokenSaving: 'در حال بررسی…',
+      tokenNone: 'توکنی ذخیره نشده — دسترسی ناشناس به گیت‌هاب (برای مخازن عمومی کافی است).',
+      tokenSaved: 'توکن ذخیره شد ({hint}) — بررسی بروزرسانی از آن استفاده می‌کند.',
+      tokenSavedUnverified: 'ذخیره شد ({hint}) — گیت‌هاب برای تأیید در دسترس نبود؛ بررسی بعدی از آن استفاده می‌کند.',
+      tokenRejected: 'گیت‌هاب این توکن را نپذیرفت — چیزی ذخیره نشد.',
+      tokenNoAccess: 'این توکن به این مخزن دسترسی ندارد — چیزی ذخیره نشد.',
+      tokenCleared: 'توکن حذف شد — بررسی بروزرسانی دوباره ناشناس است.',
+      tokenInvalid: 'این شبیه توکن گیت‌هاب نیست (ghp_…).',
+      tokenSaveFailed: 'ذخیره توکن ممکن نشد — دوباره تلاش کنید.',
       accountHeading: 'حساب',
       accountBody: 'تخته‌های شما در ابر هیبانا امن هستند — هر وقت خواستید دوباره وارد شوید.',
       appearanceHeading: 'ظاهر',
@@ -151,6 +183,11 @@
       updateError: document.getElementById('db-settings-update-error'),
       updateNow: document.getElementById('db-settings-update-now'),
       check: document.getElementById('db-settings-check'),
+      tokenInput: document.getElementById('db-settings-token-input'),
+      tokenSave: document.getElementById('db-settings-token-save'),
+      tokenRemove: document.getElementById('db-settings-token-clear'),
+      tokenStatus: document.getElementById('db-settings-token-status'),
+      tokenError: document.getElementById('db-settings-token-error'),
       account: document.getElementById('db-settings-account'),
       langError: document.getElementById('db-settings-lang-error'),
       langEn: document.getElementById('db-settings-lang-en'),
@@ -168,6 +205,13 @@
     var checking = false
     var langFlipping = false
 
+    // v0.1.18 — the GitHub-access row's own state: null = the GithubTokenState
+    // round has not landed (the same claim-nothing honesty); {set, hint}
+    // after it does. The token VALUE never lives here — it crosses the
+    // bridge inside the Save click and dies with it.
+    var tokenState = null
+    var tokenBusy = false
+
     function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text }
 
     // ---- localization (every label this controller owns; the title, the
@@ -181,6 +225,13 @@
       setText('db-settings-update-heading', t('updateHeading'))
       setText('db-settings-check-label', t('checkBtn'))
       setText('db-settings-update-now-label', t('updateNow'))
+      setText('db-settings-token-label', t('tokenLabel'))
+      setText('db-settings-token-save-label', t('tokenSave'))
+      setText('db-settings-token-clear-label', t('tokenRemove'))
+      if (els.tokenInput) {
+        els.tokenInput.setAttribute('placeholder', t('tokenPlaceholder'))
+        els.tokenInput.setAttribute('aria-label', t('tokenLabel'))
+      }
       setText('db-settings-account-heading', t('accountHeading'))
       setText('db-settings-account-body', t('accountBody'))
       setText('db-settings-appearance-heading', t('appearanceHeading'))
@@ -236,6 +287,9 @@
           }, function () {})
         } catch (e) {}
       }
+      // v0.1.18 — the GitHub-access row's display state ({set, hint}); the
+      // verdict's own copy rides the Save resolve.
+      resolveTokenState()
     }
 
     // ---- SECTION 2's status line + the Update-now reveal ----
@@ -318,6 +372,136 @@
       try {
         Promise.resolve(check()).then(onCheckDone, onCheckFail)
       } catch (e) { onCheckFail(e) }
+    })
+
+    // ---- SECTION 2's GitHub-access row (v0.1.18 — the owner ask: "hibana
+    //      desktop might be a private repo so in setting, add a github
+    //      credentials so it can connect to the private repo"). The row is
+    //      a PASSWORD input + Save/Remove over the Go SetGithubToken /
+    //      GithubTokenState bindings: the token crosses the bridge ONCE
+    //      (the login password's discipline — never stored JS-side, never
+    //      in localStorage, the field cleared on every resolve); only the
+    //      ghp_…ABCD hint ever crosses back. A SAVED token immediately
+    //      re-checks (the row's whole point — connect now), riding the
+    //      manual-check flow above through its own click handler. ----
+    function showTokenError(msg) {
+      if (els.tokenError) { els.tokenError.textContent = msg; els.tokenError.hidden = false }
+    }
+    function hideTokenError() { if (els.tokenError) els.tokenError.hidden = true }
+
+    function paintToken() {
+      if (els.tokenStatus) {
+        if (tokenState == null) els.tokenStatus.textContent = ''
+        else if (tokenState.set) els.tokenStatus.textContent = fmt('tokenSaved', { hint: String(tokenState.hint || '') })
+        else els.tokenStatus.textContent = t('tokenNone')
+      }
+      if (els.tokenRemove) els.tokenRemove.hidden = !(tokenState && tokenState.set)
+    }
+
+    function resolveTokenState(after) {
+      var state = resolveBoundMethod('GithubTokenState')
+      if (!state) { if (after) after(); return }
+      try {
+        Promise.resolve(state()).then(function (s) {
+          tokenState = s && typeof s === 'object' && s.set
+            ? { set: true, hint: String(s.hint || '') }
+            : { set: false, hint: '' }
+          paintToken()
+          if (after) after()
+        }, function () { if (after) after() })
+      } catch (e) { if (after) after() }
+    }
+
+    function setTokenBusy(on) {
+      tokenBusy = on
+      if (els.tokenSave) els.tokenSave.disabled = on
+      if (els.tokenRemove) els.tokenRemove.disabled = on
+    }
+
+    function onTokenSaveDone(res) {
+      setTokenBusy(false)
+      hideTokenError()
+      if (!res || typeof res !== 'object') res = {}
+      if (res.cleared) {
+        if (els.tokenInput) els.tokenInput.value = ''
+        tokenState = { set: false, hint: '' }
+        paintToken()
+        if (els.tokenStatus) els.tokenStatus.textContent = t('tokenCleared')
+        return
+      }
+      if (res.ok && res.saved) {
+        // The field never keeps the secret — the value lives Go-side only.
+        if (els.tokenInput) els.tokenInput.value = ''
+        var unverified = !res.verified
+        resolveTokenState(function () {
+          if (unverified && tokenState && tokenState.set && els.tokenStatus) {
+            els.tokenStatus.textContent = fmt('tokenSavedUnverified', { hint: String(tokenState.hint || '') })
+          } else {
+            paintToken()
+          }
+        })
+        // THE CONNECT-NOW REFLEX — the row's whole point: a saved token is
+        // used by the very next check, so fire one immediately through the
+        // manual-check flow's own handler (busy/disable/verdict paint all
+        // reused; a check already in flight is simply left alone).
+        if (els.check && !checking) { try { els.check.click() } catch (e) {} }
+        return
+      }
+      var code = String(res.code || '')
+      // The verdict's failure paths RESTORE the status line to the stored
+      // state's truth (the probe caught the stuck "Verifying…" — a refused
+      // save must never leave the busy line on screen).
+      paintToken()
+      if (code === 'invalid') showTokenError(t('tokenRejected'))
+      else if (code === 'no_access') showTokenError(t('tokenNoAccess'))
+      else if (code === 'not_wired') showTokenError(t('notWired'))
+      else showTokenError(t('tokenSaveFailed'))
+    }
+
+    // The ONLY rejected promise this binding returns is the malformed-shape
+    // refusal (errBadGithubToken) — the catch paints the shape line. The
+    // status line restores the stored truth (nothing was saved).
+    function onTokenSaveFail() {
+      setTokenBusy(false)
+      hideTokenError()
+      paintToken()
+      showTokenError(t('tokenInvalid'))
+    }
+
+    if (els.tokenSave) els.tokenSave.addEventListener('click', function () {
+      if (tokenBusy) return
+      var value = els.tokenInput ? String(els.tokenInput.value || '') : ''
+      hideTokenError()
+      if (!value) return // nothing to save — Remove is the clear path
+      var save = resolveBoundMethod('SetGithubToken')
+      if (!save) { showTokenError(t('notWired')); return }
+      setTokenBusy(true)
+      if (els.tokenStatus) els.tokenStatus.textContent = t('tokenSaving')
+      try {
+        Promise.resolve(save(value)).then(onTokenSaveDone, onTokenSaveFail)
+      } catch (e) { onTokenSaveFail() }
+    })
+
+    if (els.tokenRemove) els.tokenRemove.addEventListener('click', function () {
+      if (tokenBusy) return
+      var save = resolveBoundMethod('SetGithubToken')
+      if (!save) { showTokenError(t('notWired')); return }
+      hideTokenError()
+      if (els.tokenInput) els.tokenInput.value = ''
+      setTokenBusy(true)
+      if (els.tokenStatus) els.tokenStatus.textContent = t('tokenSaving')
+      try {
+        Promise.resolve(save('')).then(onTokenSaveDone, onTokenSaveFail) // "" = the Go clear contract
+      } catch (e) { onTokenSaveFail() }
+    })
+
+    // Enter in the field SAVES — a method="dialog" form would otherwise
+    // swallow the keypress as a submit (closing the sheet mid-save).
+    if (els.tokenInput) els.tokenInput.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault()
+        if (els.tokenSave && !tokenBusy) els.tokenSave.click()
+      }
     })
 
     // ---- SECTION 4's segmented controls ----

@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"hibana/desktop/internal/api"
+	"hibana/desktop/internal/update"
 )
 
 // THE SETTINGS BINDING — the language half of the settings round (the owner
@@ -168,3 +170,147 @@ var errBadLanguage = &languageError{}
 type languageError struct{}
 
 func (*languageError) Error() string { return "bridge: language: unknown preference" }
+
+// ---------------------------------------------------------------------------
+// THE GITHUB CREDENTIALS BINDINGS (v0.1.18 — the owner ask: "hibana desktop
+// might be a private repo so in setting, add a github credentials so it can
+// connect to the private repo").
+//
+// Two bound methods over the wired update.TokenStore (main.go passes the
+// Updater's OWN data dir + repo — one token file, one truth):
+//
+//      SetGithubToken("")        → CLEAR the stored token ({ok, cleared})
+//      SetGithubToken("ghp_…")   → shape-gate → VERIFY against GitHub → save
+//                                   per the verdict matrix below
+//      GithubTokenState()        → {set, hint} — the display state (ghp_…ABCD,
+//                                   never the token; the login password's
+//                                   never-crosses-back discipline)
+//
+// THE VERDICT MATRIX (every cell honest):
+//
+//      200 (verified)      → SAVE → {ok, saved, verified}
+//      401 (invalid)       → NOT saved → {ok:false, code:"invalid"}
+//      404 (no repo access)→ NOT saved → {ok:false, code:"no_access"}
+//      unreachable/403/5xx → SAVE (the write is LOCAL; only the verification
+//                             didn't happen) → {ok, saved, message: the honest
+//                             saved-unverified note} — the next real check
+//                             reveals the truth
+//      garbage shape       → a REJECTED promise (errBadGithubToken — the
+//                             hostile-input law, errBadLanguage's shape)
+//      no store wired      → {ok:false, code:"not_wired"}
+//
+// The busy guard is deliberately NOT taken: the updateBusy guard would make
+// saving a setting wait out a 45-minute download window, and the rounds
+// themselves are safe to overlap (the in-flight check simply runs with the
+// previous token; the NEXT round reads the fresh file).
+// ---------------------------------------------------------------------------
+
+// githubTokenDeadline bounds one save's verify round-trip (one cheap GET
+// /repos/<repo> — the langDeadline budget discipline).
+const githubTokenDeadline = 10 * time.Second
+
+// SetGithubTokenResult is what SetGithubToken resolves to JS.
+type SetGithubTokenResult struct {
+	OK       bool   `json:"ok"`
+	Saved    bool   `json:"saved,omitempty"`
+	Cleared  bool   `json:"cleared,omitempty"`
+	Verified bool   `json:"verified,omitempty"`
+	Code     string `json:"code,omitempty"` // invalid | no_access | not_wired | save_failed
+	Message  string `json:"message,omitempty"`
+}
+
+// GithubTokenStateResult is the display state the sheet's status line paints.
+type GithubTokenStateResult struct {
+	Set  bool   `json:"set"`
+	Hint string `json:"hint,omitempty"`
+}
+
+// SetGithubTokenStore wires the token store (main.go: the Updater's own
+// data dir + repo). Without it the bindings resolve the honest not-wired
+// verdict (the SetUpdateCheck precedent).
+func (a *API) SetGithubTokenStore(s *update.TokenStore) {
+	a.settingsMu.Lock()
+	a.ghTokens = s
+	a.settingsMu.Unlock()
+}
+
+// ghStore snapshots the wired store under the settings lock.
+func (a *API) ghStore() *update.TokenStore {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+	return a.ghTokens
+}
+
+// SetGithubToken is the bound write the GitHub-access row calls. The token
+// exists in bridge memory only for this call — shape-gated, verified against
+// GitHub, persisted to the data dir on the honest verdicts, never logged.
+func (a *API) SetGithubToken(token string) (SetGithubTokenResult, error) {
+	token = strings.TrimSpace(token)
+	store := a.ghStore()
+	if store == nil {
+		return SetGithubTokenResult{Code: "not_wired", Message: "The update credentials store is not wired — restart the app."}, nil
+	}
+
+	// The explicit CLEAR: "" removes the stored token; the round goes back to
+	// anonymous (the public-repo default, byte-identical to v0.1.14-0.1.17).
+	if token == "" {
+		if err := store.Clear(); err != nil {
+			return SetGithubTokenResult{Code: "save_failed", Message: "Couldn't clear the saved token — try again."}, nil
+		}
+		return SetGithubTokenResult{OK: true, Cleared: true}, nil
+	}
+
+	// The hostile-input law: an Authorization header value must be RFC-clean —
+	// anything outside the PAT alphabet is refused before disk or wire.
+	if !update.ValidTokenShape(token) {
+		return SetGithubTokenResult{}, errBadGithubToken
+	}
+
+	// The verify round (one cheap GET /repos/<repo> with the token riding the
+	// same header the update rounds will send).
+	ctx, cancel := context.WithTimeout(context.Background(), githubTokenDeadline)
+	defer cancel()
+	status := store.Verify(ctx, token)
+	switch status {
+	case update.TokenInvalid:
+		return SetGithubTokenResult{Code: "invalid", Message: "GitHub rejected the token — nothing was saved."}, nil
+	case update.TokenNoAccess:
+		return SetGithubTokenResult{Code: "no_access", Message: "The token cannot see this repository — check its repository access; nothing was saved."}, nil
+	}
+
+	// Verified, or honestly unverified (offline / rate-limited / 5xx): the
+	// write itself is LOCAL, so it stands either way — an unreachable GitHub
+	// must never block saving a setting; the next real check reveals the truth.
+	if err := store.Save(token); err != nil {
+		return SetGithubTokenResult{Code: "save_failed", Message: "Couldn't save the token — try again."}, nil
+	}
+	if status != update.TokenVerified {
+		return SetGithubTokenResult{
+			OK:      true,
+			Saved:   true,
+			Message: "Saved — GitHub couldn't be reached to verify it; the next check uses it.",
+		}, nil
+	}
+	return SetGithubTokenResult{OK: true, Saved: true, Verified: true}, nil
+}
+
+// GithubTokenState reports the display state: whether a token is stored and
+// its HINT ("ghp_…ABCD"). The token itself never crosses back.
+func (a *API) GithubTokenState() (GithubTokenStateResult, error) {
+	store := a.ghStore()
+	if store == nil {
+		return GithubTokenStateResult{}, nil
+	}
+	if tok := store.Load(); tok != "" {
+		return GithubTokenStateResult{Set: true, Hint: update.TokenHint(tok)}, nil
+	}
+	return GithubTokenStateResult{}, nil
+}
+
+// errBadGithubToken keeps the malformed-token path out of fmt (and the JS
+// console gets Wails' rejected-promise shape — the errBadLanguage precedent).
+var errBadGithubToken = &githubTokenError{}
+
+type githubTokenError struct{}
+
+func (*githubTokenError) Error() string { return "bridge: github token: malformed value" }
