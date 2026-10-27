@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hibana: sync status symbol (visual reference)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+/* ILLUSTRATIVE VALUES ONLY. In the real app, use Hibana's own design tokens and icon set. */
+:root{
+  --page:#f6f7f8; --card:#ffffff; --border:#dfe3e6; --text:#1d2327; --muted:#8a9096; --secondary:#5d666d;
+  --teal:#2f7b7f; --teal-ink:#ffffff;
+  --danger:#b4362f; --danger-bg:#fdeceb; --danger-border:#efb9b5;
+  --band-bg:#f5e3b8; --band-ink:#6b4a0a; --col:#fbf1e8; --chip:#eef1f2;
+}
+:root[data-theme="dark"]{
+  --page:#101315; --card:#1d2226; --border:#2e353a; --text:#e7eaec; --muted:#8b949b; --secondary:#a5aeb4;
+  --teal:#5fb3b8; --teal-ink:#0e2a2c;
+  --danger:#f0847d; --danger-bg:#3a1f1d; --danger-border:#6b3430;
+  --band-bg:#4a3b16; --band-ink:#f0d9a0; --col:#1a1e21; --chip:#2a3136;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--text);font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+button{font:inherit;color:inherit;cursor:pointer}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--card)}
+.top h1{font-size:15px;margin:0;font-weight:600;margin-inline-end:auto}
+.btn{border:1px solid var(--border);background:var(--card);border-radius:10px;padding:6px 12px;display:inline-flex;align-items:center;gap:6px}
+.btn:focus-visible,.sync:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.btn-sync{background:var(--teal);color:var(--teal-ink);border-color:var(--teal);position:relative;font-weight:600}
+.btn-sync .count{position:absolute;top:-7px;inset-inline-end:-7px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--card);color:var(--teal);border:1px solid var(--teal);font-size:11px;font-weight:600;display:none;align-items:center;justify-content:center}
+.btn-sync.has-count .count{display:inline-flex}
+.wrap{display:grid;grid-template-columns:minmax(280px,320px) minmax(0,1fr);gap:28px;padding:24px 20px;max-width:980px;margin:0 auto}
+@media(max-width:760px){.wrap{grid-template-columns:1fr}}
+.col{background:var(--col);border:1px solid var(--border);border-radius:14px;padding:10px;align-self:start}
+.col-h{display:flex;align-items:center;gap:8px;padding:2px 4px 10px;font-weight:600}
+.pill{background:var(--chip);border-radius:10px;padding:0 7px;font-size:11px;color:var(--secondary);font-weight:500}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:8px}
+.band{background:var(--band-bg);color:var(--band-ink);font-size:10px;font-weight:600;letter-spacing:.06em;text-align:center;padding:3px 0;text-transform:uppercase}
+.body{padding:8px 10px 6px}
+.body h3{margin:0;font-size:13px;line-height:1.35;font-weight:600}
+.desc{margin:2px 0 0;color:var(--secondary);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{display:flex;align-items:center;gap:8px;margin-top:6px;min-height:20px}
+.ts{font-size:11px;color:var(--muted)}
+.chip{font-size:11px;color:var(--secondary);background:var(--chip);border-radius:10px;padding:0 7px}
+.sync{position:relative;margin-inline-start:auto;display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:1;background:none;border:0;padding:0;color:var(--muted)}
+.sync i{font-size:15px;line-height:1}
+.sync::before{content:attr(data-label);position:absolute;bottom:calc(100% + 6px);inset-inline-end:0;white-space:nowrap;background:var(--text);color:var(--page);font-size:11px;padding:3px 8px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .12s;z-index:5}
+.sync:hover::before,.sync:focus-visible::before{opacity:1}
+.s-pending,.s-syncing{color:var(--teal)}
+.s-synced{color:var(--muted)}
+.s-failed{color:var(--danger);background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:11px;min-height:22px;padding:0 8px 0 6px}
+.s-failed::after{content:"";position:absolute;inset:-6px -4px}
+.spin{display:inline-block;animation:spin 1.2s linear infinite}
+.pop{animation:pop .3s ease-out}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.spin,.pop{animation:none}}
+.legend h2{font-size:14px;margin:0 0 10px}
+.legend table{border-collapse:collapse;width:100%}
+.legend th,.legend td{text-align:start;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;font-size:12px}
+.legend th{color:var(--secondary);font-weight:600}
+.legend .ic{font-size:16px}
+.note{color:var(--secondary);font-size:12px;margin-top:14px;max-width:62ch}
+</style>
+</head>
+<body>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<header class="top">
+  <h1>Hibana</h1>
+  <button class="btn" id="bTheme" type="button"><i class="ti ti-sun-moon" aria-hidden="true"></i><span id="tTheme">Theme</span></button>
+  <button class="btn" id="bLang" type="button"><i class="ti ti-language" aria-hidden="true"></i><span id="tLang">Farsi (RTL)</span></button>
+  <button class="btn" id="bReplay" type="button"><i class="ti ti-player-play" aria-hidden="true"></i><span id="tReplay">Replay flow</span></button>
+  <button class="btn btn-sync" id="bSync" type="button"><i class="ti ti-refresh" id="syncIcon" aria-hidden="true"></i><span id="tSync">Sync</span><span class="count" id="count" aria-hidden="true">0</span></button>
+</header>
+
+<main class="wrap">
+  <section class="col" aria-label="Plans">
+    <div class="col-h"><span id="colName">Plans</span><span class="pill" id="colCount">4</span></div>
+    <div id="cards"></div>
+  </section>
+
+  <section class="legend">
+    <h2 id="legendTitle">The four states</h2>
+    <table>
+      <thead><tr><th id="thIcon">Symbol</th><th id="thState">State</th><th id="thLabel">Label on hover and focus</th><th id="thColor">Colour direction</th></tr></thead>
+      <tbody id="legendRows"></tbody>
+    </table>
+    <p class="note" id="note"></p>
+  </section>
+</main>
+
+<script>
+(function(){
+  var I18N = {
+    en:{dir:"ltr",lang:"en",theme:"Theme",langBtn:"Farsi (RTL)",replay:"Replay flow",sync:"Sync",col:"Plans",
+      band:"Medium priority",legend:"The four states",thIcon:"Symbol",thState:"State",thLabel:"Label on hover and focus",thColor:"Colour direction",
+      pending:"Saved on this device",syncing:"Syncing\u2026",synced:"Synced",failed:"Couldn\u2019t sync. Retry",retry:"Retry",
+      names:{pending:"Pending",syncing:"Syncing",synced:"Synced",failed:"Failed"},
+      colors:{pending:"Teal (Sync button token)",syncing:"Teal (Sync button token)",synced:"Muted grey (timestamp token)",failed:"Danger token, in a pill with text"},
+      cards:[
+        {t:"Calendar page upgrade",d:"Upgrade calendar page and make it more sophisticated",ts:"27 Oct 2026 \u00b7 3:05 AM",chip:""},
+        {t:"Backup automation robot",d:"Backup automation robot, for both my personal and work",ts:"27 Oct 2026 \u00b7 3:06 AM",chip:"1 file"},
+        {t:"Google Chrome extension",d:"Creating a Google Chrome extension, for fast note capture",ts:"27 Oct 2026 \u00b7 3:06 AM",chip:""},
+        {t:"Adding FDD to projects",d:"Feature-driven development is a method in agile",ts:"27 Oct 2026 \u00b7 3:07 AM",chip:""}],
+      note:"Try it: click Replay flow to see Pending, then Syncing, then Synced on the first card. Click the red Retry pill on the last card. The Sync button count always equals Pending plus Failed. Hover or tab to a symbol to see its label."},
+    fa:{dir:"rtl",lang:"fa",theme:"\u062d\u0627\u0644\u062a \u0631\u0646\u06af",langBtn:"English (LTR)",replay:"\u067e\u062e\u0634 \u0645\u062c\u062f\u062f \u0645\u0631\u0627\u062d\u0644",sync:"\u0647\u0645\u06af\u0627\u0645\u200c\u0633\u0627\u0632\u06cc",col:"\u0628\u0631\u0646\u0627\u0645\u0647\u200c\u0647\u0627",
+      band:"\u0627\u0648\u0644\u0648\u06cc\u062a \u0645\u062a\u0648\u0633\u0637",legend:"\u0686\u0647\u0627\u0631 \u062d\u0627\u0644\u062a",thIcon:"\u0646\u0645\u0627\u062f",thState:"\u062d\u0627\u0644\u062a",thLabel:"\u0628\u0631\u0686\u0633\u0628 \u0647\u0646\u06af\u0627\u0645 \u0642\u0631\u0627\u0631 \u06af\u0631\u0641\u062a\u0646 \u0645\u0648\u0634 \u06cc\u0627 \u0641\u0648\u06a9\u0648\u0633",thColor:"\u062c\u0647\u062a \u0631\u0646\u06af",
+      pending:"\u0641\u0642\u0637 \u0631\u0648\u06cc \u0627\u06cc\u0646 \u062f\u0633\u062a\u06af\u0627\u0647 \u0630\u062e\u06cc\u0631\u0647 \u0634\u062f\u0647",syncing:"\u062f\u0631 \u062d\u0627\u0644 \u0647\u0645\u06af\u0627\u0645\u200c\u0633\u0627\u0632\u06cc\u2026",synced:"\u0647\u0645\u06af\u0627\u0645\u200c\u0634\u062f\u0647",failed:"\u0647\u0645\u06af\u0627\u0645\u200c\u0633\u0627\u0632\u06cc \u0627\u0646\u062c\u0627\u0645 \u0646\u0634\u062f. \u062a\u0644\u0627\u0634 \u062f\u0648\u0628\u0627\u0631\u0647",retry:"\u062a\u0644\u0627\u0634 \u062f\u0648\u0628\u0627\u0631\u0647",
+      names:{pending:"\u062f\u0631 \u0627\u0646\u062a\u0638\u0627\u0631",syncing:"\u062f\u0631 \u062d\u0627\u0644 \u0647\u0645\u06af\u0627\u0645\u200c\u0633\u0627\u0632\u06cc",synced:"\u0647\u0645\u06af\u0627\u0645\u200c\u0634\u062f\u0647",failed:"\u0646\u0627\u0645\u0648\u0641\u0642"},
+      colors:{pending:"\u0633\u0628\u0632\u0622\u0628\u06cc (\u0645\u0634\u0627\u0628\u0647 \u062f\u06a9\u0645\u0647 \u0647\u0645\u06af\u0627\u0645\u200c\u0633\u0627\u0632\u06cc)",syncing:"\u0633\u0628\u0632\u0622\u0628\u06cc (\u0645\u0634\u0627\u0628\u0647 \u062f\u06a9\u0645\u0647 \u0647\u0645\u06af\u0627\u0645\u200c\u0633\u0627\u0632\u06cc)",synced:"\u062e\u0627\u06a9\u0633\u062a\u0631\u06cc \u06a9\u0645\u200c\u0631\u0646\u06af (\u0645\u0634\u0627\u0628\u0647 \u0632\u0645\u0627\u0646)",failed:"\u0631\u0646\u06af \u062e\u0637\u0627\u060c \u062f\u0631 \u06cc\u06a9 \u0642\u0631\u0635 \u0628\u0627 \u0645\u062a\u0646"},
+      cards:[
+        {t:"\u0627\u0631\u062a\u0642\u0627\u06cc \u0635\u0641\u062d\u0647 \u062a\u0642\u0648\u06cc\u0645",d:"\u0635\u0641\u062d\u0647 \u062a\u0642\u0648\u06cc\u0645 \u0631\u0627 \u067e\u06cc\u0634\u0631\u0641\u062a\u0647\u200c\u062a\u0631 \u06a9\u0646",ts:"\u06f5 \u0622\u0628\u0627\u0646 \u06f1\u06f4\u06f0\u06f5 \u00b7 \u06f3:\u06f0\u06f5",chip:""},
+        {t:"\u0631\u0628\u0627\u062a \u067e\u0634\u062a\u06cc\u0628\u0627\u0646\u200c\u06af\u06cc\u0631\u06cc \u062e\u0648\u062f\u06a9\u0627\u0631",d:"\u067e\u0634\u062a\u06cc\u0628\u0627\u0646\u200c\u06af\u06cc\u0631\u06cc \u062e\u0648\u062f\u06a9\u0627\u0631 \u0628\u0631\u0627\u06cc \u06a9\u0627\u0631 \u0648 \u0632\u0646\u062f\u06af\u06cc \u0634\u062e\u0635\u06cc",ts:"\u06f5 \u0622\u0628\u0627\u0646 \u06f1\u06f4\u06f0\u06f5 \u00b7 \u06f3:\u06f0\u06f6",chip:"\u06f1 \u0641\u0627\u06cc\u0644"},
+        {t:"\u0627\u0641\u0632\u0648\u0646\u0647 \u06a9\u0631\u0648\u0645 \u06af\u0648\u06af\u0644",d:"\u0627\u0641\u0632\u0648\u0646\u0647 \u06a9\u0631\u0648\u0645 \u0628\u0631\u0627\u06cc \u06cc\u0627\u062f\u062f\u0627\u0634\u062a \u0633\u0631\u06cc\u0639",ts:"\u06f5 \u0622\u0628\u0627\u0646 \u06f1\u06f4\u06f0\u06f5 \u00b7 \u06f3:\u06f0\u06f6",chip:""},
+        {t:"\u0627\u0641\u0632\u0648\u062f\u0646 FDD \u0628\u0647 \u067e\u0631\u0648\u0698\u0647\u200c\u0647\u0627",d:"\u062a\u0648\u0633\u0639\u0647 \u0645\u0628\u062a\u0646\u06cc \u0628\u0631 \u0648\u06cc\u0698\u06af\u06cc \u062f\u0631 \u0631\u0648\u0634 \u0686\u0627\u0628\u06a9",ts:"\u06f5 \u0622\u0628\u0627\u0646 \u06f1\u06f4\u06f0\u06f5 \u00b7 \u06f3:\u06f0\u06f7",chip:""}],
+      note:"\u0628\u0631\u0627\u06cc \u0622\u0632\u0645\u0627\u06cc\u0634: \u00ab\u067e\u062e\u0634 \u0645\u062c\u062f\u062f\u00bb \u0631\u0627 \u0628\u0632\u0646\u06cc\u062f \u062a\u0627 \u06a9\u0627\u0631\u062a \u0627\u0648\u0644 \u0627\u0632 \u062f\u0631 \u0627\u0646\u062a\u0638\u0627\u0631 \u0628\u0647 \u0647\u0645\u06af\u0627\u0645\u200c\u0633\u0627\u0632\u06cc \u0648 \u0647\u0645\u06af\u0627\u0645\u200c\u0634\u062f\u0647 \u0628\u0631\u0633\u062f. \u0631\u0648\u06cc \u062f\u06a9\u0645\u0647 \u0642\u0631\u0645\u0632 \u06a9\u0627\u0631\u062a \u0622\u062e\u0631 \u0628\u0632\u0646\u06cc\u062f. \u0634\u0645\u0627\u0631\u0646\u062f\u0647 \u062f\u06a9\u0645\u0647 \u0647\u0645\u06af\u0627\u0645\u200c\u0633\u0627\u0632\u06cc \u0647\u0645\u06cc\u0634\u0647 \u0628\u0631\u0627\u0628\u0631 \u0645\u062c\u0645\u0648\u0639 \u00ab\u062f\u0631 \u0627\u0646\u062a\u0638\u0627\u0631\u00bb \u0648 \u00ab\u0646\u0627\u0645\u0648\u0641\u0642\u00bb \u0627\u0633\u062a."}
+  };
+  var ICON = {pending:"ti-cloud-up",syncing:"ti-refresh",synced:"ti-cloud-check",failed:"ti-cloud-exclamation"};
+  var ORDER = ["pending","syncing","synced","failed"];
+  var state = ["pending","syncing","synced","failed"];
+  var lang = "en", timers = [], justSynced = -1;
+
+  function T(){ return I18N[lang]; }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+  function badge(i){
+    var s = state[i], t = T(), label = t[s], ic = ICON[s];
+    var cls = "sync s-" + s + (justSynced === i && s === "synced" ? " pop" : "");
+    var iconCls = "ti " + ic + (s === "syncing" ? " spin" : "");
+    if (s === "failed") {
+      return '<button type="button" class="'+cls+'" data-i="'+i+'" data-label="'+esc(label)+'" aria-label="'+esc(label)+'"><i class="'+iconCls+'" aria-hidden="true"></i><span>'+esc(t.retry)+'</span></button>';
+    }
+    return '<span class="'+cls+'" role="img" tabindex="0" data-label="'+esc(label)+'" aria-label="'+esc(label)+'"><i class="'+iconCls+'" aria-hidden="true"></i></span>';
+  }
+
+  function render(){
+    var t = T(), root = document.documentElement;
+    root.lang = t.lang; root.dir = t.dir;
+    document.getElementById("tTheme").textContent = t.theme;
+    document.getElementById("tLang").textContent = t.langBtn;
+    document.getElementById("tReplay").textContent = t.replay;
+    document.getElementById("tSync").textContent = t.sync;
+    document.getElementById("colName").textContent = t.col;
+    document.getElementById("legendTitle").textContent = t.legend;
+    document.getElementById("thIcon").textContent = t.thIcon;
+    document.getElementById("thState").textContent = t.thState;
+    document.getElementById("thLabel").textContent = t.thLabel;
+    document.getElementById("thColor").textContent = t.thColor;
+    document.getElementById("note").textContent = t.note;
+    document.getElementById("cards").innerHTML = t.cards.map(function(c,i){
+      return '<article class="card"><div class="band">'+esc(t.band)+'</div><div class="body"><h3>'+esc(c.t)+'</h3><p class="desc">'+esc(c.d)+'</p><div class="meta"><span class="ts">'+esc(c.ts)+'</span>'+(c.chip?'<span class="chip">'+esc(c.chip)+'</span>':'')+badge(i)+'</div></div></article>';
+    }).join("");
+    document.getElementById("legendRows").innerHTML = ORDER.map(function(s){
+      return '<tr><td><i class="ti '+ICON[s]+' ic" aria-hidden="true"></i></td><td>'+esc(t.names[s])+'</td><td>'+esc(t[s])+'</td><td>'+esc(t.colors[s])+'</td></tr>';
+    }).join("");
+    var n = state.filter(function(s){return s==="pending"||s==="failed";}).length;
+    var b = document.getElementById("bSync");
+    document.getElementById("count").textContent = n;
+    b.classList.toggle("has-count", n > 0);
+    var running = state.indexOf("syncing") !== -1;
+    document.getElementById("syncIcon").classList.toggle("spin", running);
+    justSynced = -1;
+  }
+
+  function announce(msg){ document.getElementById("live").textContent = msg; }
+  function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+  function later(fn, ms){ timers.push(setTimeout(fn, ms)); }
+  function set(i, s){ state[i] = s; if (s === "synced") justSynced = i; render(); if (s === "synced") announce(T().synced); if (s === "failed") announce(T().failed); }
+
+  function replay(){
+    clearTimers();
+    state = ["pending","syncing","synced","failed"];
+    render();
+    later(function(){ set(0,"syncing"); }, 1500);
+    later(function(){ set(0,"synced"); }, 3200);
+  }
+
+  document.getElementById("bTheme").addEventListener("click", function(){
+    var r = document.documentElement;
+    r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark";
+  });
+  document.getElementById("bLang").addEventListener("click", function(){ lang = lang === "en" ? "fa" : "en"; render(); });
+  document.getElementById("bReplay").addEventListener("click", replay);
+  document.getElementById("bSync").addEventListener("click", function(){
+    clearTimers();
+    var idx = [];
+    state.forEach(function(s,i){ if (s==="pending"||s==="failed") idx.push(i); });
+    idx.forEach(function(i){ state[i] = "syncing"; });
+    render();
+    later(function(){ idx.forEach(function(i){ state[i] = "synced"; }); justSynced = idx[0]; render(); announce(T().synced); }, 1500);
+  });
+  document.getElementById("cards").addEventListener("click", function(e){
+    var el = e.target.closest(".s-failed");
+    if (!el) return;
+    var i = +el.dataset.i;
+    clearTimers();
+    set(i,"syncing");
+    later(function(){ set(i,"synced"); }, 1500);
+  });
+  render();
+})();
+</script>
+</body>
+</html>
