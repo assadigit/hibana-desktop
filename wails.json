@@ -8,7 +8,7 @@
   "frontend:dev:serverUrl": "auto",
   "info": {
     "productName": "Hibana Kanban",
-    "productVersion": "0.1.21",
+    "productVersion": "0.1.22",
     "copyright": "Ali",
     "comments": "The Hibana Kanban Windows desktop port — Go + Wails v2 + WebView2 + modernc.org/sqlite"
   }
