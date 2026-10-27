@@ -170,20 +170,37 @@
   const findSprint = (id) => state.sprints.find((x) => x.id === id) || null
   const tagById = (id) => state.tags.find((x) => x.id === id) || null
 
+  // hibana-sync-status-spec §8/§14: every TASK mutation reports to the per-card
+  // sync tracker (public/js/sync-state.js — the ONE state store; the card badges,
+  // the header Sync button count and the aria-live region all derive from it).
+  // track() paints Pending optimistically, flips to Syncing past 500ms, and
+  // settles Synced/Failed on the server's ack — and the promise still REJECTS on
+  // failure, so every caller's toast contract below stays intact. The retry
+  // closure re-issues THIS mutation when the card's failed pill is clicked.
+  // createTask is deliberately untracked: a fresh card renders from the server's
+  // own creation ack (synced by definition — spec §2).
+  const tracked = (id, run) => (window.HibanaSyncState && id ? window.HibanaSyncState.track(id, run) : run())
   const createTask = (body) => api('/api/projects/' + state.projectId + '/devtasks', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   })
-  const patchTask = (id, body) => api('/api/devtasks/' + id, {
+  const patchTask = (id, body) => tracked(id, () => api('/api/devtasks/' + id, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  })
-  const deleteTask = (id) => api('/api/devtasks/' + id, { method: 'DELETE' })
-  const reorderTasks = (ids) => api('/api/projects/' + state.projectId + '/devtasks/reorder', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
-  })
-  const addTaskTag = (id, name, color) => api('/api/devtasks/' + id + '/tags', {
+  }))
+  const deleteTask = (id) => tracked(id, () => api('/api/devtasks/' + id, { method: 'DELETE' }))
+  // A reorder is ONE request for many cards: trackBulk puts every id Pending
+  // together and settles them on the single verdict (the retry re-issues the bulk
+  // — the server contract is idempotent).
+  const reorderTasks = (ids) => (window.HibanaSyncState && ids && ids.length
+    ? window.HibanaSyncState.trackBulk(ids, () => api('/api/projects/' + state.projectId + '/devtasks/reorder', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+      }))
+    : api('/api/projects/' + state.projectId + '/devtasks/reorder', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+      }))
+  const addTaskTag = (id, name, color) => tracked(id, () => api('/api/devtasks/' + id + '/tags', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color }),
-  })
-  const removeTaskTag = (id, tagId) => api('/api/devtasks/' + id + '/tags/' + tagId, { method: 'DELETE' })
+  }))
+  const removeTaskTag = (id, tagId) => tracked(id, () => api('/api/devtasks/' + id + '/tags/' + tagId, { method: 'DELETE' }))
 
   // S152: the category colors are the curated fill+ink PAIRS now — create sends the
   // pair, delete archives (soft — block 8: rows stay, task references stay).
@@ -774,6 +791,17 @@
     return modalEl
   }
 
+  // hibana-sync-status-spec §10: the editor footer's detail badge (icon + label +
+  // "Synced N minutes ago"). Built from the ONE tracker state so the footer shows
+  // Pending → Syncing → Synced live while the save runs (sync-state.js repaints
+  // every [data-sync-badge-detail] node on change).
+  const modalSyncBadge = (taskId) => {
+    const chips = window.HibanaChips
+    if (!taskId || !chips || !chips.syncBadgeDetailHtml) return ''
+    const ss = window.HibanaSyncState
+    return chips.syncBadgeDetailHtml(taskId, ss ? ss.stateOf(taskId) : 'synced', false, ss ? ss.syncedAt(taskId) : null)
+  }
+
   function openEditor(taskId, opts) {
     modalCtx = { taskId: taskId || null, onSaved: (opts && opts.onSaved) || null, defaults: (opts && opts.defaults) || {} }
     const task = taskId ? findTask(taskId) : null
@@ -944,7 +972,11 @@
         '</div>' +
         '<div class="row spread db-modal-foot">' +
           (isNew ? '' : '<button type="button" class="btn ghost danger" data-db-del>' + esc(t('common.delete', 'Delete')) + '</button>') +
-          '<div class="row"><button type="button" class="ghost" data-db-close>' + esc(t('common.cancel', 'Cancel')) + '</button>' +
+          // hibana-sync-status-spec §10: the same badge worn near the Save area of
+          // the item editor — icon + label (+ the last confirmed sync time when
+          // synced). data-sync-badge-detail lets sync-state.js's paint loop keep it
+          // live while the save round-trip runs (modalSyncBadge above).
+          '<div class="row" style="gap:.5rem;align-items:center">' + (isNew ? '' : modalSyncBadge(modalCtx.taskId)) + '<button type="button" class="ghost" data-db-close>' + esc(t('common.cancel', 'Cancel')) + '</button></div>' +
           // Session 23 (user request: "the ذخیره button must be green like other
           // buttons"): plain <button> = the system's green CTA fill (was .btn neutral).
           '<button type="button" data-db-save>' + esc(isNew ? t('common.add', 'Add') : t('common.save', 'Save')) + '</button></div></div>' +

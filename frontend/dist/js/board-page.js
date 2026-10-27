@@ -232,7 +232,16 @@
                   const shotsBadgeHtml = shotsN
                     ? '<button type="button" class="pd-task-shots" data-db-shots-dialog="' + task.id + '" title="' + B().esc(_t('db.taskShotsHint', 'Pinned pictures — note + proof stuck to this item')) + '" aria-label="' + B().esc(_t('db.taskShotsBadge', 'Pinned pictures ({n})').replace('{n}', String(shotsN))) + '">' + I_PIN + ' ' + B().faDig(shotsN) + '</button>'
                     : ''
-                  const metaHtml = '<span class="pd-task-meta">' + (CH() ? CH().metaDateHtml(task.created_at, task.status === 'done', lang) : B().esc((task.status === 'done' && task.done_at ? '✓ ' : '') + B().fullLabel(B().dayIdx(task.created_at), lang))) + (shotsBadgeHtml ? ' · ' + shotsBadgeHtml : '') + '</span>'
+                  // hibana-sync-status-spec §5: the sync badge is the LAST child of
+                  // the meta row, pushed to the inline-end (ms-auto in CSS) so every
+                  // column keeps one vertical scan line even when a card carries the
+                  // pin chip. Fresh renders are 'synced' (server-confirmed); edits go
+                  // Pending → Syncing → Synced/Failed through sync-state.js, which
+                  // repaints only the changed card's badge.
+                  const syncBadge = (CH() && CH().syncBadgeHtml && window.HibanaSyncState)
+                    ? CH().syncBadgeHtml(task.id, window.HibanaSyncState.stateOf(task.id))
+                    : (CH() && CH().syncBadgeHtml ? CH().syncBadgeHtml(task.id, 'synced') : '')
+                  const metaHtml = '<span class="pd-task-meta">' + (CH() ? CH().metaDateHtml(task.created_at, task.status === 'done', lang) : B().esc((task.status === 'done' && task.done_at ? '✓ ' : '') + B().fullLabel(B().dayIdx(task.created_at), lang))) + (shotsBadgeHtml ? ' · ' + shotsBadgeHtml : '') + syncBadge + '</span>'
                   return '<div class="pd-task-wrap" data-task-card="' + task.id + '" data-priority="' + (task.priority || 'medium') + '">' + prioBanner +
                     '<div class="pd-task st-' + task.status + '" draggable="true" role="button" tabindex="0" aria-label="' + B().esc(task.title) + '">' +
                       '<span class="pd-task-body">' +
@@ -311,7 +320,7 @@
           planning: ['cmdk.statusPlanning', 'Planning'],
           queued: ['cmdk.statusQueued', 'Up Next'],
           developing: ['cmdk.statusDeveloping', 'Developing'],
-          awaiting_dev: ['cmdk.statusAwaitingDev', 'Awaiting Development'],
+          awaiting_dev: ['cmdk.statusAwaitingDev', 'On Hold'],
           operational: ['cmdk.statusOperational', 'Operational'],
         }
         const renderSwitchRows = (list, query) => {
@@ -893,8 +902,8 @@
             if (window.HibanaBoard) return resolve(true)
             if (!injected && waited >= 1200) {
               injected = true
-              inject('/js/devboard.js?v=28') // keep in sync with the <head> tag + sw SHELL
-              if (!window.HibanaChips) inject('/js/chip-render.js?v=12') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
+              inject('/js/devboard.js?v=29') // keep in sync with the <head> tag + sw SHELL
+              if (!window.HibanaChips) inject('/js/chip-render.js?v=13') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
               if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA
             }
             if (waited >= 9000) return resolve(false)

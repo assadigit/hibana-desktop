@@ -86,6 +86,15 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2))
+
+// The island pin + the desktop's own version, read LIVE from the generated
+// artifacts — the stub and the expected version line can never go stale on a
+// pin move again (the v0.1.21 round's lesson: the hardcoded e6661c8/v0.4.1.35
+// pair failed the moment the island moved to 7a3198b/v0.4.1.37).
+const WEB_REF = JSON.parse(fs.readFileSync(path.join(args.dist, 'web-ref.json'), 'utf8'))
+const DESKTOP_VERSION = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'wails.json'), 'utf8')).info.productVersion
+const VERSION_LINE = 'Hibana ' + DESKTOP_VERSION + ' · island ' + WEB_REF.ref + ' (v' + WEB_REF.packageVersion + ')'
+const VERSION_LINE_FA = 'هیبانا ' + DESKTOP_VERSION + ' · جزیره ' + WEB_REF.ref + ' (v' + WEB_REF.packageVersion + ')'
 for (const f of ['index.html', 'js/desktop-settings.js', 'css/desktop-settings.css', 'js/desktop-update.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-login.js', 'js/i18n-fa.js', 'icon.svg']) {
   if (!fs.existsSync(path.join(args.dist, f))) {
     console.error('[probe] missing ' + f + ' under ' + args.dist + ' — run scripts/sync-island.mjs first.')
@@ -142,7 +151,7 @@ const mockRuntimeJs = () => [
   '  Logout: function () { return Promise.resolve({ ok: true }) },',
   "  AuthState: function () { return Promise.resolve({ authenticated: window.__probe.authed, user: window.__probe.authed ? { username: 'ali', email: 'aliassadi@live.com', language_pref: window.__probe.lang, calendar_pref: 'gregorian' } : null }) },",
   '  Request: function (method, p, body) { return window.__probeRequest(method, p, body) },',
-  "  AppInfo: function () { return Promise.resolve({ version: '0.1.16', webRef: 'e6661c8' }) },",
+  '  AppInfo: function () { return Promise.resolve({ version: ' + JSON.stringify(DESKTOP_VERSION) + ', webRef: ' + JSON.stringify(WEB_REF.ref) + ' }) },',
   '  SetTheme: function (pref) { window.__probeThemeCalls.push(pref); return Promise.resolve({ ok: true, pref: pref }) },',
   '  SetLanguage: function (lang) { return window.__probeSetLanguage(lang) },',
   '  SetGithubToken: function (tok) { return window.__probeSetToken(tok) },',
@@ -398,7 +407,7 @@ async function main() {
       JSON.stringify(sheet.heads))
     check('the sheet is the wide-dialog grammar', sheet.wide && /modal/.test(sheet.modalClass))
     check('the version line names the app + the island pin (AppInfo + the baked package version)',
-      sheet.version === 'Hibana 0.1.16 · island e6661c8 (v0.4.1.35)', JSON.stringify(sheet.version))
+      sheet.version === VERSION_LINE, JSON.stringify(sheet.version))
     check('the account line names the signed-in identity (AuthState)', sheet.account === 'ali · aliassadi@live.com', JSON.stringify(sheet.account))
     check('before any check the status line claims NOTHING (an unchecked app is not "latest")', sheet.status === '', JSON.stringify(sheet.status))
     check('Update now is hidden before an available verdict', sheet.updateNowHidden === true)
@@ -820,7 +829,7 @@ async function main() {
     })
     check('the FA sheet title rides the pin\'s own nav.settings key (تنظیمات)', faSheet.title === 'تنظیمات', JSON.stringify(faSheet.title))
     check('the FA sections keep the owner\'s order', faSheet.heads[0] === 'همگام‌سازی' && faSheet.heads[1] === 'بروزرسانی برنامه' && faSheet.heads[2] === 'حساب' && faSheet.heads[3] === 'ظاهر', JSON.stringify(faSheet.heads))
-    check('the FA version line names the app + the island pin', faSheet.version === 'هیبانا 0.1.16 · جزیره e6661c8 (v0.4.1.35)', JSON.stringify(faSheet.version))
+    check('the FA version line names the app + the island pin', faSheet.version === VERSION_LINE_FA, JSON.stringify(faSheet.version))
     check('the FA Sync-now + Check labels', faSheet.syncNow === 'همگام‌سازی کن' && faSheet.check === 'بررسی بروزرسانی', JSON.stringify({ syncNow: faSheet.syncNow, check: faSheet.check }))
     check('the FA Sign out rides the pin\'s own nav.signout key (خروج)', faSheet.signout === 'خروج', JSON.stringify(faSheet.signout))
     check('the FA labels: Language/Theme + the Dark option', faSheet.langLabel === 'زبان' && faSheet.themeLabel === 'پوسته' && faSheet.themeDark === 'تیره', JSON.stringify({ langLabel: faSheet.langLabel, themeLabel: faSheet.themeLabel, themeDark: faSheet.themeDark }))

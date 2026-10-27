@@ -5,15 +5,14 @@ window.__hibanaDictEN = {
       // nav
       'nav.dashboard': 'Dashboard', 'nav.projects': 'Projects', 'nav.sparks': 'Ideas',
       'nav.kanban': 'Kanban', // S205: the dedicated project-Kanban entry point
-      'nav.canvas': 'Canvas', 'nav.canvasHint': 'Boundless board — pen, notes, promote to Idea',
-      'nav.whiteboard': 'Notebook', 'nav.sadhana': 'To-do list',
+      'nav.canvas': 'Canvas', 'nav.whiteboard': 'Notebook', 'nav.sadhana': 'To-do list',
       'nav.clients': 'Clients', 'nav.archive': 'Archive', 'nav.gallery': 'Gallery',
       'nav.reports': 'Reports', 'nav.settings': 'Settings', 'nav.signout': 'Sign out',
       'nav.lang': 'فارسی',
       'nav.themeHint': 'Toggle theme (light/dark)',
       'nav.theme': 'Theme',
       'nav.more': 'More', 'mobilenav.label': 'Main menu',
-      'nav.search': 'Search', 'nav.searchCmd': 'Search & commands',
+      'nav.searchCmd': 'Search & commands',
       // S88: the navigation rail + its secondary panel
       'nav.railLabel': 'Primary sections', 'nav.brandHome': 'Hibana — home',
       'nav.help': 'Help — replay the guided tour',
@@ -26,8 +25,6 @@ window.__hibanaDictEN = {
       'rail.g.plans': 'Plans', 'rail.g.inProgress': 'In Progress', 'rail.g.done': 'Done',
       'rail.sparksEmpty': 'No ideas captured yet — the Ideas shelf fills as you spark.',
       'rail.notesEmpty': 'No notes yet — the vault fills as you write.',
-      'rail.canvasHint': 'The boundless Canvas is a single board — open it to draw, pin notes, and frame regions.',
-      'rail.notebookHint': 'The Notebook is your single whiteboard — open it to sketch and write freehand.',
       'rail.calendarHint': 'Everything you scheduled — projects, tasks and to-dos — lands here as it approaches.',
       'rail.todoFailed': "Couldn't update the task — try again",
       // S113 (owner, urgent): the sidebar to-do panel shows OPEN work only — a tick
@@ -48,7 +45,7 @@ window.__hibanaDictEN = {
       // S89: the LABELED rail — a small text label rides under every icon
       'rail.label.search': 'Search', 'rail.label.dashboard': 'Dashboard', 'rail.label.todo': 'To-do',
       'rail.label.projects': 'Projects', 'rail.label.ideas': 'Ideas', 'rail.label.notes': 'Notes',
-      'rail.label.calendar': 'Calendar', 'rail.label.canvas': 'Canvas', 'rail.label.settings': 'Settings',
+      'rail.label.calendar': 'Calendar', 'rail.label.canvas': 'Canvas', 'rail.label.settings': 'Settings', 'rail.label.kanban': 'Kanban',
       'rail.label.help': 'Help', 'rail.label.theme': 'Theme', 'rail.label.sidebar': 'Sidebar', 'rail.collapseHint': 'Collapse or expand the sidebar',
       // S89: the to-do panel groups tasks under their QUADRANT (box) name —
       // the same defaults the sadhana page carries, localized
@@ -60,8 +57,6 @@ window.__hibanaDictEN = {
       // R5.1: onboarding tour — S89: the full-app walk (13 steps)
       'tour.welcome': 'Welcome to Hibana',
       'tour.welcomeBody': 'A two-minute walk through the places you’ll live in — the rail on the left, the panel each icon opens, and capture everywhere. Skip anytime.',
-      'tour.cmdk': 'Command palette',
-      'tour.cmdkBody': 'Press Ctrl+K (or /) to search projects and jump anywhere instantly.',
       'tour.rail': 'The navigation rail',
       'tour.railBody': 'Every section sits on this rail — one icon and label per destination. The filled square marks where you are; clicking an icon opens its list panel beside the rail.',
       'tour.search': 'Search & commands',
@@ -93,7 +88,7 @@ window.__hibanaDictEN = {
       // Magic Button (idea §1) — AI polish/rewrite/translate wand
       'magic.tooltip': 'AI: polish, rewrite, or translate',
       'magic.title': 'Magic wand',
-      'magic.polish': 'Polish', 'magic.rewrite': 'Rewrite', 'magic.translate': 'Translate',
+      'magic.polish': 'Polish', 'magic.translate': 'Translate',
       'magic.custom': 'Ask AI…', 'magic.customTitle': 'Ask the AI',
       'magic.customPh': 'Tell the AI what to do with this text — e.g. “Classify these books into categories”, “Summarize in 5 bullets”, “Extract the deadlines”…',
       'magic.customRun': 'Run', 'magic.customBack': 'Back', 'magic.customRequired': 'Write your instruction first.',
@@ -192,53 +187,27 @@ window.__hibanaDictEN = {
       'settings.syncIdle': 'All changes synced',
       'common.edit': 'Edit', 'common.add': 'Add', 'common.loading': 'Loading…',
       // sadhana page (quadrant task board, spec 2026-08-25)
-      'sadhana.title': 'Title', 'sadhana.emoji': 'Emoji',
+      'sadhana.emoji': 'Emoji',
       'sadhana.qeSymbol': 'Pick a symbol', 'sadhana.qeEmpty': 'No symbol — minimalist',
-      'sadhana.note': 'Note', 'sadhana.tags': 'Tags',
-      'sadhana.quickPick': 'Quick pick', 'sadhana.exactDate': 'Exact date',
-      'sadhana.recurring': 'Recurring', 'sadhana.reopen': 'Reopen automatically',
-      'sadhana.config': 'Config',
-      'sadhana.recurWeekly': 'Weekly (0–6, Mon=0)', 'sadhana.recurNdays': 'Every N days', 'sadhana.recurMonthly': 'Monthly',
-      'sadhana.recurEvery': 'Every', 'sadhana.recurDaysSuffix': 'days',
-      'sadhana.recurOfEachMonth': 'of each month',
-      'sadhana.fuzzy.48h': 'Within 48 hours',
-      'sadhana.fuzzy.mon': 'This month',
-      'sadhana.fuzzy.6mo': 'Next 6 months',
-      'sadhana.cancel': 'Cancel', 'sadhana.saveFailed': 'Could not save the task',
-      'sadhana.deleted': 'Task deleted', 'sadhana.undo': 'Undo',
-      'sadhana.moveFailed': "Couldn't move it — try again",
-      'sadhana.setDeadline': 'Set deadline…', 'sadhana.clear': 'Clear', 'sadhana.confirm': 'Confirm',
       'sadhana.emojiSearch': 'Search emoji…',
       // R10: redesigned card — actions panel + state selector + inline note edit
-      'sadhana.addNote': 'Add note', 'sadhana.changeState': 'Change state',
-      'sadhana.done': 'Done', 'sadhana.notes': 'Notes',
-      'sadhana.addNotePlaceholder': 'Add a note…',
-      'sadhana.deleteNote': 'Delete note',
-      'sadhana.noteUpdateFailed': "Couldn't save the note",
-      'sadhana.notStarted': 'Not started',
-      'sadhana.onHold': 'On hold',
       'common.undo': 'Undo',
       // quick-add modal (app.js)
       'qa.title': 'New Idea', 'qa.name': 'Name', 'qa.oneLiner': 'One-liner',
       'qa.tags': 'Tags (comma-separated, optional)', 'qa.tagsPlaceholder': 'AI, WordPress, …',
       'qa.sketch': 'Sketch (optional)', 'qa.sketchHint': 'Attach a sketch — a photo or drawing', 'qa.shareCaptured': 'Idea captured from the share sheet', 'qa.saving': 'Saving…',
-      'qa.voiceError': 'Voice input failed: ',
       'qa.savedOffline': 'Saved offline — it will sync when you reconnect',
       'qa.errorPrefix': "Couldn't create the idea —",
       'qa.duplicate': 'A project with this title already exists',
       'qa.filesInto': 'Files into',
       // theme — S87: two looks only (light + claude-dark); the toggle is a binary flip
-      'theme.toLight': 'Switch to light mode', 'theme.toDark': 'Switch to dark mode',
       // page titles / headings
-      'pages.projects': 'Projects', 'pages.sparks': 'Ideas',
-      'pages.clients': 'Clients', 'pages.archive': 'Archive',
-      'pages.reports': 'Reports', 'pages.settings': 'Settings',
-      // project list views + filters
+      'pages.projects': 'Projects', 'pages.clients': 'Clients', 'pages.archive': 'Archive',
+      'pages.reports': 'Reports', // project list views + filters
       'view.grid': 'Stages', 'view.cards': 'Cards', 'view.list': 'List', 'view.sticky': 'Sticky Notes', 'view.kanban': 'Kanban',
       'view.label': 'View:',
       'filter.search': 'Search (exact match)…', 'filter.allStatuses': 'All statuses',
-      'filter.allTags': 'All tags', 'filter.byStatus': 'Status', 'filter.byTag': 'Tag', 'filter.searchLabel': 'Search',
-      // S45: the projects page sort select ('stage' = the historical order)
+      'filter.allTags': 'All tags', // S45: the projects page sort select ('stage' = the historical order)
       'sort.label': 'Sort', 'sort.stage': 'By stage', 'sort.recent': 'Recently updated', 'sort.title': 'Name',
       'list.reorderFailed': 'Reorder failed — try again',
       // batch q lifecycle: spark = idea; the six project stages follow Ali's funnel
@@ -259,12 +228,10 @@ window.__hibanaDictEN = {
       'settings.sendInvite': 'Send invite', 'settings.inviteSent': 'Invitation sent to',
       'settings.inviteEmailRequired': 'Enter an email first',
       'settings.noInvites': 'No invites yet — generate one above.',
-      'settings.telegram': 'Telegram', 'settings.generateCode': 'Generate link code',
-      'settings.telegramConnect': 'Connect to Telegram',
+      'settings.telegram': 'Telegram', 'settings.telegramConnect': 'Connect to Telegram',
       'settings.telegramConnectHint': 'Click the button — Telegram opens with the bot ready. Just tap Start.',
       'settings.codeFailed': 'Link code generation failed',
       'settings.telegramLinked': 'Linked to Telegram', 'settings.telegramNotLinked': 'Not linked yet',
-      'settings.telegramStep2': '2. Send it your code like this:',
       'settings.unlink': 'Unlink', 'settings.unlinked': 'Telegram unlinked', 'settings.unlinkFailed': 'Unlink failed — try again',
       'settings.telegramHint': 'After linking, text any idea to the bot — it creates the Idea and replies with a link back.',
       'settings.sendToBot': 'Send this to your bot:',
@@ -327,21 +294,17 @@ window.__hibanaDictEN = {
       'settings.moveUp': 'Move up', 'settings.moveDown': 'Move down', 'settings.show': 'Show', 'settings.hide': 'Hide',
       'settings.viewsSaved': 'Dashboard view saved',
       // client module (module.ts remnants may also use these via server)
-      'task.progress': 'Task progress', 'client.payments': 'Payments',
       // sparks page
       'sparks.heading': 'Ideas', 'sparks.capture': 'Capture an idea',
       'sparks.hint': 'The whiteboard replacement — capture in seconds, promote later.',
       'sparks.more': 'More actions',
-      'sparks.edit': 'Edit idea',
       'sparks.title': 'Title',
       'sparks.description': 'Description',
       'sparks.saved': 'Saved',
       'sparks.deleted': 'Idea deleted',
       'sparks.deleteFailed': "Couldn't delete the idea",
-      'sparks.reorderFailed': 'Reorder failed — try again',
-      'sparks.saving': 'Saving…', 'sparks.saveFailed': "Couldn't save the idea", 'sparks.loadFailed': "Couldn't load the idea",
-      // batch (s) 2026-09-08 — idea folders (پوشه‌ها): organize sparks into named folders
-      'sparks.allFolders': 'All', 'sparks.noFolder': 'No folder',
+      'sparks.saving': 'Saving…', 'sparks.saveFailed': "Couldn't save the idea", // batch (s) 2026-09-08 — idea folders (پوشه‌ها): organize sparks into named folders
+      'sparks.noFolder': 'No folder',
       'sparks.newFolder': 'New folder', 'sparks.folderName': 'Folder name',
       'sparks.renameFolder': 'Rename folder', 'sparks.deleteFolder': 'Delete folder',
       'sparks.deleteFolderHint': 'The ideas in it move back to All.',
@@ -358,9 +321,6 @@ window.__hibanaDictEN = {
       'sparks.searchClear': 'Clear search',
       'sparks.nMatchesOne': '1 match',
       'sparks.nMatches': '{n} matches',
-      'sparks.bannerUpload': 'Upload a banner',
-      'sparks.bannerChange': 'Change banner',
-      'sparks.bannerRemove': 'Remove banner',
       'sparks.bannerFailed': "Couldn't update the banner — try again",
       'sparks.cropTitle': 'Crop banner',
       'sparks.cropHint': 'Drag to reposition · scroll to zoom',
@@ -576,7 +536,7 @@ window.__hibanaDictEN = {
       'calendar.quadrant': 'Quadrant', 'calendar.stickyColor': 'Sticky color',
       'calendar.saveSticky': 'Add sticky', 'calendar.saveTask': 'Add task', 'calendar.saveNote': 'Add note',
       'calendar.stickyAdded': 'Sticky note added', 'calendar.taskAdded': 'Task added', 'calendar.noteAdded': 'Note added',
-      'calendar.taskDeleted': 'Task deleted', 'calendar.addFailed': "Couldn't save — try again.",
+      'calendar.addFailed': "Couldn't save — try again.",
       'calendar.color_yellow': 'Yellow', 'calendar.color_green': 'Green', 'calendar.color_pink': 'Pink', 'calendar.color_blue': 'Blue',
       // 22-a: unified delete toast, week jump, right-click day menu
       'calendar.deleted': 'Deleted', 'calendar.nextWeek': 'Next week',
@@ -608,15 +568,11 @@ window.__hibanaDictEN = {
       'filters.namePrompt': 'Name this filter (e.g. "Client work this week"):',
       'filters.remove': 'Remove',
       // bulk actions (R3.1)
-      'bulk.actions': 'Bulk actions', 'bulk.selectItem': 'Select item',
-      'bulk.selectAll': 'Select all',
-      'bulk.deletedN': '{n} deleted', 'bulk.failedN': '{n} failed',
       // project page
-      'project.stageSaved': 'Stage saved', 'project.captionPrompt': 'Caption (optional):',
-      'project.shotUploaded': 'Screenshot uploaded', 'project.shotFailed': 'Upload failed', 'project.uploading': 'Uploading…',
+      'project.stageSaved': 'Stage saved', 'project.shotUploaded': 'Screenshot uploaded', 'project.shotFailed': 'Upload failed', 'project.uploading': 'Uploading…',
       'project.shotDeleted': 'File deleted',
       // S86: file uploads (PDF/CSV/XLSX/DOCX/MD/TXT) ride the screenshots bucket
-      'project.fileUploaded': 'File uploaded', 'project.uploadFiles': 'Upload files', 'project.downloadFile': 'Download {f}',
+      'project.fileUploaded': 'File uploaded', 'project.downloadFile': 'Download {f}',
       // S35: the screenshot problem cards
       'project.shotZoom': 'Screenshot', 'project.videoTileAria': 'Recording — press Enter to view full screen', 'project.shotNotePh': 'What is broken & where — the exact spot to work on…',
       // S46: screenshot-note modal + create-bug/idea-from-screenshot + task-composer shot-attach count
@@ -688,8 +644,6 @@ window.__hibanaDictEN = {
       'pd.labels': 'Labels', 'pd.labelsPh': 'e.g. UI/UX, Security', 'pd.labelsHint': 'Comma-separated — a chip per label',
       // S46.2: screenshots in the task editor (pde-form) — upload + pin to this item + view pinned
       'pde.shotsAttach': 'Upload File', 'pde.shotsAttachTitle': 'Upload a file — images, video (webm), PDF, Excel, Word, Markdown, text — pinned to this item',
-      'pde.shotsView': 'Pinned pictures', 'pde.shotsViewTitle': 'View pictures pinned to this item',
-      'pde.shotsUploading': 'Uploading image…',
       // S46.7: editor title + full-screen writing + add-note button (when no note)
       'pde.title': 'Create a new task', 'pde.fullscreen': 'Full-screen writing',
       'notes.addNote': 'Add note',
@@ -758,9 +712,7 @@ window.__hibanaDictEN = {
       'db.taskShotsHint': 'Pinned pictures — note + proof stuck to this item',
       'db.taskShotsBadge': 'Pinned pictures ({n})',
       'db.zoom': 'Zoom', 'db.zoomDays': 'Days',
-      'db.zoomMonths': 'Months', 'db.newSprintTitle': 'Sprint',
       'db.zoom1w': '1 week', 'db.zoom1m': '1 month', 'db.zoom3m': '3 months', 'db.zoom6m': '6 months', 'db.zoom12m': '12 months',
-      'db.delCatConfirm': 'Delete this category? Its tasks move to Uncategorized.', 'db.catDeleted': 'Category deleted',
       'db.hideLane': 'Hide on timeline', 'db.showLane': 'Show on timeline', 'db.weekNum': 'Week {n}',
       // batch (p) 2026-09-06 — مشکل‌ها tab operates on bug dev_tasks (same items as the
       // Problems box), and the new برنامه آتی (Upcoming Plan) tab's phrases.
@@ -771,7 +723,6 @@ window.__hibanaDictEN = {
       'bl.itemAdded': 'New item: {t}',
       'bl.noDocs': 'No plan documents yet — write the first full plan here.',
       'bl.noPlans': 'No plans yet — add one above; it lands in the Plans box of the progress board.',
-      'bl.plansHead': 'Plans', 'bl.plansHeadSub': 'box items',
       'bl.noHistory': 'No backlog changes yet.',
       'bl.historyTitle': 'Latest changes', 'bl.latest': 'last change',
       'bl.docSaved': 'Document saved', 'bl.docDeleted': 'Document deleted',
@@ -788,7 +739,6 @@ window.__hibanaDictEN = {
       'hx.failed': "Couldn't load the latest — content unchanged",
       // floating action button
       'fab.idea': 'New idea', 'fab.project': 'New project', 'fab.new': 'New',
-      'fab.task': 'New Task',
       // Phase 7 item 12: the FAB's quick-note option + its modal strings
       'fab.note': 'New quick note',
       'qn.title': 'Quick note', 'qn.save': 'Save',
@@ -829,8 +779,7 @@ window.__hibanaDictEN = {
       /* 'notes.deleteFailed' lives in the Trash block below (S115 r2: the duplicate —
          esbuild's duplicate-object-key warning — is retired; the later value wins). */
       'notes.deleted': 'Note deleted', 'notes.undo': 'Undo',
-      'notes.updateFailed': "Couldn't update the note", 'notes.doneMarked': 'Marked done', 'notes.unmarked': 'Marked undone',
-      'notes.emptyHint': 'Write a note first',
+      'notes.updateFailed': "Couldn't update the note", 'notes.emptyHint': 'Write a note first',
       'notes.reorderFailed': "Couldn't reorder the notes",
       // notebook page (whiteboard)
       'wb.move': 'Move / select', 'wb.black': 'Black pen', 'wb.blue': 'Blue pen',
@@ -864,7 +813,6 @@ window.__hibanaDictEN = {
       'reports.labelDist': 'Labels', 'reports.labelHint': 'Tasks per label — ✓ done, + started in the last 30 days.',
       'reports.velocity': 'Sprint velocity by priority', 'reports.velSprint': 'Sprint', 'reports.velDone': 'Done',
       'reports.velocityHint': 'Done tasks per priority tier in each sprint — which tier actually ships.',
-      'dash.urgentHeading': 'Urgent across projects', 'dash.urgentOpen': 'Open board', 'dash.urgentQuiet': 'Nothing urgent — the fire strip stays hidden.',
       // S30 batch 2: the board filter bar + priority cycling
       'db.filterAria': 'Filter tasks', 'db.filterPrio': 'Priority', 'db.filterLabels': 'Labels',
       'db.filterPrioHint': 'Show only {p} tasks', 'db.filterTagHint': 'Click to filter by this label',
@@ -920,6 +868,15 @@ window.__hibanaDictEN = {
       'resume.clear': 'Clear recents', 'resume.clearAria': 'Clear the recent-items list', 'resume.cleared': 'Recents cleared',
       // S181 (the owner's promised additions): the resume hero's summary line + progress-bar sentence
       'nav.syncPending': '{n} pending', 'nav.syncHint': 'Waiting to sync — click to try now', 'nav.syncSent': 'Synced your offline changes',
+      // hibana-sync-status-spec §4 + §11: the per-card sync badge labels (the FA
+      // strings are the spec's drafts — the owner may adjust; sentence case, no
+      // exclamation marks, errors say what happened then what to do).
+      'sync.pending': 'Saved on this device',
+      'sync.pendingOffline': 'Waiting for connection',
+      'sync.syncing': 'Syncing…',
+      'sync.synced': 'Synced',
+      'sync.failed': "Couldn't sync. Retry",
+      'sync.retry': 'Retry',
       // S52: Trash palette command + recoverable-count sublabel
       'cmdk.openTrash': 'Trash — recover deleted items',
       'cmdk.trashCount': '{n} recoverable',
@@ -971,8 +928,7 @@ window.__hibanaDictEN = {
       'admin.usersSearch': 'Search username or email…',
       'admin.colActivity': 'Last activity', 'admin.joined': 'Joined',
       'admin.projects': 'Projects', 'admin.notes': 'Notes',
-      'admin.roleOwner': 'super-admin', 'admin.roleMember': 'member',
-      'admin.stVerified': 'verified', 'admin.stUnverified': 'unverified',
+      'admin.roleOwner': 'super-admin', 'admin.stVerified': 'verified', 'admin.stUnverified': 'unverified',
       'admin.stBannedUntil': 'banned until', 'admin.stForever': 'banned — permanent',
       'admin.onlineNow': 'online', 'admin.self': 'you', 'admin.noMatch': 'No users match.',
       'admin.relNow': 'just now',
@@ -1038,6 +994,7 @@ window.__hibanaDictEN = {
       // The chrome strings are tagged in the 4 auth .html files with data-i18n* attributes;
       // i18n.js's apply() swaps them at runtime (navigator.language fallback when logged out).
       'auth.welcomeBack': 'Welcome back',
+      'auth.inviteCode': 'Invite code', 'auth.inviteCodePlaceholder': 'Ask an existing user for a code',
       'auth.signIn': 'Sign in',
       'auth.emailOrUsername': 'Email or username',
       'auth.password': 'Password',
@@ -1140,7 +1097,6 @@ window.__hibanaDictEN = {
       'notes.importQuickNone': 'All your quick notes are already notes here',
       'notes.outline': 'On this page',
       'fab.vault': 'New note',
-      'fab.vaultHint': 'Long-form note in your Notes vault',
       'cmdk.newNote': 'New note',
       'cat.field': 'Category',
       'cat.ph': 'None — type to pick or create',

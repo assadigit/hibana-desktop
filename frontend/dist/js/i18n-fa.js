@@ -5,15 +5,14 @@ window.__hibanaDictFA = {
       // nav
       'nav.dashboard': 'پیشخوان', 'nav.projects': 'پروژه‌ها', 'nav.sparks': 'ایده‌ها',
       'nav.kanban': 'کانبان', // S205: نقطه ورود اختصاصی برد کانبان پروژه‌ها
-      'nav.canvas': 'بوم', 'nav.canvasHint': 'فضای بی‌حدومرز — قلم، یادداشت، تبدیل به ایده',
-      'nav.whiteboard': 'برگه یادداشت', 'nav.sadhana': 'لیست کارها',
+      'nav.canvas': 'بوم', 'nav.whiteboard': 'برگه یادداشت', 'nav.sadhana': 'لیست کارها',
       'nav.clients': 'مشتری‌ها', 'nav.archive': 'بایگانی', 'nav.gallery': 'نگارخانه',
       'nav.reports': 'گزارش‌ها', 'nav.settings': 'تنظیمات', 'nav.signout': 'خروج',
       'nav.lang': 'English',
       'nav.themeHint': 'تغییر پوسته (روشن/تیره)',
       'nav.theme': 'پوسته',
       'nav.more': 'بیشتر', 'mobilenav.label': 'منوی اصلی',
-      'nav.search': 'جست‌وجو', 'nav.searchCmd': 'جست‌وجو و فرمان‌ها',
+      'nav.searchCmd': 'جست‌وجو و فرمان‌ها',
       // S88: the navigation rail + its secondary panel
       'nav.railLabel': 'بخش‌های اصلی', 'nav.brandHome': 'هیبانا — خانه',
       'nav.help': 'راهنما — پخش دوبارهٔ تور معرفی',
@@ -26,8 +25,6 @@ window.__hibanaDictFA = {
       'rail.g.plans': 'برنامه‌ها', 'rail.g.inProgress': 'در حال انجام', 'rail.g.done': 'انجام‌شده',
       'rail.sparksEmpty': 'هنوز ایده‌ای ثبت نشده — قفسهٔ ایده‌ها با ثبت‌های تو پر می‌شود.',
       'rail.notesEmpty': 'هنوز یادداشتی نیست — گاوصندوق با نوشتن تو پر می‌شود.',
-      'rail.canvasHint': 'بوم بی‌حدومرز یک تختهٔ واحد است — بازش کن تا بکشی، یادداشت سنجاق کنی و قاب بسازی.',
-      'rail.notebookHint': 'برگه یادداشت تختهٔ سفید توست — بازش کن تا آزادانه بنویسی و بکشی.',
       'rail.calendarHint': 'هر چیز برنامه‌ریزی‌شده — پروژه، وظیفه یا کارِ لیست — وقتی نزدیک شود همین‌جا می‌آید.',
       'rail.todoFailed': 'به‌روزرسانی کار ممکن نشد — دوباره تلاش کن',
       // S113 (owner, urgent): the sidebar to-do panel shows OPEN work only — a tick
@@ -48,7 +45,7 @@ window.__hibanaDictFA = {
       // S89: the LABELED rail — a small text label rides under every icon
       'rail.label.search': 'جست‌وجو', 'rail.label.dashboard': 'پیشخوان', 'rail.label.todo': 'کارها',
       'rail.label.projects': 'پروژه‌ها', 'rail.label.ideas': 'ایده‌ها', 'rail.label.notes': 'یادداشت‌ها',
-      'rail.label.calendar': 'تقویم', 'rail.label.canvas': 'بوم', 'rail.label.settings': 'تنظیمات',
+      'rail.label.calendar': 'تقویم', 'rail.label.canvas': 'بوم', 'rail.label.settings': 'تنظیمات', 'rail.label.kanban': 'کانبان',
       'rail.label.help': 'راهنما', 'rail.label.theme': 'پوسته', 'rail.label.sidebar': 'نوار کناری', 'rail.collapseHint': 'جمع‌کردن یا بازکردن نوار کناری',
       // S89: the to-do panel groups tasks under their QUADRANT (box) name —
       // the same defaults the sadhana page carries, localized
@@ -60,8 +57,6 @@ window.__hibanaDictFA = {
       // R5.1: onboarding tour — S89: the full-app walk (13 steps)
       'tour.welcome': 'به هیبانا خوش آمدی',
       'tour.welcomeBody': 'دو دقیقه پیاده‌روی میان جاهایی که قرار است در آن‌ها زندگی کنی — ریل سمت چپ، پنلی که هر آیکن باز می‌کند، و ثبت از هر جا. هر وقت خواستی رد کن.',
-      'tour.cmdk': 'پنل فرمان',
-      'tour.cmdkBody': 'Ctrl+K (یا /) را بزن تا پروژه‌ها را جست‌وجو کنی و سریع بپری جای دیگر.',
       'tour.rail': 'ریل ناوبری',
       'tour.railBody': 'همهٔ بخش‌ها روی همین ریل نشسته‌اند — هر مقصد یک آیکن و یک برچسب. مربعِ پرشده نشان می‌دهد الان کجایی؛ کلیک روی هر آیکن پنل فهرست همان بخش را کنار ریل باز می‌کند.',
       'tour.search': 'جست‌وجو و فرمان‌ها',
@@ -93,7 +88,7 @@ window.__hibanaDictFA = {
       // Magic Button (idea §1) — AI polish/rewrite/translate wand
       'magic.tooltip': 'هوش مصنوعی: اصلاح، بازنویسی یا ترجمه',
       'magic.title': 'چوب جادو',
-      'magic.polish': 'اصلاح', 'magic.rewrite': 'بازنویسی', 'magic.translate': 'ترجمه',
+      'magic.polish': 'اصلاح', 'magic.translate': 'ترجمه',
       'magic.custom': 'هوش مصنوعی…', 'magic.customTitle': 'پرسش از هوش مصنوعی',
       'magic.customPh': 'به هوش مصنوعی بگو با این متن چه کند — مثلاً «این کتاب‌ها را دسته‌بندی کن»، «در ۵ مورد خلاصه کن»، «موعدی‌ها را استخراج کن»…',
       'magic.customRun': 'اجرا', 'magic.customBack': 'بازگشت', 'magic.customRequired': 'اول دستور خود را بنویس.',
@@ -192,53 +187,28 @@ window.__hibanaDictFA = {
       'settings.syncIdle': 'همهٔ تغییرات همگام شده',
       'common.edit': 'ویرایش', 'common.add': 'افزودن', 'common.loading': 'در حال بارگذاری…',
       // sadhana page (quadrant task board, spec 2026-08-25)
-      'sadhana.title': 'عنوان', 'sadhana.emoji': 'ایموجی',
+      'sadhana.emoji': 'ایموجی',
       'sadhana.qeSymbol': 'انتخاب نماد', 'sadhana.qeEmpty': 'بدون نماد — مینیمال',
-      'sadhana.note': 'یادداشت', 'sadhana.tags': 'برچسب‌ها',
-      'sadhana.quickPick': 'انتخاب سریع', 'sadhana.exactDate': 'تاریخ دقیق',
-      'sadhana.recurring': 'تکرارشونده', 'sadhana.reopen': 'خودکار باز شود',
-      'sadhana.config': 'پیکربندی',
-      'sadhana.recurWeekly': 'هفتگی (۰–۶، دوشنبه=۰)', 'sadhana.recurNdays': 'هر N روز', 'sadhana.recurMonthly': 'ماهانه',
-      'sadhana.recurEvery': 'هر', 'sadhana.recurDaysSuffix': 'روز',
-      'sadhana.recurOfEachMonth': 'هر ماه',
-      'sadhana.fuzzy.48h': 'تا ۴۸ ساعت دیگر',
-      'sadhana.fuzzy.mon': 'این ماه',
-      'sadhana.fuzzy.6mo': 'شش ماه آینده',
-      'sadhana.cancel': 'انصراف', 'sadhana.saveFailed': 'ذخیره ممکن نشد',
-      'sadhana.deleted': 'کار حذف شد', 'sadhana.undo': 'برگردان',
-      'sadhana.moveFailed': 'جابه‌جایی ممکن نشد — دوباره تلاش کن',
-      'sadhana.setDeadline': 'تعیین مهلت…', 'sadhana.clear': 'پاک کردن', 'sadhana.confirm': 'تأیید',
       'sadhana.emojiSearch': 'جستجوی ایموجی…',
       // R10: redesigned card — actions panel + state selector + inline note edit
-      'sadhana.addNote': 'افزودن یادداشت', 'sadhana.changeState': 'تغییر وضعیت',
-      'sadhana.done': 'انجام شد', 'sadhana.notes': 'یادداشت‌ها',
-      'sadhana.addNotePlaceholder': 'افزودن یادداشت…',
-      'sadhana.deleteNote': 'حذف یادداشت',
-      'sadhana.noteUpdateFailed': 'ذخیره یادداشت ممکن نشد',
-      'sadhana.notStarted': 'شروع نشده',
-      'sadhana.onHold': 'معلق', // P4.6 (F-M18): معلق (paused) not متوقف (halted)
+      // P4.6 (F-M18): معلق (paused) not متوقف (halted)
       'common.undo': 'برگردان',
       // quick-add modal (app.js)
       'qa.title': 'ایده جدید', 'qa.name': 'نام', 'qa.oneLiner': 'توضیح کوتاه',
       'qa.tags': 'برچسب‌ها (با کاما جدا کنید، اختیاری)', 'qa.tagsPlaceholder': 'AI، WordPress، …',
       'qa.sketch': 'طرح (اختیاری)', 'qa.sketchHint': 'چسباندن یک طرح — عکس یا نقاشی', 'qa.shareCaptured': 'ایده از صفحهٔ اشتراک‌گذاری ثبت شد', 'qa.saving': 'در حال ذخیره…',
-      'qa.voiceError': 'ورودی صوتی ناموفق: ',
       'qa.savedOffline': 'آفلاین ذخیره شد — به محض اتصال همگام می‌شود',
       'qa.errorPrefix': 'ایجاد ایده ممکن نشد —',
       'qa.duplicate': 'پروژه‌ای با این نام قبلاً وجود دارد',
       'qa.filesInto': 'ثبت در پوشه',
       // theme — S87: two looks only (light + claude-dark); the toggle is a binary flip
-      'theme.toLight': 'حالت روشن', 'theme.toDark': 'حالت تاریک',
       // page titles / headings
-      'pages.projects': 'پروژه‌ها', 'pages.sparks': 'ایده‌ها',
-      'pages.clients': 'مشتری‌ها', 'pages.archive': 'بایگانی',
-      'pages.reports': 'گزارش‌ها', 'pages.settings': 'تنظیمات',
-      // project list views + filters
+      'pages.projects': 'پروژه‌ها', 'pages.clients': 'مشتری‌ها', 'pages.archive': 'بایگانی',
+      'pages.reports': 'گزارش‌ها', // project list views + filters
       'view.grid': 'مرحله‌ها', 'view.cards': 'کارت‌ها', 'view.list': 'فهرست', 'view.sticky': 'یادداشت‌های چسبان', 'view.kanban': 'کانبان',
       'view.label': 'نمایش:',
       'filter.search': 'جستجو (تطابق دقیق)…', 'filter.allStatuses': 'همهٔ وضعیت‌ها',
-      'filter.allTags': 'همهٔ برچسب‌ها', 'filter.byStatus': 'وضعیت', 'filter.byTag': 'برچسب', 'filter.searchLabel': 'جستجو',
-      // S45: مرتب‌سازی فهرست پروژه‌ها ('stage' = ترتیب همیشگی)
+      'filter.allTags': 'همهٔ برچسب‌ها', // S45: مرتب‌سازی فهرست پروژه‌ها ('stage' = ترتیب همیشگی)
       'sort.label': 'مرتب‌سازی', 'sort.stage': 'به ترتیب مرحله', 'sort.recent': 'به‌روزرسانی اخیر', 'sort.title': 'نام',
       'list.reorderFailed': 'مرتب‌سازی ناموفق بود — دوباره تلاش کن',
       // batch q lifecycle: spark = idea; the six project stages follow Ali's funnel
@@ -259,12 +229,10 @@ window.__hibanaDictFA = {
       'settings.sendInvite': 'ارسال دعوت', 'settings.inviteSent': 'دعوت ارسال شد به',
       'settings.inviteEmailRequired': 'اول یک ایمیل وارد کن',
       'settings.noInvites': 'هنوز دعوتی نیست — یکی از بالا تولید کن.',
-      'settings.telegram': 'تلگرام', 'settings.generateCode': 'تولید کد اتصال',
-      'settings.telegramConnect': 'اتصال به تلگرام',
+      'settings.telegram': 'تلگرام', 'settings.telegramConnect': 'اتصال به تلگرام',
       'settings.telegramConnectHint': 'روی دکمه بزن — تلگرام با ربات باز می‌شود. فقط Start را بزن.',
       'settings.codeFailed': 'تولید کد ممکن نشد',
       'settings.telegramLinked': 'به تلگرام متصل است', 'settings.telegramNotLinked': 'هنوز متصل نیست',
-      'settings.telegramStep2': '۲. کدتان را این‌طور بفرستید:',
       'settings.unlink': 'قطع اتصال', 'settings.unlinked': 'اتصال تلگرام قطع شد', 'settings.unlinkFailed': 'قطع اتصال ممکن نشد — دوباره تلاش کنید',
       'settings.telegramHint': 'پس از اتصال، هر ایده‌ای را به ربات بفرستید — ایده می‌سازد و لینک بازگشت می‌دهد.',
       'settings.sendToBot': 'این را به ربات بفرستید:',
@@ -327,20 +295,16 @@ window.__hibanaDictFA = {
       'settings.moveUp': 'انتقال به بالا', 'settings.moveDown': 'انتقال به پایین', 'settings.show': 'نمایش', 'settings.hide': 'مخفی',
       'settings.viewsSaved': 'نمای پیشخوان ذخیره شد',
       // client module
-      'task.progress': 'پیشرفت وظایف', 'client.payments': 'پرداخت‌ها',
       // sparks page
       'sparks.heading': 'ایده‌ها', 'sparks.capture': 'ثبت یک ایده',
       'sparks.hint': 'جایگزین وایت‌برد — در چند ثانیه ثبت کنید، بعداً تبدیل به ایده کنید.',
       'sparks.more': 'گزینه‌های بیشتر',
-      'sparks.edit': 'ویرایش ایده',
       'sparks.title': 'عنوان',
       'sparks.description': 'توضیحات',
       'sparks.saved': 'ذخیره شد',
       'sparks.deleted': 'ایده حذف شد',
       'sparks.deleteFailed': 'حذف ایده ممکن نشد',
-      'sparks.reorderFailed': 'مرتب‌سازی انجام نشد — دوباره تلاش کن',
-      'sparks.saving': 'در حال ذخیره…', 'sparks.saveFailed': 'ذخیره ایده ممکن نشد', 'sparks.loadFailed': 'دریافت ایده ممکن نشد',
-      'sparks.allFolders': 'همه', 'sparks.noFolder': 'بدون پوشه',
+      'sparks.saving': 'در حال ذخیره…', 'sparks.saveFailed': 'ذخیره ایده ممکن نشد', 'sparks.noFolder': 'بدون پوشه',
       'sparks.newFolder': 'پوشهٔ جدید', 'sparks.folderName': 'نام پوشه',
       'sparks.renameFolder': 'تغییر نام پوشه', 'sparks.deleteFolder': 'حذف پوشه',
       'sparks.deleteFolderHint': 'ایده‌های داخل آن به «همه» برمی‌گردند.',
@@ -357,9 +321,6 @@ window.__hibanaDictFA = {
       'sparks.searchClear': 'پاک‌کردن جست‌وجو',
       'sparks.nMatchesOne': '۱ نتیجه',
       'sparks.nMatches': '{n} نتیجه',
-      'sparks.bannerUpload': 'بارگذاری بنر',
-      'sparks.bannerChange': 'تعویض بنر',
-      'sparks.bannerRemove': 'حذف بنر',
       'sparks.bannerFailed': 'به‌روزرسانی بنر ممکن نشد — دوباره تلاش کن',
       'sparks.cropTitle': 'برش بنر',
       'sparks.cropHint': 'برای جابه‌جایی بکش · برای بزرگ‌نمایی اسکرول کن',
@@ -574,7 +535,7 @@ window.__hibanaDictFA = {
       'calendar.quadrant': 'ربع', 'calendar.stickyColor': 'رنگ چسبان',
       'calendar.saveSticky': 'افزودن چسبان', 'calendar.saveTask': 'افزودن کار', 'calendar.saveNote': 'افزودن یادداشت',
       'calendar.stickyAdded': 'یادداشت چسبان اضافه شد', 'calendar.taskAdded': 'کار اضافه شد', 'calendar.noteAdded': 'یادداشت اضافه شد',
-      'calendar.taskDeleted': 'کار حذف شد', 'calendar.addFailed': 'ذخیره نشد — دوباره تلاش کنید.',
+      'calendar.addFailed': 'ذخیره نشد — دوباره تلاش کنید.',
       'calendar.color_yellow': 'زرد', 'calendar.color_green': 'سبز', 'calendar.color_pink': 'صورتی', 'calendar.color_blue': 'آبی',
       // 22-a: پیام یکپارچهٔ حذف، پیمایش هفته، منوی راست‌کلیک روز
       'calendar.deleted': 'حذف شد', 'calendar.nextWeek': 'هفته بعد',
@@ -606,14 +567,10 @@ window.__hibanaDictFA = {
       'filters.namePrompt': 'نام این فیلتر (مثلاً «کار مشتری این هفته»):',
       'filters.remove': 'حذف',
       // bulk actions (R3.1)
-      'bulk.actions': 'اقدام‌های گروهی', 'bulk.selectItem': 'انتخاب مورد',
-      'bulk.selectAll': 'انتخاب همه',
-      'bulk.deletedN': '{n} حذف شد', 'bulk.failedN': '{n} ناموفق',
       // project page
-      'project.stageSaved': 'مرحله ذخیره شد', 'project.captionPrompt': 'توضیح (اختیاری):',
-      'project.shotUploaded': 'اسکرین‌شات آپلود شد', 'project.shotFailed': 'آپلود انجام نشد', 'project.uploading': 'در حال بارگذاری…',
+      'project.stageSaved': 'مرحله ذخیره شد', 'project.shotUploaded': 'اسکرین‌شات آپلود شد', 'project.shotFailed': 'آپلود انجام نشد', 'project.uploading': 'در حال بارگذاری…',
       'project.shotDeleted': 'فایل حذف شد',
-      'project.fileUploaded': 'فایل آپلود شد', 'project.uploadFiles': 'آپلود فایل', 'project.downloadFile': 'دانلود {f}',
+      'project.fileUploaded': 'فایل آپلود شد', 'project.downloadFile': 'دانلود {f}',
       // S35: the screenshot problem cards
       'project.shotZoom': 'اسکرین‌شات', 'project.videoTileAria': 'ضبط‌شده — برای دیدن تمام‌صفحه اینتر را بزنید', 'project.shotNotePh': 'چه چیزی خراب است و کجا — دقیقاً همان‌جا که باید کار کنی…',
       // S46: screenshot-note modal + create-bug/idea-from-screenshot + task-composer shot-attach count
@@ -685,8 +642,6 @@ window.__hibanaDictFA = {
       'pd.labels': 'برچسب‌ها', 'pd.labelsPh': 'مثلاً UI/UX، امنیت', 'pd.labelsHint': 'با کاما جدا کن — یک چیپ برای هر برچسب',
       // S46.2: اسکرین‌شات در ویرایشگر کار (pde-form) — بارگذاری + سنجاق به این قلم + دیدن تصاویر سنجاق‌شده
       'pde.shotsAttach': 'آپلود فایل', 'pde.shotsAttachTitle': 'فایل آپلود کن — تصویر، ویدیو (وب‌ام)، PDF، اکسل، ورد، مارک‌داون، متن — سنجاق‌شده به این قلم',
-      'pde.shotsView': 'تصاویر سنجاق‌شده', 'pde.shotsViewTitle': 'تصاویر سنجاق‌شده به این قلم را ببین',
-      'pde.shotsUploading': 'در حال اپلود تصویر …',
       // S46.7: عنوان ویرایشگر کار + نوشتن تمام‌صفحه + دکمهٔ افزودن یادداشت (وقتی یادداشتی نیست)
       'pde.title': 'ایجاد یک کار جدید', 'pde.fullscreen': 'نوشتن تمام‌صفحه',
       'notes.addNote': 'افزودن یادداشت',
@@ -755,9 +710,7 @@ window.__hibanaDictFA = {
       'db.taskShotsHint': 'تصاویر سنجاق‌شده — یادداشت + مدرکِ سنجاق‌شده به این قلم',
       'db.taskShotsBadge': 'تصاویر سنجاق‌شده ({n})',
       'db.zoom': 'بزرگ‌نمایی', 'db.zoomDays': 'روزانه',
-      'db.zoomMonths': 'ماهانه', 'db.newSprintTitle': 'اسپرینت',
       'db.zoom1w': '۱ هفته', 'db.zoom1m': '۱ ماه', 'db.zoom3m': '۳ ماه', 'db.zoom6m': '۶ ماه', 'db.zoom12m': '۱۲ ماه',
-      'db.delCatConfirm': 'این دسته‌بندی حذف شود؟ کارهایش به دسته‌بندی‌نشده می‌روند.', 'db.catDeleted': 'دسته‌بندی حذف شد',
       'db.hideLane': 'پنهان در خط زمان', 'db.showLane': 'نمایش در خط زمان', 'db.weekNum': 'هفتهٔ {n}',
       // batch (p) 2026-09-06 — مشکل‌ها tab operates on bug dev_tasks (same items as the
       // مشکلات box), and the new برنامه آتی (Upcoming Plan) tab's phrases.
@@ -768,7 +721,6 @@ window.__hibanaDictFA = {
       'bl.itemAdded': 'قلم جدید: {t}',
       'bl.noDocs': 'هنوز سندی نیست — اولین برنامهٔ کامل را همین‌جا بنویس.',
       'bl.noPlans': 'هنوز برنامه‌ای نیست — بالا یکی اضافه کن؛ در جعبهٔ «برنامه‌ها» تابلوی پیشرفت می‌نشیند.',
-      'bl.plansHead': 'برنامه‌ها', 'bl.plansHeadSub': 'قلم‌های جعبه',
       'bl.noHistory': 'هنوز تغییری در برنامه‌ها ثبت نشده.',
       'bl.historyTitle': 'آخرین تغییرات برنامه', 'bl.latest': 'آخرین تغییر',
       'bl.docSaved': 'سند ذخیره شد', 'bl.docDeleted': 'سند حذف شد',
@@ -785,7 +737,6 @@ window.__hibanaDictFA = {
       'hx.failed': 'بارگذاری نشد — محتوا بدون تغییر ماند',
       // floating action button
       'fab.idea': 'ایده جدید', 'fab.project': 'پروژه جدید', 'fab.new': 'جدید',
-      'fab.task': 'کار جدید',
       // Phase 7 item 12: گزینهٔ یادداشت سریع + رشته‌های مودال آن
       'fab.note': 'یادداشت سریع جدید',
       'qn.title': 'یادداشت سریع', 'qn.save': 'ذخیره',
@@ -825,8 +776,7 @@ window.__hibanaDictFA = {
       /* 'notes.deleteFailed' lives in the Trash block below (S115 r2: the duplicate —
          esbuild's duplicate-object-key warning — is retired; the later value wins). */
       'notes.deleted': 'یادداشت حذف شد', 'notes.undo': 'برگردان',
-      'notes.updateFailed': 'به‌روزرسانی یادداشت ممکن نشد', 'notes.doneMarked': 'انجام‌شده علامت خورد', 'notes.unmarked': 'علامت انجام‌شدگی برداشته شد',
-      'notes.emptyHint': 'اول یک یادداشت بنویس',
+      'notes.updateFailed': 'به‌روزرسانی یادداشت ممکن نشد', 'notes.emptyHint': 'اول یک یادداشت بنویس',
       'notes.reorderFailed': 'ترتیب‌دهی ناموفق بود.',
       // notebook page (whiteboard)
       'wb.move': 'جابه‌جایی / انتخاب', 'wb.black': 'قلم مشکی', 'wb.blue': 'قلم آبی',
@@ -860,7 +810,6 @@ window.__hibanaDictFA = {
       'reports.labelDist': 'برچسب‌ها', 'reports.labelHint': 'کارها به تفکیک برچسب — ✓ انجام‌شده، + شروع‌شده در ۳۰ روز اخیر.',
       'reports.velocity': 'سرعت اسپرینت بر اساس اولویت', 'reports.velSprint': 'اسپرینت', 'reports.velDone': 'انجام‌شده',
       'reports.velocityHint': 'کارهای انجام‌شده به تفکیک اولویت در هر اسپرینت — کدام سطح واقعاً تمام می‌شود.',
-      'dash.urgentHeading': 'فوری در همهٔ پروژه‌ها', 'dash.urgentOpen': 'باز کردن برد', 'dash.urgentQuiet': 'چیزی فوری نیست — نوار آتش مخفی می‌ماند.',
       // S30 بستهٔ ۲: نوار فیلتر برد + چرخش اولویت
       'db.filterAria': 'فیلتر کارها', 'db.filterPrio': 'اولویت', 'db.filterLabels': 'برچسب‌ها',
       'db.filterPrioHint': 'فقط کارهای {p}', 'db.filterTagHint': 'برای فیلتر با این برچسب کلیک کن',
@@ -916,6 +865,14 @@ window.__hibanaDictFA = {
       'resume.clear': 'پاک‌کردن اخیرها', 'resume.clearAria': 'پاک‌کردن فهرست موارد اخیر', 'resume.cleared': 'اخیرها پاک شد',
       // S181 (the owner's promised additions): the resume hero's summary line + progress-bar sentence
       'nav.syncPending': '{n} در انتظار', 'nav.syncHint': 'در انتظار همگام‌سازی — برای ارسال کلیک کن', 'nav.syncSent': 'تغییرات آفلاین ارسال شد',
+      // hibana-sync-status-spec §4 + §11: the per-card sync badge labels — the
+      // spec's FA drafts (متن پیشنهادی؛ مالک می‌تواند تنظیم کند).
+      'sync.pending': 'فقط روی این دستگاه ذخیره شده',
+      'sync.pendingOffline': 'منتظر اتصال',
+      'sync.syncing': 'در حال همگام‌سازی…',
+      'sync.synced': 'همگام‌شده',
+      'sync.failed': 'همگام‌سازی انجام نشد. تلاش دوباره',
+      'sync.retry': 'تلاش دوباره',
       // S52: Trash palette command + recoverable-count sublabel
       'cmdk.openTrash': 'سطل بازیافت — بازیابی موارد حذف‌شده',
       'cmdk.trashCount': '{n} مورد قابل بازیابی',
@@ -967,8 +924,7 @@ window.__hibanaDictFA = {
       'admin.usersSearch': 'جست‌وجوی نام کاربری یا ایمیل…',
       'admin.colActivity': 'آخرین فعالیت', 'admin.joined': 'عضویت',
       'admin.projects': 'پروژه', 'admin.notes': 'یادداشت',
-      'admin.roleOwner': 'مدیر ارشد', 'admin.roleMember': 'عضو',
-      'admin.stVerified': 'تأییدشده', 'admin.stUnverified': 'تأییدنشده',
+      'admin.roleOwner': 'مدیر ارشد', 'admin.stVerified': 'تأییدشده', 'admin.stUnverified': 'تأییدنشده',
       'admin.stBannedUntil': 'مسدود تا', 'admin.stForever': 'مسدود دائم',
       'admin.onlineNow': 'آنلاین', 'admin.self': 'شما', 'admin.noMatch': 'کاربری پیدا نشد.',
       'admin.relNow': 'همین حالا',
@@ -1032,6 +988,7 @@ window.__hibanaDictFA = {
       // P4.2 (F-H3): صفحات ورود/ثبت‌نام/تأیید/بازیابی — متن‌های ایستا.
       // بقیهٔ پیام‌ها (htmx fragments + رشته‌های پویا) انگلیسی می‌مانند.
       'auth.welcomeBack': 'خوش آمدید',
+      'auth.inviteCode': 'کد دعوت', 'auth.inviteCodePlaceholder': 'از یک کاربر موجود کد بگیرید',
       'auth.signIn': 'ورود',
       'auth.emailOrUsername': 'ایمیل یا نام کاربری',
       'auth.password': 'رمز عبور',
@@ -1133,7 +1090,6 @@ window.__hibanaDictFA = {
       'notes.importQuickNone': 'همهٔ یادداشت‌های سریع همین‌جا هستند',
       'notes.outline': 'در این صفحه',
       'fab.vault': 'یادداشت جدید',
-      'fab.vaultHint': 'یادداشت بلند در دانش‌نامه',
       'cmdk.newNote': 'یادداشت جدید',
       'cat.field': 'دسته',
       'cat.ph': 'بدون — برای انتخاب یا ساختن بنویس',

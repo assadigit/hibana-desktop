@@ -133,6 +133,45 @@
     var retryBtn = document.getElementById('db-sync-retry')
     var doneBtn = document.getElementById('db-sync-done')
     var syncing = false
+    // v0.1.21 — THE COUNT BADGE (hibana-sync-status-spec §9): the toolbar Sync
+    // button wears pending + failed cards, from the SAME tracker the cards'
+    // badges paint from (the island's sync-state.js — ONE source: the button
+    // and the cards can never disagree). Hidden at zero; the icon rotates while
+    // the round runs OR any card is mid-sync. HONEST DEVIATION, recorded: the
+    // spec's "pressing Sync moves all Pending and Failed cards to Syncing
+    // together" is deliberately NOT done — this round pulls boards + drains the
+    // outbox, and a FAILED live board edit is NOT re-sent by it (only the card's
+    // own Retry pill re-sends that write), so claiming "syncing" for those cards
+    // would promise an ack this round never seeks (spec §2: synced only after
+    // the server confirmed THE write).
+    var countEl = null
+    var roundRunning = false
+    var anyCardSyncing = false
+    function paintCount(n) {
+      if (!n && !countEl) return
+      if (!countEl) {
+        countEl = document.createElement('span')
+        countEl.className = 'db-sync-count'
+        countEl.setAttribute('aria-hidden', 'true')
+        btn.appendChild(countEl)
+      }
+      countEl.textContent = String(n)
+      countEl.hidden = !n
+    }
+    function paintSpin() {
+      btn.classList.toggle('db-sync-running', roundRunning || anyCardSyncing)
+    }
+    var syncTracker = window.HibanaSyncState
+    if (syncTracker && typeof syncTracker.subscribe === 'function') {
+      paintCount(syncTracker.count())
+      anyCardSyncing = !!(syncTracker.hasSyncing && syncTracker.hasSyncing())
+      paintSpin()
+      syncTracker.subscribe(function (n) {
+        paintCount(n)
+        anyCardSyncing = !!(syncTracker.hasSyncing && syncTracker.hasSyncing())
+        paintSpin()
+      })
+    }
     // v0.1.13 — the sound round's hero (the owner ask: "also in modal i want
     // syncing animation with icons and animation"): the living emblem above
     // the step rows. data-stage follows the round's ACTIVE step (connect /
@@ -219,6 +258,8 @@
 
     function onDone(out) {
       syncing = false
+      roundRunning = false
+      paintSpin()
       if (!out || typeof out !== 'object') out = {}
       if (out.ok) {
         // Belt: the events may lag the promise (the same IPC, different lanes) —
@@ -256,12 +297,16 @@
 
     function onReject() {
       syncing = false
+      roundRunning = false
+      paintSpin()
       setKind('err')
       showPanel('err', t('errTitle'), t('notWired'), false)
     }
 
     function run() {
       syncing = true
+      roundRunning = true
+      paintSpin()
       var syncNow = resolveBoundMethod('SyncNow')
       if (!syncNow) { onReject(); return }
       try {

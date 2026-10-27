@@ -21,8 +21,8 @@ on:
   workflow_dispatch: {}
 
 env:
-  WEB_REF: e6661c8          # the island pin (must match scripts/sync-island.mjs)
-  WEB_VERSION: "0.4.1.35"   # the pin's package version (Release notes carry BOTH)
+  WEB_REF: 7a3198b          # the island pin (must match scripts/sync-island.mjs)
+  WEB_VERSION: "0.4.1.37"   # the pin's package version (Release notes carry BOTH)
 
 jobs:
   build:

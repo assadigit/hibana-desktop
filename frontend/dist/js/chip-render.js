@@ -399,10 +399,65 @@
     return esc(metaLine(iso, done, lang))
   }
 
+  // ---------------------------------------------------------------------------
+  // The per-card sync badge (hibana-sync-status-spec.md §4–§6, §12). ONE badge
+  // component for every kanban card type — the client twin of detail-helpers.ts's
+  // server-side badge (a fresh server render is 'synced' by definition: the data
+  // came from the server). Markup contract shared with the server twin — keep
+  // them byte-compatible. Icons: the SAME 24×24 stroke grammar as the page
+  // header's Sync button (base.css .icon — one stroke-weight system), all four
+  // the same size; the syncing glyph is the header Sync button's own arrows.
+  const SYNC_ICONS = {
+    pending: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 13.5a4 4 0 0 0-.3-7.99A5.5 5.5 0 0 0 6.9 4.6 3.5 3.5 0 0 0 7 13.5Z"/><path d="M12 21v-5"/><path d="M9.5 18.5 12 16l2.5 2.5"/></svg>',
+    syncing: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10"/><path d="M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>',
+    synced: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 18.5a4 4 0 0 0-.3-7.99A5.5 5.5 0 0 0 6.9 9.6 3.5 3.5 0 0 0 7 18.5Z"/><path d="m9.5 12.5 2 2 3.5-3.5"/></svg>',
+    failed: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 18.5a4 4 0 0 0-.3-7.99A5.5 5.5 0 0 0 6.9 9.6 3.5 3.5 0 0 0 7 18.5Z"/><path d="M12 9.5v4.5"/><path d="M12 17.4v.3"/></svg>',
+  }
+  const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
+  // Spec §4 label table (EN + FA live in i18n-en.js / i18n-fa.js under sync.*).
+  // Offline Pending swaps to the "Waiting for connection" label (§8).
+  function syncLabel(state) {
+    if (state === 'pending') return isOffline() ? t('sync.pendingOffline', 'Waiting for connection') : t('sync.pending', 'Saved on this device')
+    if (state === 'syncing') return t('sync.syncing', 'Syncing…')
+    if (state === 'failed') return t('sync.failed', "Couldn't sync. Retry")
+    return t('sync.synced', 'Synced')
+  }
+  // The CARD badge: icon-only for pending/syncing/synced (no text on the card, no
+  // tab stop — the label is the accessible name and the hover tooltip, spec §12);
+  // failed is a real pill BUTTON with the word Retry (spec §6) whose click
+  // re-runs just that card's mutation (sync-state.js's delegated handler).
+  function syncBadgeHtml(id, state, pop) {
+    const s = state === 'pending' || state === 'syncing' || state === 'failed' ? state : 'synced'
+    const label = syncLabel(s)
+    if (s === 'failed') {
+      return '<button type="button" class="pd-sync s-failed" data-sync-badge="' + esc(id) + '" data-sync-retry="' + esc(id) + '" data-label="' + esc(label) + '" aria-label="' + esc(label) + '">' + SYNC_ICONS.failed + '<span class="pd-sync-label">' + esc(t('sync.retry', 'Retry')) + '</span></button>'
+    }
+    const popCls = pop && s === 'synced' ? ' pop' : ''
+    return '<span class="pd-sync s-' + s + popCls + '" data-sync-badge="' + esc(id) + '" data-label="' + esc(label) + '" role="img" aria-label="' + esc(label) + '">' + SYNC_ICONS[s] + '</span>'
+  }
+  // The DETAIL badge (spec §10): same component family, worn near the Save area of
+  // the task editor (devboard.js's modal footer) — the icon plus the text label,
+  // and when synced, the time of the last confirmed sync ("Synced 2 minutes ago").
+  function syncedAgoText(atMs) {
+    const mins = Math.max(0, Math.round((Date.now() - atMs) / 60000))
+    const lang = (window.hibanaI18n && window.hibanaI18n.lang && window.hibanaI18n.lang()) || (typeof document !== 'undefined' && document.documentElement.lang) || 'en'
+    let rel = ''
+    try { rel = new Intl.RelativeTimeFormat(lang === 'fa' ? 'fa' : 'en', { numeric: 'auto' }).format(-mins, 'minute') } catch { return t('sync.synced', 'Synced') }
+    return t('sync.synced', 'Synced') + ' ' + rel
+  }
+  function syncBadgeDetailHtml(id, state, pop, syncedAtMs) {
+    const s = state === 'pending' || state === 'syncing' || state === 'failed' ? state : 'synced'
+    const label = syncLabel(s)
+    const text = s === 'synced' && syncedAtMs ? syncedAgoText(syncedAtMs) : label
+    const popCls = pop && s === 'synced' ? ' pop' : ''
+    return '<span class="pd-sync pd-sync-detail s-' + s + popCls + '" data-sync-badge-detail="' + esc(id) + '" data-label="' + esc(label) + '" role="img" aria-label="' + esc(label) + '">' + SYNC_ICONS[s] + '<span class="pd-sync-label">' + esc(text) + '</span></span>'
+  }
+
   window.HibanaChips = {
     esc, t, TITLE_CLAMP,
     renderTitle, titleHtml, titleAttrs, readMoreBtn, previewHtml, applyTitle, htmlToMd,
     tagChip, tagChipsRow,
     prioLabel, metaLine, metaHtml, metaDateHtml,
+    syncBadgeHtml, syncBadgeDetailHtml, syncLabel,
   }
 })()

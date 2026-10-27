@@ -174,6 +174,33 @@
   white-space: nowrap;
 }
 #db-sync-button .icon { flex: none; }
+#db-sync-button { position: relative; } /* v0.1.21: the count badge's corner anchor */
+/* v0.1.21 — THE COUNT BADGE (hibana-sync-status-spec §9): pending + failed cards,
+   from the SAME tracker the cards' badges paint from (the island's sync-state.js);
+   hidden at zero. Danger fill + the CTA's own --btn-text ink — no new hex; the
+   --card ring separates it from the toolbar surface. The rotation reuses this
+   sheet's own db-sync-rotate keyframes, reduced-motion guarded. */
+.db-sync-count {
+  position: absolute;
+  top: -0.42rem;
+  inset-inline-end: -0.42rem;
+  min-inline-size: 1.02rem;
+  block-size: 1.02rem;
+  padding-inline: 0.28rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--btn-text);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.02rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--card);
+}
+.db-sync-count[hidden] { display: none; }
+#db-sync-button.db-sync-running .icon { animation: db-sync-rotate 1.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  #db-sync-button.db-sync-running .icon { animation: none; }
+}
 
 /* v0.1.13 — THE HERO (the owner ask: "also in modal i want syncing animation
    with icons and animation"): the round's living emblem, a compact stage

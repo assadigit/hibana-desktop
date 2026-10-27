@@ -623,6 +623,107 @@ html[lang='fa'] body .t-code {
   gap: 0.3rem;
   flex-wrap: wrap;
 }
+/* ============================================================================
+   The per-card sync badge (hibana-sync-status-spec.md §5–§7, §12, §13).
+   Placement: LAST child of .pd-task-meta, pinned to the inline-end by
+   margin-inline-start:auto — a LOGICAL property, so RTL mirrors it to the left
+   automatically (§13) and every column keeps one vertical scan line even when a
+   card carries the 📌 chip (§5). No new row, no taller card: the icon rides the
+   meta line's height. Colours: existing tokens ONLY (§7) — teal = the Sync
+   button's --accent (pending/syncing: pressing Sync is what clears them), muted
+   grey = the timestamp's --muted (synced: almost invisible), danger = the one
+   place red is allowed (failed). Amber/orange/red stay reserved for priority.
+   ========================================================================== */
+.pd-sync {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  position: relative;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: calc(var(--fs-xs) * 0.8);
+  line-height: 1;
+  cursor: default;
+}
+/* §6: icon size matches the timestamp's line height (~14–16px); all four the
+   same size. The .icon base (base.css) carries the one stroke-weight system. */
+.pd-sync .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.pd-sync.s-pending, .pd-sync.s-syncing { color: var(--accent); }
+/* §2: synced is almost invisible — but still perceivable (§12 contrast note);
+   --muted is the AA-checked secondary rung (variables.css). */
+.pd-sync.s-synced { color: var(--muted); }
+/* §12: the label appears on hover AND keyboard focus — a pure-CSS tooltip off
+   the data-label attribute (logical inset-inline-end so RTL mirrors). */
+.pd-sync::before {
+  content: attr(data-label);
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  inset-inline-end: 0;
+  white-space: nowrap;
+  background: var(--text);
+  color: var(--card);
+  font-size: var(--fs-xs, 0.75rem);
+  line-height: 1.2;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.4rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 6;
+}
+.pd-sync:hover::before, .pd-sync:focus-visible::before { opacity: 1; }
+.pd-sync:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* §6: failed is the ONLY state with visible text — a small danger pill and a
+   REAL button (its click retries just this card; sync-state.js wires it). The
+   pill shape keeps it distinct from the priority band fused across the top. */
+.pd-sync.s-failed {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: 999px;
+  min-block-size: 1.4rem;
+  padding-inline: 0.5rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.pd-sync.s-failed:hover, .pd-sync.s-failed:focus-visible {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent);
+  outline: none;
+}
+.pd-sync.s-failed .icon { inline-size: 0.85rem; block-size: 0.85rem; }
+/* §6: the failed pill's clickable area extends beyond its visible edge without
+   changing the layout — a transparent ::after laid over the row (logical
+   inset-block so RTL mirrors). Desktop ≈ 32px; touch (pointer: coarse) ≈ 44px. */
+.pd-sync.s-failed::after {
+  content: "";
+  position: absolute;
+  inset-block: -0.5rem;
+  inset-inline: -0.3rem;
+  border-radius: 999px;
+}
+@media (pointer: coarse) {
+  .pd-sync.s-failed::after { inset-block: -0.85rem; }
+}
+/* §10: the detail (editor footer) variant carries a text label next to the icon. */
+.pd-sync-detail { cursor: default; }
+.pd-sync.pd-sync-detail .pd-sync-label { color: var(--muted); white-space: nowrap; }
+.pd-sync.pd-sync-detail.s-failed .pd-sync-label { color: var(--danger); }
+/* §8: the Synced confirmation — a short (300ms) fade+scale of the check icon;
+   the Syncing icon rotates. Both are guarded by prefers-reduced-motion (the
+   app's standing animation rule — see .topbar-sync's guard): reduced-motion
+   users get plain state switches, no rotation. */
+@media (prefers-reduced-motion: no-preference) {
+  .pd-sync.s-syncing .icon { animation: pd-sync-spin 1.2s linear infinite; }
+  .pd-sync.pop .icon { animation: pd-sync-pop 0.3s ease-out; }
+}
+@keyframes pd-sync-spin { to { transform: rotate(360deg); } }
+@keyframes pd-sync-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 /* S46.13: compact the task cards on mobile — less padding, less gap, tighter body. */
 @media (max-width: 768px) {
   .pd-task { padding: 0.3rem 0.35rem; gap: 0.3rem; }

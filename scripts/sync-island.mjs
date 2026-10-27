@@ -69,8 +69,8 @@ import { fileURLToPath } from 'node:url'
 // The sealed pin (guide §3.3.1: "records the ref into frontend/dist/web-ref.json
 // ({ref, packageVersion} — e.g. e6661c8, 0.4.1.35)"). S211 session: the S209 seal.
 // ---------------------------------------------------------------------------
-const PIN_REF = 'e6661c8'
-const PIN_PACKAGE_VERSION = '0.4.1.35'
+const PIN_REF = '7a3198b'
+const PIN_PACKAGE_VERSION = '0.4.1.37'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -133,15 +133,16 @@ const FONT_FILES = [
 
 // The JS set (guide §3.1). devboard.js/board-page.js get the §4 seam patches; the rest
 // are verbatim. i18n-fa.js + image-resize.js are LAZY (i18n.js:49-60 injects
-// /js/i18n-fa.js?v=94 on FA; devboard.js:307-319 injects /js/image-resize.js?v=1 on
+// /js/i18n-fa.js?v=95 on FA; devboard.js:307-319 injects /js/image-resize.js?v=1 on
 // first editor open) — the embedded asset server serves those exact paths.
 const JS_FILES = [
-  'js/devboard.js',        // v28 — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR)
-  'js/chip-render.js',     // v12 — the markdown-lite title renderer (byte-parity target, UI-UX §3.3)
-  'js/board-page.js',      // v21 — the /kanban page; PATCHED (§4.2: 4 direct fetches)
-  'js/i18n-en.js',         // v100 — the EN dictionary (loaded before i18n.js; defer order)
-  'js/i18n.js',            // v154 — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below)
-  'js/i18n-fa.js',         // v94 — the LAZY FA dictionary (i18n.js:49-60)
+  'js/sync-state.js',      // v2 (v0.4.1.37) — the per-card sync tracker (hibana-sync-status-spec §14: ONE source; devboard.js's task mutations report in, the badges + the Sync button count derive from it)
+  'js/devboard.js',        // v29 (v0.4.1.37) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked()
+  'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
+  'js/board-page.js',      // v22 (v0.4.1.37) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child
+  'js/i18n-en.js',         // v101 (v0.4.1.37) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels
+  'js/i18n.js',            // v155 (v0.4.1.37) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below)
+  'js/i18n-fa.js',         // v95 (v0.4.1.37) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels
   'js/image-resize.js',    // v1 — the LAZY ≤1600px WebP prepare pass (devboard.js:307-319)
   'vendor/jalaali.min.js', // Jalali dates for FA (devboard.js calOf)
 ]
@@ -170,7 +171,7 @@ const COPY_MANIFEST = [...CSS_SHEETS, ...FONT_CSS, ...FONT_FILES, ...JS_FILES, .
 //     navigator.language (i18n.js:81-82). M3's auth work takes language resolution
 //     over Go-side WITHOUT touching the island: define window.__hibanaMe (the very
 //     hook i18n.js:69 prefers) from a Go binding.
-//  2. i18n.js:49-60 (dynamic <script> /js/i18n-fa.js?v=94) and devboard.js:307-319
+//  2. i18n.js:49-60 (dynamic <script> /js/i18n-fa.js?v=95) and devboard.js:307-319
 //     (dynamic <script> /js/image-resize.js?v=1) — STATIC-ASSET loaders over HTTP to
 //     same-origin paths. The Wails asset server serves them same-origin; left
 //     untouched by design (they are not /api traffic).
@@ -258,7 +259,7 @@ const HTML_STRIP_LINES = [
 const HTML_INSERT = {
   name: 'insert /js/desktop-shim.js before devboard.js',
   cite: 'guide §3.2 + §4.3',
-  anchor: '<script src="/js/devboard.js?v=28" defer></script>',
+  anchor: '<script src="/js/devboard.js?v=29" defer></script>',
   insert: '<script src="/js/desktop-shim.js"></script>',
 }
 
@@ -362,7 +363,7 @@ const HTML_THEME_OPS = [
   {
     name: 'insert /js/desktop-theme.js after the chip-render.js tag — the FIRST blocking head script (immediately before desktop-shim.js)',
     cite: 'v0.1.5 (S216); desktop-theme.js: the pre-paint resolution must beat the first render',
-    anchor: `    <script src="/js/chip-render.js?v=12" defer></script>`,
+    anchor: `    <script src="/js/chip-render.js?v=13" defer></script>`,
     insert: `<script src="/js/desktop-theme.js"></script>`,
   },
   {
@@ -2241,6 +2242,45 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
     var retryBtn = document.getElementById('db-sync-retry')
     var doneBtn = document.getElementById('db-sync-done')
     var syncing = false
+    // v0.1.21 — THE COUNT BADGE (hibana-sync-status-spec §9): the toolbar Sync
+    // button wears pending + failed cards, from the SAME tracker the cards'
+    // badges paint from (the island's sync-state.js — ONE source: the button
+    // and the cards can never disagree). Hidden at zero; the icon rotates while
+    // the round runs OR any card is mid-sync. HONEST DEVIATION, recorded: the
+    // spec's "pressing Sync moves all Pending and Failed cards to Syncing
+    // together" is deliberately NOT done — this round pulls boards + drains the
+    // outbox, and a FAILED live board edit is NOT re-sent by it (only the card's
+    // own Retry pill re-sends that write), so claiming "syncing" for those cards
+    // would promise an ack this round never seeks (spec §2: synced only after
+    // the server confirmed THE write).
+    var countEl = null
+    var roundRunning = false
+    var anyCardSyncing = false
+    function paintCount(n) {
+      if (!n && !countEl) return
+      if (!countEl) {
+        countEl = document.createElement('span')
+        countEl.className = 'db-sync-count'
+        countEl.setAttribute('aria-hidden', 'true')
+        btn.appendChild(countEl)
+      }
+      countEl.textContent = String(n)
+      countEl.hidden = !n
+    }
+    function paintSpin() {
+      btn.classList.toggle('db-sync-running', roundRunning || anyCardSyncing)
+    }
+    var syncTracker = window.HibanaSyncState
+    if (syncTracker && typeof syncTracker.subscribe === 'function') {
+      paintCount(syncTracker.count())
+      anyCardSyncing = !!(syncTracker.hasSyncing && syncTracker.hasSyncing())
+      paintSpin()
+      syncTracker.subscribe(function (n) {
+        paintCount(n)
+        anyCardSyncing = !!(syncTracker.hasSyncing && syncTracker.hasSyncing())
+        paintSpin()
+      })
+    }
     // v0.1.13 — the sound round's hero (the owner ask: "also in modal i want
     // syncing animation with icons and animation"): the living emblem above
     // the step rows. data-stage follows the round's ACTIVE step (connect /
@@ -2327,6 +2367,8 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
 
     function onDone(out) {
       syncing = false
+      roundRunning = false
+      paintSpin()
       if (!out || typeof out !== 'object') out = {}
       if (out.ok) {
         // Belt: the events may lag the promise (the same IPC, different lanes) —
@@ -2364,12 +2406,16 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
 
     function onReject() {
       syncing = false
+      roundRunning = false
+      paintSpin()
       setKind('err')
       showPanel('err', t('errTitle'), t('notWired'), false)
     }
 
     function run() {
       syncing = true
+      roundRunning = true
+      paintSpin()
       var syncNow = resolveBoundMethod('SyncNow')
       if (!syncNow) { onReject(); return }
       try {
@@ -2630,6 +2676,33 @@ const DESKTOP_SYNC_CSS = `/* desktop-sync.css — the manual sync modal's step r
   white-space: nowrap;
 }
 #db-sync-button .icon { flex: none; }
+#db-sync-button { position: relative; } /* v0.1.21: the count badge's corner anchor */
+/* v0.1.21 — THE COUNT BADGE (hibana-sync-status-spec §9): pending + failed cards,
+   from the SAME tracker the cards' badges paint from (the island's sync-state.js);
+   hidden at zero. Danger fill + the CTA's own --btn-text ink — no new hex; the
+   --card ring separates it from the toolbar surface. The rotation reuses this
+   sheet's own db-sync-rotate keyframes, reduced-motion guarded. */
+.db-sync-count {
+  position: absolute;
+  top: -0.42rem;
+  inset-inline-end: -0.42rem;
+  min-inline-size: 1.02rem;
+  block-size: 1.02rem;
+  padding-inline: 0.28rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--btn-text);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.02rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--card);
+}
+.db-sync-count[hidden] { display: none; }
+#db-sync-button.db-sync-running .icon { animation: db-sync-rotate 1.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  #db-sync-button.db-sync-running .icon { animation: none; }
+}
 
 /* v0.1.13 — THE HERO (the owner ask: "also in modal i want syncing animation
    with icons and animation"): the round's living emblem, a compact stage
@@ -5204,6 +5277,17 @@ function verifyDist(outDir, fileMap) {
   // modal ids must exist, the controller must resolve the Go SyncNow binding at
   // CLICK time and relay the hibana:sync-progress events, and the "will not
   // vanish" success copy must ship in BOTH languages.
+  // The v0.1.21 per-card sync badge round (hibana-sync-status-spec §9): the Sync
+  // button's count must derive from the island's OWN tracker (ONE source with the
+  // cards' badges) — never a second tally.
+  {
+    const dsJs = fileMap['js/desktop-sync.js'] || ''
+    if (!dsJs.includes('window.HibanaSyncState')) problems.push('js/desktop-sync.js: the Sync button must subscribe to the island\'s HibanaSyncState (the per-card badge round, spec §9 one-source rule)')
+    if (!dsJs.includes('db-sync-count')) problems.push('js/desktop-sync.js: the §9 count badge element is missing')
+    if (!dsJs.includes('hasSyncing')) problems.push('js/desktop-sync.js: the rotation cue (hasSyncing) is missing')
+    const dsCss = fileMap['css/desktop-sync.css'] || ''
+    if (!dsCss.includes('.db-sync-count')) problems.push('css/desktop-sync.css: the §9 count badge styles are missing')
+  }
   for (const kept of ['id="db-sync-button"', 'class="small db-sync-cta"', 'id="db-sync-btn-label"', 'id="db-sync-dialog"', 'id="db-sync-steps"', 'id="db-sync-panel"', 'aria-label="Sync now"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the sync round is missing "' + kept + '"')
   }
