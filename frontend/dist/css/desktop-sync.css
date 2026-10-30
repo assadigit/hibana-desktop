@@ -375,3 +375,61 @@
   .db-sync-steps li[data-state='done'] .db-sync-mark .icon { animation: none; }
   .db-sync-panel:not([hidden]) { animation: none; }
 }
+
+/* ══ S211 (owner: "the sync modal, two success svg icons collide with each
+   other") ════════════════════════════════════════════════════════════════
+   ROOT CAUSE: the hero emblem carries 5 glyphs (connect/upload/orbit/ok/err),
+   all position:absolute; inset:0; margin:auto — stacked in the SAME spot. The
+   stage rules light the stage glyph (connect/upload/orbit) based on data-stage;
+   the kind rules light the verdict glyph (ok/warn/err) based on data-kind. BUT
+   when a verdict lands (setKind('ok')) the stage attribute is NEVER cleared —
+   data-stage stays at 'sync' (or whichever step was last active), so BOTH the
+   stage's orbit glyph AND the verdict's ok glyph sit at opacity:1, overlapping
+   in the center of the emblem. The comment at line 229 claimed "a settled
+   verdict overrides whatever stage the round last stood at" — but CSS doesn't
+   override across DIFFERENT elements (orbit ≠ ok); both stayed visible.
+
+   FIX: when a verdict (ok/warn/err) is set, explicitly hide the STAGE glyphs.
+   (warn keeps the orbit glyph — it IS the warn verdict's own glyph, so only
+   connect+upload are dimmed for warn; ok and err dim all three.) */
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-connect,
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-upload,
+.db-sync-hero[data-kind='ok'] .db-sync-glyph-orbit,
+.db-sync-hero[data-kind='warn'] .db-sync-glyph-connect,
+.db-sync-hero[data-kind='warn'] .db-sync-glyph-upload,
+.db-sync-hero[data-kind='err'] .db-sync-glyph-connect,
+.db-sync-hero[data-kind='err'] .db-sync-glyph-upload,
+.db-sync-hero[data-kind='err'] .db-sync-glyph-orbit {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+/* ══ S211 (owner: "the dark mode/light mode is not centered") ══════════════
+   ROOT CAUSE: the toolbar's theme toggle (#db-theme-toggle) rides the global
+   [data-theme-toggle] rule from base.css — a 1.75rem (28px) square with
+   padding:0. The labeled toolbar buttons (Sync, Refresh, Sprints, Labels) sit
+   at ~2.35rem tall (padding:0.55rem 1rem + font). The 28px theme toggle is
+   SHORTER than every sibling, so in the flex row (align-items:center) it reads
+   as misaligned/off — and its tight 28px width next to the settings gear's
+   wider box made the two icon buttons look packed/colliding.
+
+   FIX: the toolbar's icon-only buttons (theme toggle + settings gear) now
+   share ONE square size that matches the labeled buttons' height, with the
+   icon centered via inline-grid place-items. (Specificity .db-toolbar #id at
+   (1,1,0) beats both [data-theme-toggle] (0,1,0) and button{} (0,0,1).) */
+.db-toolbar #db-theme-toggle,
+.db-toolbar #db-settings-button {
+  inline-size: auto;
+  block-size: auto;
+  min-block-size: 2.35rem;
+  min-inline-size: 2.35rem;
+  padding: 0.55rem;
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+}
+.db-toolbar #db-theme-toggle .icon,
+.db-toolbar #db-settings-button .icon {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+}
