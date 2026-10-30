@@ -1,6 +1,6 @@
-Desktop 0.1.23 — auto-release: every update to main ships a release.
+Desktop 0.1.24 — auto-release: every update to main ships a release.
 
-Changes since v0.1.22-desktop:
+Changes since v0.1.23-desktop:
 
 - fix(desktop): sync modal icon collision + theme toggle centering (S211)
 
