@@ -385,9 +385,9 @@
    when a verdict lands (setKind('ok')) the stage attribute is NEVER cleared —
    data-stage stays at 'sync' (or whichever step was last active), so BOTH the
    stage's orbit glyph AND the verdict's ok glyph sit at opacity:1, overlapping
-   in the center of the emblem. The comment at line 229 claimed "a settled
-   verdict overrides whatever stage the round last stood at" — but CSS doesn't
-   override across DIFFERENT elements (orbit ≠ ok); both stayed visible.
+   in the center of the emblem. The original comment claimed "a settled verdict
+   overrides whatever stage the round last stood at" — but CSS doesn't override
+   across DIFFERENT elements (orbit ≠ ok); both stayed visible.
 
    FIX: when a verdict (ok/warn/err) is set, explicitly hide the STAGE glyphs.
    (warn keeps the orbit glyph — it IS the warn verdict's own glyph, so only
