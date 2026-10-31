@@ -14,7 +14,7 @@
   "css/desktop-settings.css": "d912cac365c334f048e5068994527e320ccdd2ec0f256a238cd09060c8bd46a7",
   "css/desktop-sync.css": "27573a635e94f0d9205add9c6e17d17147da02301d5904168dfb49b8619f6e06",
   "css/desktop-update.css": "52c51f70ceb2f2488a8b7f98c6e7da765b72a549b71298c31826a6bd6c09606c",
-  "css/devboard.css": "e39ee9c6b37856a1476e5ebaf951ce67301f806e6a90ba723fa0e6e71bf5c480",
+  "css/devboard.css": "2361c71063a11809d6976a82db929f5817739abf47d7405bda4a90c39505b236",
   "css/layout.css": "60c6b4f17f633b0dcc9abf8e19116014eabf676ef25a944a07a197e9de491cd8",
   "css/misc.css": "2648f168e788747775147d74b004d208277d555798339ae459dbc11ac1b5a4b0",
   "css/notifications.css": "a9af93c79486d2b56a82b50d4bf5d92e7b7bf2a16172c8ca2603b2d545b56d34",
@@ -32,7 +32,7 @@
   "icons/empty-state/new-ideas-lamp.png": "140afb9a985198c436d4bf8f20f12a05403c225518ea9caba0d9dfb857ce8cbc",
   "icons/empty-state/plans-checklist.png": "c5434a302eae2e586327cea94b51f6baac928d7b46ea00c2830c2f4679f28fb6",
   "icons/empty-state/problems-warning.png": "c3d80a034d4e2c81ed89317ef3f3a30b08f2e0f08b8d6d0ef29d87d58967f04f",
-  "index.html": "305e4ebd631106224be8c901ce227145cfd966879bf9a40481d4a282221ef581",
+  "index.html": "1e36de7b60c5492adec6cb6a0562601f601bc44e682dd7850c213a19d049acbe",
   "js/board-page.js": "93c959c3d688f30dde5ec7368e0be6d75f7137d8c61ceee1729e0590829a569a",
   "js/chip-render.js": "ef91070846167842800ad9adba2132e9717f7a67608a1038b2f9d00d52c6b1f5",
   "js/desktop-audio.js": "d25cf9c376ab517d77e4920913365d887a829224d40d1425ca7eb3c591b40796",
@@ -40,7 +40,7 @@
   "js/desktop-logout.js": "9be8d41d5950493a6fc4c5197cd2fb777bd4b53ea7b7830e62f31dfdba19e3a3",
   "js/desktop-newproject.js": "7ced6e1c08c18531c9a0814250031886cd1af3292d4efc3d827bb5c1ef18dd2d",
   "js/desktop-refresh.js": "03e15eb258983b811259be83080d1bf58876c082293fa69e0cdaea011b075a45",
-  "js/desktop-settings.js": "0410dacd5f5f1a4cca02dd9080e9c4d4c2b4ceead1970c225d4624becdada777",
+  "js/desktop-settings.js": "b64426b1a06c4c7513024e44a73db8a58a71cf8a96e92985d7e5009d70b0ad6f",
   "js/desktop-shim.js": "91c9d1aeb7da1973b3028636a23fef87cd812d8b4b432fa503bf7780d3cbb18b",
   "js/desktop-sync.js": "ec1319d524bfb9eb66ff376db4d76ba9a3f884dfc14fffac7739c42bdc7f26a8",
   "js/desktop-theme.js": "bdfccdf77656cc1bf9dab3f3ea61d3ecac92dc8da625e4aba9c5f8e08ba62bb3",
@@ -69,5 +69,5 @@
   "vendor/vazir/Vazir-Regular.woff2": "d783603a0dd07db6896ecd8a3460e2256a48dca62373a0478706a05490c1a2d8",
   "vendor/vazir/Vazir-Thin.woff2": "ad3cd4cbda94aee8578c1b622b9002f9dfe345c05870eb375a02da853d08f072",
   "vendor/vazir/font-face.css": "6cd803f9783c7559ab145e9648ebfd80c1c0f944d3b3d46226a64e8cb10cfe96",
-  "web-ref.json": "1f463d20ae400224eeb25ef8eac83b34c694844314275ffffd1269162c7fa9ec"
+  "web-ref.json": "9ee9572b3a66906679b1fd595db156a0e86a1ee2888a49c661998ff2a59d1aea"
 }

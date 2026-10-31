@@ -1403,3 +1403,148 @@ html[data-theme="claude-dark"] .db-hint,
    theme-specific-opacity route the handoff §6/§10 prescribes). */
 html[data-theme="claude-dark"] .pd-empty-icon,
 :root[data-theme="claude-dark"] .pd-empty-icon { opacity: 0.72; }
+
+/* ============================================================================
+   S231 — THE REFINEMENT & POLISH PASS (the owner's audit round, 2026-11-01).
+   The base (aee9acf) + completion (S230) rounds landed the five-lane redesign;
+   this round fixes the execution gaps the owner flagged:
+
+   C. THE STRETCH BUG — a populated lane's last grid row (the .pd-task-add button)
+      stretched into an enormous outlined rectangle (measured 283px tall in a 606px
+      lane) because .pd-tasks is a GRID (project-header.css:1145) whose default
+      align-content:stretch distributes the full-height chain's leftover space
+      across the rows, and the full-width button stretches with its row. S230 only
+      fixed the EMPTY case (:has(> .pd-empty) → center). THE FIX: populated lanes
+      pack their rows from the TOP — align-content: start — so the button keeps
+      its natural ~40px height forever (the leftover space stays below the content
+      as quiet lane body, still a valid drop target — the S210 whole-column rule).
+      The :has(> .pd-empty) center rule (0,4,0) still wins for empty lanes.
+   B. THE FILTER TOOLBAR — the dashed-outline container retires (it read as a
+      debug/drop zone); a clean compact toolbar: borderless row, 32px controls,
+      the search capped at 20rem. All data-attrs + classes unchanged (the
+      board-filters spec's contract).
+   A/G. SIZING + HEADERS — 14px gutters, 56px consistent lane headers with
+      comfortable padding, 13px/600 lane titles, a lane-tinted count badge.
+   H. CARDS — 14px titles (board scope only — the project page keeps the owner's
+      12px S88 choice), 12px meta (was a 9.6px whisper), 11px priority banner,
+      roomier padding + card gap, a quiet hover cue.
+   F. ADD TASK — ONE recipe for both placements (the empty group's button and the
+      populated strip): 40px height, 13px/600 label, lane-tinted border, card
+      background, soft tint hover — retiring the old teal-fill hover on the board.
+   D/E. EMPTY STATES — the illustrations grow to 120px and lift to 0.70/0.78
+      (light/dark): the owner read the base's 112px @ 0.60 as too small + too
+      faint; 16px/600 heading, 13px description.
+   Everything is scoped to the board (.db-cols / main.board-shell) — the project
+   page's embedded board keeps its established look (the S88 title ruling etc.).
+   ============================================================================ */
+
+/* ---- C. THE STRETCH BUG — the root-cause fix -------------------------------- */
+.db-cols > .pd-col > .pd-tasks {
+  align-content: start; /* populated rows pack from the top; Add task NEVER grows */
+  gap: 0.5rem;          /* 8px between cards (was a tight 0.35rem) */
+}
+/* While a card hovers over an EMPTY lane during a drag, the empty group yields
+   the lane to the drop cue (the live-placed card appends below it otherwise). */
+.db-cols .pd-col.drag-over .pd-empty { display: none; }
+
+/* ---- B. THE FILTER TOOLBAR — clean + compact, no dashed container ----------- */
+main.board-shell .db-filter {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  gap: 0.4rem;
+  margin-block-end: 0.75rem;
+}
+main.board-shell .db-filter-search {
+  max-inline-size: 20rem;
+  min-block-size: 32px;
+  font-size: 0.8125rem;                 /* 13px — a real text-field size */
+  border-radius: calc(var(--radius-sm) - 5px);
+}
+main.board-shell .db-filter .chip {
+  min-block-size: 32px;                 /* matches the search field's height */
+  padding: 0.25em 0.75em;
+  border-radius: calc(var(--radius-sm) - 5px);
+}
+main.board-shell .db-filter .chip .prio-dot { inline-size: 8px; block-size: 8px; }
+
+/* ---- A/G. LANE GEOMETRY + THE FIVE HEADERS ---------------------------------- */
+.db-cols { gap: 0.875rem; }             /* 14px gutters — the design table's top */
+.db-cols > .pd-col { padding: 0.65rem; }
+.db-cols > .pd-col > .pd-col-head {
+  margin: -0.65rem -0.65rem 0.6rem;     /* matches the new lane padding */
+  padding: 0.6rem 0.8rem;
+  min-block-size: 3.5rem;               /* 56px — one consistent header height */
+}
+.db-cols .pd-col-title {
+  font-size: 0.8125rem;                 /* 13px/600 — a clear lane title */
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  gap: 0.3rem;
+}
+.db-cols .pd-col-title::before { inline-size: 0.65rem; block-size: 0.65rem; }
+.db-cols .detail-tab-count {
+  padding: 0.08rem 0.5rem;
+  font-weight: 600;
+  background: rgb(var(--pd-c, 128 128 128) / 0.1);  /* the lane's own quiet tint */
+  color: var(--pd-ink, var(--muted));
+}
+.db-cols .db-col-menu-btn { min-block-size: 32px; min-inline-size: 32px; }
+
+/* ---- H. TASK CARDS — scannable, roomier, a quiet hover ---------------------- */
+.db-cols .pd-task { padding: 0.6rem 0.7rem; }
+.db-cols .pd-task-body { gap: 0.22rem; }             /* title ↔ meta separation */
+.db-cols .pd-task-title { font-size: 0.875rem; }     /* 14px — the board's scan size */
+.db-cols .pd-task-meta { font-size: var(--fs-xs); }  /* 12px — was fs-xs × 0.8 = 9.6px */
+.db-cols .prio-banner { font-size: 11px; }           /* readable, still a whisper */
+.db-cols .pd-task:hover {
+  border-color: color-mix(in srgb, var(--pd-dot, var(--brand)) 45%, var(--line));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+}
+
+/* ---- F. ADD TASK — one recipe for both placements --------------------------- */
+.db-cols .pd-task-add,
+.db-cols .pd-empty-add {
+  min-block-size: 40px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8125rem;                 /* 13px */
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--pd-dot, var(--accent-ink));
+  background: var(--card);
+  border: 1.5px solid color-mix(in srgb, var(--pd-dot, var(--accent)) 55%, var(--line));
+  border-radius: calc(var(--radius-sm) - 2px);       /* 12px — rounded, never pill */
+  gap: 0.45rem;
+}
+.db-cols .pd-task-add .icon,
+.db-cols .pd-empty-add .icon {
+  inline-size: 0.9rem;
+  block-size: 0.9rem;
+  color: currentColor;
+  transition: none;
+}
+.db-cols .pd-task-add:hover,
+.db-cols .pd-empty-add:hover {
+  background: color-mix(in srgb, var(--pd-dot, var(--accent)) 9%, var(--card));
+  border-color: var(--pd-dot, var(--accent));
+  color: var(--pd-ink, var(--accent-ink));
+}
+.db-cols .pd-task-add:hover .icon,
+.db-cols .pd-empty-add:hover .icon { color: currentColor; }
+.db-cols .pd-task-add:focus-visible,
+.db-cols .pd-empty-add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ---- D/E. THE EMPTY STATES — present, balanced, recognizable ----------------- */
+.pd-empty { gap: 0.45rem; padding: 1.5rem 0.75rem 1.1rem; }
+.pd-empty-icon { inline-size: 120px; block-size: 120px; opacity: 0.70; }
+.pd-empty-title { font-size: 1rem; }                 /* 16px semibold */
+.pd-empty-text { font-size: 0.8125rem; max-inline-size: 24ch; } /* 13px / 1.5 */
+html[data-theme="claude-dark"] .pd-empty-icon,
+:root[data-theme="claude-dark"] .pd-empty-icon { opacity: 0.78; }
+
+/* ---- A/J. THE TOOLBAR ROW — a touch more air, same 41px control family ------- */
+main.board-shell .db-frame .db-toolbar { padding: 0.25rem 0.2rem 0.85rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .db-cols .pd-task-add, .db-cols .pd-empty-add, .db-cols .pd-task { transition: none; }
+}

@@ -76,8 +76,14 @@ import { fileURLToPath } from 'node:url'
 // art lift). board.html's devboard.css?v=36 / board-page.js?v=24 /
 // i18n-en.js?v=102 / i18n-fa.js?v=96 are the cache-busted surfaces; the seam
 // patches + strip/insert anchors below were re-verified against the new bytes.
-const PIN_REF = '073bb95'
-const PIN_PACKAGE_VERSION = '0.4.1.38'
+// S231 (the refinement & polish pass): the pin moved to 6037d8f (web v0.4.1.39) — the
+// populated lanes' Add-task row never stretches (grid align-content root cause — was a
+// 283px outlined rectangle), the filter toolbar's dashed container retires (clean 32px
+// row), 56px lane headers, 14px board titles, one lane-tinted 40px Add-task recipe,
+// 120px @ 0.70/0.78 empty-state art. Only devboard.css changed (v37) in the manifest —
+// board-page.js and every seam/anchor string are byte-identical to the S230 pin.
+const PIN_REF = '6037d8f'
+const PIN_PACKAGE_VERSION = '0.4.1.39'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -105,7 +111,7 @@ const CSS_SHEETS = [
   'css/notifications.css',  // ?v=12
   'css/polish-batch.css',   // ?v=29 — .toast-msg unicode-bidi (:644)
   'css/project-header.css', // ?v=50 — the .pd-col column anatomy
-  'css/devboard.css',       // ?v=34 — the .db-frame mother container (S207)
+  'css/devboard.css',       // ?v=37 — the .db-frame mother container (S207) + the redesign (S230) + the polish pass (S231)
   'css/misc.css',           // ?v=24
   'css/themes.css',         // ?v=9  — the explicit LIGHT token block
   'css/claude-dark-theme.css', // ?v=31 — html[data-theme='claude-dark']
