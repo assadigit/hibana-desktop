@@ -314,12 +314,19 @@ async function main() {
     const board = await page.evaluate(() => ({
       title: (document.getElementById('db-title') || {}).textContent.trim(),
       counts: (document.getElementById('db-counts') || {}).textContent.trim(),
+      countsHidden: !!(document.getElementById('db-counts') || {}).hidden,
       columns: document.querySelectorAll('#db-board .pd-col').length,
+      laneEmptyStates: document.querySelectorAll('#db-board .pd-empty').length,
       url: location.href,
     }))
     check('the 201 {ok,id} resolve deep-links the island\'s /kanban?project=<id> boot', /kanban\?project=/.test(board.url), JSON.stringify(board.url))
     check('the fresh board renders THE NEW PROJECT as its board', board.title === 'Probe Project Alpha', JSON.stringify(board.title))
-    check('the fresh kanban renders (the columns + the 0/0 counts line)', board.columns > 0 && /0 of 0 done/.test(board.counts), 'columns: ' + board.columns + ' counts: ' + JSON.stringify(board.counts))
+    // UI-redesign (073bb95): the "0 of 0 done" counts line is RETIRED (the span stays
+    // in the markup but is emptied + hidden); a fresh board instead renders the five
+    // per-lane empty states. Pin BOTH sides of the redesign: no counts line, and the
+    // five empty lanes carrying their illustration groups.
+    check('the fresh kanban renders (the columns; the retired counts line is EMPTY + HIDDEN)', board.columns > 0 && board.counts === '' && board.countsHidden === true, 'columns: ' + board.columns + ' counts: ' + JSON.stringify(board.counts) + ' hidden: ' + board.countsHidden)
+    check('the fresh kanban renders the five per-lane empty states (the UI-redesign empty board)', board.laneEmptyStates === 5, 'empty states: ' + board.laneEmptyStates)
     check('the board boot issued the new project\'s devboard GET', probe.devboardGets.some((g) => g.includes(call.id)), JSON.stringify(probe.devboardGets))
 
     await page.screenshot({ path: path.join(args.out, 'newproject-created-board.png') })

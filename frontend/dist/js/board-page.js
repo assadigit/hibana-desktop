@@ -161,13 +161,23 @@
           // archive-done/data-db-clear-done attributes are preserved verbatim inside the
           // menu items so the delegated handlers (board-page.js:714/724/743/761) keep
           // working unchanged.
-          const I_ELLIPSIS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>'
+          const I_ELLIPSIS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>'
           const I_INFO = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>'
           // Per-lane empty-state asset + i18n key map (spec §5.1). The PNGs ship at
           // /icons/empty-state/<name>.png (320×320 RGBA transparent → displayed ~112px).
           const EMPTY_ICON = { idea: 'new-ideas-lamp', bug: 'problems-warning', planned: 'plans-checklist', in_progress: 'in-progress-play', done: 'implemented-check' }
           const EMPTY_TITLE = { idea: 'db.empty.idea.title', bug: 'db.empty.bug.title', planned: 'db.empty.planned.title', in_progress: 'db.empty.inprog.title', done: 'db.empty.done.title' }
           const EMPTY_TEXT = { idea: 'db.empty.idea.text', bug: 'db.empty.bug.text', planned: 'db.empty.planned.text', in_progress: 'db.empty.inprog.text', done: 'db.empty.done.text' }
+          // S230 completion: inline EN fallbacks for every empty-state string (the _t
+          // convention — every call carries its fallback; a dictionary that fails to
+          // load must never render an EMPTY line under the heading).
+          const EMPTY_FALLBACK = {
+            idea: ['No ideas yet', 'Capture new ideas and potential improvements.'],
+            bug: ['No problems yet', 'Track issues and blockers here.'],
+            planned: ['No plans yet', 'Plan upcoming work and define next steps.'],
+            in_progress: ['Nothing in progress', 'Move tasks here when you start working.'],
+            done: ['No completed tasks', 'Completed tasks will appear here.'],
+          }
           // S136 (owner report: the fullscreen board's cards, columns and filter bar
           // don't match the project page's .pd-board): the board now renders the EXACT
           // anatomy of the project page's kanban (routes/projects/detail-helpers.ts) —
@@ -211,8 +221,8 @@
             const emptyGroupHtml = laneIsEmpty
               ? '<div class="pd-empty" data-pd-empty>' +
                   '<img class="pd-empty-icon" src="/icons/empty-state/' + EMPTY_ICON[st] + '.png" alt="" width="112" height="112" loading="lazy" decoding="async" />' +
-                  '<p class="pd-empty-title">' + B().esc(_t(EMPTY_TITLE[st], 'No items yet')) + '</p>' +
-                  '<p class="pd-empty-text">' + B().esc(_t(EMPTY_TEXT[st], '')) + '</p>' +
+                  '<p class="pd-empty-title">' + B().esc(_t(EMPTY_TITLE[st], EMPTY_FALLBACK[st][0])) + '</p>' +
+                  '<p class="pd-empty-text">' + B().esc(_t(EMPTY_TEXT[st], EMPTY_FALLBACK[st][1])) + '</p>' +
                   '<button type="button" class="pd-empty-add" data-add="' + st + '">' + I_PLUS + ' <span>' + B().esc(_t('db.addTask', 'Add task')) + '</span></button>' +
                 '</div>'
               : ''

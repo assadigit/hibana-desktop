@@ -1332,3 +1332,74 @@ html[data-theme="claude-dark"] .db-col-menu,
 @media (prefers-reduced-motion: reduce) {
   .pd-empty-add, .db-col-menu-btn { transition: none; }
 }
+
+/* ============================================================================
+   UI-REDESIGN COMPLETION (S230 follow-up, 2026-11-01) — the QA round on the
+   base implementation above, closing the handoff's remaining spec items:
+   the neutral canvas (§3.3), the scroll scope (§3.3 — the lanes scroll, never
+   the toolbar), the empty group's central placement (§5), and the helper
+   hint's legibility (§7 — its #7B8491 @ 0.66 starting point lands under 2:1
+   on white; the handoff's own "verify legibility" caveat + the QA bar of
+   sufficient contrast win: the app's --muted ink at 0.85 keeps ≥4.5:1 on
+   both themes while staying monochrome, low emphasis, pill-free).
+   ============================================================================ */
+
+/* §3.3 THE NEUTRAL CANVAS — "Use a subtle neutral app canvas behind white lane
+   surfaces": the board region below the toolbar becomes the quiet work surface
+   (var(--statcard-bg): light #F5F6F7 / dark #191817 — the existing recessed-step
+   token, exactly one rung below the card surface in BOTH themes), bleeding to
+   the frame's side/bottom edges (the frame's padding is the toolbar's breathing
+   room, not the canvas's) and flexing to fill the 100dvh floor so the lanes own
+   the full height. The toolbar row keeps the frame's white. */
+main.board-shell .db-frame > .db-board {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--statcard-bg);
+  margin: 0 -1rem -1rem;
+  padding: 0.8rem 1rem 0.9rem;
+}
+@media (max-width: 640px) {
+  main.board-shell .db-frame > .db-board {
+    margin: 0 -0.65rem -0.8rem;
+    padding: 0.5rem 0.65rem 0.7rem;
+  }
+}
+
+/* §3.3 THE SCROLL SCOPE — only the LANES scroll horizontally, never the toolbar
+   (the workspace selector stays anchored at the inline-start, the action group
+   at the inline-end; the base round scrolled the whole .db-frame, toolbar
+   included). The board region below the toolbar owns the scrollport; the frame
+   keeps overflow visible so the page still scrolls as one with its content. */
+main.board-shell .db-frame { overflow: visible; }
+main.board-shell .db-frame > .db-board { overflow-x: auto; }
+/* the lanes' bottom breathing room inside the scrollport (the scrollbar's band) */
+main.board-shell .db-board .db-cols { padding-block-end: 0.35rem; }
+/* §3.3 THE FULL-HEIGHT CHAIN — the lanes must own the canvas's whole height:
+   the board region flexes to the frame's 100dvh floor (the rule above) and the
+   columns grid flexes to the region, so .pd-col stretch (align-items: stretch,
+   the base .db-cols rule) reaches the bottom on EVERY board — empty ones too
+   (the base round's lanes hugged their content: a short board left the canvas
+   bare below them). */
+main.board-shell .db-board .db-cols { flex: 1 1 auto; }
+
+/* §5 THE EMPTY GROUP'S PLACEMENT — "the upper-middle/central working area of
+   the lane, consistent across all five lanes": the grown lane body centers the
+   group (the base round's margin:auto could not engage inside the grid row —
+   the row hugs its content, so the group sat hard at the lane's top). */
+.db-cols > .pd-col > .pd-tasks:has(> .pd-empty) { align-content: center; }
+
+/* §7 THE HELPER HINT — the quiet-but-legible ink (see the block header above).
+   Same treatment in the dark theme (the base round's #9AA3AF @ 0.72 also lands
+   under the bar on the dark canvas). */
+.db-hint { color: var(--muted); opacity: 0.85; }
+html[data-theme="claude-dark"] .db-hint,
+:root[data-theme="claude-dark"] .db-hint { color: var(--muted); opacity: 0.85; }
+
+/* §10 dark-theme illustration visibility — the base round's 0.46 reads too
+   faint on the near-black lane surface (visual QA: the art nearly vanished).
+   The light 0.60 art is a light-gray stroke family; on dark it needs a LIFT,
+   not a cut: 0.72 keeps it quiet but clearly perceivable (never tinted — the
+   theme-specific-opacity route the handoff §6/§10 prescribes). */
+html[data-theme="claude-dark"] .pd-empty-icon,
+:root[data-theme="claude-dark"] .pd-empty-icon { opacity: 0.72; }

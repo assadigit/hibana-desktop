@@ -21,7 +21,7 @@ on:
   workflow_dispatch: {}
 
 env:
-  WEB_REF: aee9acf          # the island pin (must match scripts/sync-island.mjs)
+  WEB_REF: 073bb95          # the island pin (must match scripts/sync-island.mjs) — the kanban UI-redesign ref (base aee9acf + the S230 completion)
   WEB_VERSION: "0.4.1.38"   # the pin's package version (Release notes carry BOTH)
 
 jobs:

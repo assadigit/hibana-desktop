@@ -14,7 +14,7 @@
   "css/desktop-settings.css": "d912cac365c334f048e5068994527e320ccdd2ec0f256a238cd09060c8bd46a7",
   "css/desktop-sync.css": "27573a635e94f0d9205add9c6e17d17147da02301d5904168dfb49b8619f6e06",
   "css/desktop-update.css": "52c51f70ceb2f2488a8b7f98c6e7da765b72a549b71298c31826a6bd6c09606c",
-  "css/devboard.css": "6fd9d7efe0282377e9d710b3cd55c88bb9910e673682a8c6ccdb8be419c6af75",
+  "css/devboard.css": "e39ee9c6b37856a1476e5ebaf951ce67301f806e6a90ba723fa0e6e71bf5c480",
   "css/layout.css": "60c6b4f17f633b0dcc9abf8e19116014eabf676ef25a944a07a197e9de491cd8",
   "css/misc.css": "2648f168e788747775147d74b004d208277d555798339ae459dbc11ac1b5a4b0",
   "css/notifications.css": "a9af93c79486d2b56a82b50d4bf5d92e7b7bf2a16172c8ca2603b2d545b56d34",
@@ -32,8 +32,8 @@
   "icons/empty-state/new-ideas-lamp.png": "140afb9a985198c436d4bf8f20f12a05403c225518ea9caba0d9dfb857ce8cbc",
   "icons/empty-state/plans-checklist.png": "c5434a302eae2e586327cea94b51f6baac928d7b46ea00c2830c2f4679f28fb6",
   "icons/empty-state/problems-warning.png": "c3d80a034d4e2c81ed89317ef3f3a30b08f2e0f08b8d6d0ef29d87d58967f04f",
-  "index.html": "1a9f2a9730770dc6ce2182410b4064593303b82e3fcf564cb7f32f828da70cb3",
-  "js/board-page.js": "fb8f009279c8ba4c0355f5ac6087fde12ca59221d1d332d3e1ce69cfc2209e16",
+  "index.html": "305e4ebd631106224be8c901ce227145cfd966879bf9a40481d4a282221ef581",
+  "js/board-page.js": "93c959c3d688f30dde5ec7368e0be6d75f7137d8c61ceee1729e0590829a569a",
   "js/chip-render.js": "ef91070846167842800ad9adba2132e9717f7a67608a1038b2f9d00d52c6b1f5",
   "js/desktop-audio.js": "d25cf9c376ab517d77e4920913365d887a829224d40d1425ca7eb3c591b40796",
   "js/desktop-login.js": "ca5690a30196faea36ad6a9d9952088fb4d0a1e523b43764cd2b0a8af10b7c6d",
@@ -69,5 +69,5 @@
   "vendor/vazir/Vazir-Regular.woff2": "d783603a0dd07db6896ecd8a3460e2256a48dca62373a0478706a05490c1a2d8",
   "vendor/vazir/Vazir-Thin.woff2": "ad3cd4cbda94aee8578c1b622b9002f9dfe345c05870eb375a02da853d08f072",
   "vendor/vazir/font-face.css": "6cd803f9783c7559ab145e9648ebfd80c1c0f944d3b3d46226a64e8cb10cfe96",
-  "web-ref.json": "abe06a89a2a2126a61665747130f89e13c9807f036c6c25ee52a9765f9558da3"
+  "web-ref.json": "1f463d20ae400224eeb25ef8eac83b34c694844314275ffffd1269162c7fa9ec"
 }

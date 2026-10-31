@@ -71,10 +71,12 @@ import { fileURLToPath } from 'node:url'
 // ---------------------------------------------------------------------------
 // UI-redesign: the pin moved to aee9acf (web v0.4.1.38) — the five-lane board
 // redesign (empty states, ellipsis menus, the bottom helper hint, the Project
-// Progress summary removed). board.html's devboard.css?v=35 / board-page.js?v=23 /
+// Progress summary removed + the S230 completion: the neutral canvas, the lane-only
+// horizontal scroll, the full-height flex chain, the hint's legible ink, the dark
+// art lift). board.html's devboard.css?v=36 / board-page.js?v=24 /
 // i18n-en.js?v=102 / i18n-fa.js?v=96 are the cache-busted surfaces; the seam
 // patches + strip/insert anchors below were re-verified against the new bytes.
-const PIN_REF = 'aee9acf'
+const PIN_REF = '073bb95'
 const PIN_PACKAGE_VERSION = '0.4.1.38'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -144,7 +146,7 @@ const JS_FILES = [
   'js/sync-state.js',      // v2 (v0.4.1.37) — the per-card sync tracker (hibana-sync-status-spec §14: ONE source; devboard.js's task mutations report in, the badges + the Sync button count derive from it)
   'js/devboard.js',        // v29 (v0.4.1.37) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked()
   'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
-  'js/board-page.js',      // v23 (v0.4.1.38) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint
+  'js/board-page.js',      // v24 (v0.4.1.38) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion (inline EN fallbacks, solid ⋯ dots)
   'js/i18n-en.js',         // v102 (v0.4.1.38) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign empty-state / menu / helper keys
   'js/i18n.js',            // v155 (v0.4.1.37) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below)
   'js/i18n-fa.js',         // v96 (v0.4.1.38) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA empty-state / menu / helper keys
@@ -5263,6 +5265,26 @@ function verifyDist(outDir, fileMap) {
   const devboard = fileMap['js/devboard.js']
   const boardPage = fileMap['js/board-page.js']
   const indexHtml = fileMap['index.html']
+  const devboardCss = fileMap['css/devboard.css'] || ''
+
+  // (1z) THE UI-REDESIGN ISLAND SET (hibana-kanban-ui-redesign-handoff @ 073bb95 —
+  // the base round aee9acf + the S230 completion): the empty-state illustrations
+  // MUST ship (a missing PNG = a broken image in every empty lane), the copied
+  // board-page.js must carry the redesign's renderers (the per-lane empty states,
+  // the ⋯ column menus, the helper hint, the emptied #db-counts), and the copied
+  // devboard.css must carry the completion's additions (the neutral canvas, the
+  // lane-only scroll scope, the full-height flex chain, the legible hint ink,
+  // the dark-theme art lift) — a source-side drift on any of these fails here
+  // before it can ship as a silent visual regression.
+  for (const icon of EMPTY_STATE_ICONS) {
+    if (!fs.existsSync(path.join(outDir, icon))) problems.push(icon + ': missing from dist (the empty lanes would show broken images)')
+  }
+  for (const marker of ['pd-empty', 'data-db-col-menu', 'db-hint', "countsEl.hidden = true"]) {
+    if (!boardPage.includes(marker)) problems.push('js/board-page.js: the UI-redesign marker missing: "' + marker + '"')
+  }
+  for (const marker of ['main.board-shell .db-frame > .db-board', '.pd-empty-icon', '.db-col-menu', '.db-hint', 'data-theme="claude-dark"] .pd-empty-icon']) {
+    if (!devboardCss.includes(marker)) problems.push('css/devboard.css: the UI-redesign marker missing: "' + marker + '"')
+  }
 
   // (1) the seam took, exactly (guide §4.1: 7 fetch sites + 2 XHR in devboard; 4 in board-page).
   // UI-redesign: 7 fetch sites = the original 6 + S211's create-label POST /api/tags
@@ -5842,8 +5864,10 @@ function main() {
   const boardHtmlRaw = gitShow(src, PIN_REF, 'board.html')
 
   // Patchable files as utf8 strings (the patches are exact recorded replaces).
+  // css/devboard.css joins the utf8 map VERBATIM (no patches) — verifyDist's
+  // UI-redesign markers read it from the map (writing it again is byte-identical).
   const fileMap = {}
-  for (const rel of ['js/devboard.js', 'js/board-page.js']) fileMap[rel] = blobs[rel].toString('utf8')
+  for (const rel of ['js/devboard.js', 'js/board-page.js', 'css/devboard.css']) fileMap[rel] = blobs[rel].toString('utf8')
 
   // The HTML adaptation (guide §3.2).
   const adapted = adaptBoardHtml(boardHtmlRaw.toString('utf8'))
