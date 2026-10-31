@@ -27,7 +27,7 @@
   // The sealed pin's package version (the sync script interpolates it at emit
   // time — the AppInfo binding carries version + webRef, and the island's own
   // package version rides the web-ref.json the script already knows).
-  var PIN_PACKAGE_VERSION = '0.4.1.37'
+  var PIN_PACKAGE_VERSION = '0.4.1.38'
 
   // The desktop-owned strings. The title rides the pin's own nav.settings key
   // and Sign out rides nav.signout (both in the markup via data-i18n); every

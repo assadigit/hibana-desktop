@@ -59,9 +59,12 @@
           // name (language-neutral user content), not a generic "Board".
           if (S.project && S.project.title) document.title = S.project.title + ' — Hibana'
           document.getElementById('db-sprint-link').href = '/sprint.html?project=' + projectId
-          const done = S.tasks.filter((x) => x.status === 'done').length
-          document.getElementById('db-counts').textContent = _t('db.counts', '{n} of {m} done')
-            .replace('{n}', B().faDig(done)).replace('{m}', B().faDig(S.tasks.length))
+          // UI-redesign: the Project Progress summary (the "{n} of {m} done" completed/
+          // total card) is removed from the toolbar per spec §3.2. The #db-counts span
+          // stays in the markup (the sync's kept-markup check expects the toolbar ids)
+          // but is emptied + hidden so no summary renders. Reclaim the space for the board.
+          const countsEl = document.getElementById('db-counts')
+          if (countsEl) { countsEl.textContent = ''; countsEl.hidden = true }
 
           const lang = window.hibanaI18n && window.hibanaI18n.lang ? window.hibanaI18n.lang() : 'en'
           // S30 batch 2 (user request): the FILTER BAR — priority toggles + label
@@ -152,6 +155,19 @@
           const I_ARCHIVE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>'
           const I_TRASH = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
           const I_PLUS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
+          // UI-redesign: the column ellipsis (⋯) menu button — consolidates the always-
+          // visible Copy/Export (+ Archive/Clear for the Done column) into ONE overflow
+          // menu per lane (spec §4). The existing data-db-copy/data-db-export/data-db-
+          // archive-done/data-db-clear-done attributes are preserved verbatim inside the
+          // menu items so the delegated handlers (board-page.js:714/724/743/761) keep
+          // working unchanged.
+          const I_ELLIPSIS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>'
+          const I_INFO = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>'
+          // Per-lane empty-state asset + i18n key map (spec §5.1). The PNGs ship at
+          // /icons/empty-state/<name>.png (320×320 RGBA transparent → displayed ~112px).
+          const EMPTY_ICON = { idea: 'new-ideas-lamp', bug: 'problems-warning', planned: 'plans-checklist', in_progress: 'in-progress-play', done: 'implemented-check' }
+          const EMPTY_TITLE = { idea: 'db.empty.idea.title', bug: 'db.empty.bug.title', planned: 'db.empty.planned.title', in_progress: 'db.empty.inprog.title', done: 'db.empty.done.title' }
+          const EMPTY_TEXT = { idea: 'db.empty.idea.text', bug: 'db.empty.bug.text', planned: 'db.empty.planned.text', in_progress: 'db.empty.inprog.text', done: 'db.empty.done.text' }
           // S136 (owner report: the fullscreen board's cards, columns and filter bar
           // don't match the project page's .pd-board): the board now renders the EXACT
           // anatomy of the project page's kanban (routes/projects/detail-helpers.ts) —
@@ -170,22 +186,41 @@
           root.innerHTML = filterBarHtml + filterEmptyHtml + '<div class="db-cols">' + B().STATUSES.map((st) => {
             const items = S.tasks.filter((x) => x.status === st && taskMatches(x))
             const isDone = st === 'done'
-            // Done column gets TWO extra buttons: Archive (moves done → project_archives,
-            // viewable + restorable) + Clear (hard-deletes, no archive). Only shown when
-            // there are done tasks. (The old .db-col-done tint retired with the db column
-            // styles — the pd board paints every column identically.)
-            const doneActions = isDone && items.length > 0
-              ? '<button type="button" class="ghost small" data-db-archive-done title="' + B().esc(_t('pd.archiveDone', 'Archive done tasks')) + '">' + I_ARCHIVE + '</button>' +
-                '<button type="button" class="ghost small danger" data-db-clear-done title="' + B().esc(_t('pd.clearDone', 'Clear done (delete)')) + '">' + I_TRASH + '</button>'
+            // UI-redesign (spec §4): ONE ellipsis menu per lane replaces the always-
+            // visible Copy/Export (+ Archive/Clear for Done). The underlying actions are
+            // preserved verbatim inside the menu (same data-* attrs + i18n labels) so the
+            // delegated handlers + the existing behavior are untouched. Archive/Clear
+            // only appear when the Done lane actually has tasks (the original guard).
+            const colMenuLabel = _t('db.colMenu', 'Column actions')
+            const menuItems = []
+            if (isDone && items.length > 0) {
+              menuItems.push('<button type="button" role="menuitem" class="db-col-menu-item" data-db-archive-done>' + I_ARCHIVE + '<span>' + B().esc(_t('pd.archiveDone', 'Archive done tasks')) + '</span></button>')
+              menuItems.push('<button type="button" role="menuitem" class="db-col-menu-item danger" data-db-clear-done>' + I_TRASH + '<span>' + B().esc(_t('pd.clearDone', 'Clear done (delete)')) + '</span></button>')
+            }
+            menuItems.push('<button type="button" role="menuitem" class="db-col-menu-item" data-db-copy="' + st + '">' + I_CLIPBOARD + '<span>' + B().esc(_t('pd.quickCopy', 'Quick copy')) + '</span></button>')
+            menuItems.push('<button type="button" role="menuitem" class="db-col-menu-item" data-db-export="' + st + '">' + I_DOWNLOAD + '<span>' + B().esc(_t('pd.exportMd', 'Export Markdown')) + '</span></button>')
+            const colActionsHtml = '<span class="db-col-menu-wrap">' +
+              '<button type="button" class="ghost small db-col-menu-btn" data-db-col-menu aria-haspopup="true" aria-expanded="false" aria-label="' + B().esc(colMenuLabel) + '" title="' + B().esc(colMenuLabel) + '">' + I_ELLIPSIS + '</button>' +
+              '<div class="db-col-menu" role="menu" aria-label="' + B().esc(colMenuLabel) + '" hidden>' + menuItems.join('') + '</div>' +
+            '</span>'
+            // UI-redesign (spec §5): the per-lane empty-state group — shown ONLY when the
+            // lane has no tasks AND no filter is hiding them (the filter-miss banner owns
+            // the filtered-empty case). illustration → heading → copy → lane-colored
+            // outlined Add task (the same data-add contract the bottom .pd-task-add uses).
+            const laneIsEmpty = items.length === 0 && !anyFilter
+            const emptyGroupHtml = laneIsEmpty
+              ? '<div class="pd-empty" data-pd-empty>' +
+                  '<img class="pd-empty-icon" src="/icons/empty-state/' + EMPTY_ICON[st] + '.png" alt="" width="112" height="112" loading="lazy" decoding="async" />' +
+                  '<p class="pd-empty-title">' + B().esc(_t(EMPTY_TITLE[st], 'No items yet')) + '</p>' +
+                  '<p class="pd-empty-text">' + B().esc(_t(EMPTY_TEXT[st], '')) + '</p>' +
+                  '<button type="button" class="pd-empty-add" data-add="' + st + '">' + I_PLUS + ' <span>' + B().esc(_t('db.addTask', 'Add task')) + '</span></button>' +
+                '</div>'
               : ''
             return '<section class="pd-col" data-status="' + st + '">' +
               '<header class="pd-col-head"><span class="pd-col-title">' + B().esc(B().statusLabel(st)) + '</span>' +
               '<span class="detail-tab-count">' + B().faDig(items.length) + '</span>' +
-              '<span class="pd-col-actions">' +
-                doneActions +
-                '<button type="button" class="ghost small" data-db-copy="' + st + '" title="' + B().esc(_t('pd.quickCopy', 'Quick copy')) + '">' + I_CLIPBOARD + '</button>' +
-                '<button type="button" class="ghost small" data-db-export="' + st + '" title="' + B().esc(_t('pd.exportMd', 'Export Markdown')) + '">' + I_DOWNLOAD + '</button>' +
-              '</span></header>' +
+              colActionsHtml +
+              '</header>' +
               // The pd column body: same container class + attr the server renders
               // (drag-over now rides the COLUMN via .pd-col.drag-over, the pd recipe).
               '<div class="pd-tasks" data-pd-tasks="' + st + '">' +
@@ -263,10 +298,15 @@
                     '</div>' +
                   '</div>'
                 }).join('') +
-                '<button type="button" class="pd-task-add" data-add="' + st + '">' + I_PLUS + ' <span>' + B().esc(_t('db.addTask', 'Add task')) + '</span></button>' +
+                (laneIsEmpty
+                  ? emptyGroupHtml
+                  : '<button type="button" class="pd-task-add" data-add="' + st + '">' + I_PLUS + ' <span>' + B().esc(_t('db.addTask', 'Add task')) + '</span></button>') +
               '</div>' +
             '</section>'
-          }).join('') + '</div>'
+          }).join('') + '</div>' +
+          // UI-redesign (spec §7): the bottom board helper hint — monochrome, low
+          // emphasis, never in a colored pill. A quiet persistent nudge below the lanes.
+          '<p class="db-hint" role="note">' + I_INFO + '<span>' + B().esc(_t('db.helperHint', 'Start by adding a task to move your work forward.')) + '</span></p>'
           root.hidden = false
           if (loading) loading.hidden = true
           // S78 parity: the miss state syncs AFTER the paint (anyFilter + shownCount).
@@ -554,10 +594,27 @@
             if (btn) btn.removeAttribute('data-open')
           })
         }
+        // UI-redesign: the column ellipsis (⋯) menu — open/close state. Mirrors the
+        // card-menu discipline: one open menu at a time, Escape + outside-click close,
+        // and every menu-item action closes it (the delegated handlers below call
+        // closeAllColMenus() before their work so the menu never lingers open over a
+        // toast/dialog). RTL-aware: the menu anchors under its button on the inline-end.
+        function closeAllColMenus() {
+          document.querySelectorAll('.db-col-menu:not([hidden])').forEach((m) => {
+            m.hidden = true
+            const btn = m.parentElement && m.parentElement.querySelector('[data-db-col-menu]')
+            if (btn) btn.setAttribute('aria-expanded', 'false')
+          })
+        }
         document.addEventListener('click', (e) => {
           if (!e.target.closest('.db-card-menu')) closeAllDbMenus()
+          // Close column menus on outside click (the toggle button keeps its menu open;
+          // its own handler flips the state). A click on a menu item is handled by the
+          // delegated action branches which call closeAllColMenus() themselves.
+          if (!e.target.closest('.db-col-menu-wrap')) closeAllColMenus()
         })
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAllDbMenus() })
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeAllDbMenus(); closeAllColMenus() } })
+
 
         // Delete confirm modal — a native <dialog> (no page refresh). "Are you sure?" +
         // Confirm/Cancel. On confirm → DELETE /api/devtasks/:id → reload().
@@ -603,7 +660,7 @@
         }
 
         // ---- interactions (delegated once — render() only rebuilds innerHTML) ----
-        ctx.on('click', (e) => {
+        ctx.on('click', async (e) => {
           if (e.target.closest('#db-retry')) {
             loading.innerHTML = '<span>' + String(_t('db.loading', 'Loading board…')).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]) + '</span>'
             boot()
@@ -665,6 +722,21 @@
             B().openEditor(null, { defaults: { status: add.dataset.add }, onSaved: reload })
             return
           }
+          // UI-redesign: the column ellipsis (⋯) toggle. One menu open at a time;
+          // clicking the button again closes it. The menu items themselves carry the
+          // existing data-db-copy/export/archive/clear attrs, so the branches below this
+          // (which call closeAllColMenus() first) handle the actions + close the menu.
+          const colMenuBtn = e.target.closest('[data-db-col-menu]')
+          if (colMenuBtn) {
+            e.preventDefault()
+            const menu = colMenuBtn.parentElement && colMenuBtn.parentElement.querySelector('.db-col-menu')
+            if (!menu) return
+            const willOpen = menu.hidden
+            closeAllColMenus()
+            menu.hidden = !willOpen
+            colMenuBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false')
+            return
+          }
           // Session 22: read-more / read-less toggle — must run BEFORE the card branch
           // (the button lives INSIDE [data-task-card], and ctx.on handlers are separate
           // document-level listeners — stopPropagation can't stop the card branch).
@@ -713,6 +785,7 @@
             .filter(Boolean)
           const copy = e.target.closest('[data-db-copy]')
           if (copy) {
+            closeAllColMenus()
             const st = copy.dataset.dbCopy
             const text = colLines(st).join('\n')
             navigator.clipboard?.writeText(text).then(
@@ -723,6 +796,7 @@
           }
           const exp = e.target.closest('[data-db-export]')
           if (exp) {
+            closeAllColMenus()
             const st = exp.dataset.dbExport
             const col = document.querySelector(`.pd-col[data-status="${st}"]`)
             const label = col ? (col.querySelector('.pd-col-title')?.textContent.trim() || st) : st
@@ -742,11 +816,12 @@
           // viewable + restorable). The safe "clear" — nothing is lost.
           const archiveBtn = e.target.closest('[data-db-archive-done]')
           if (archiveBtn) {
+            closeAllColMenus()
             const col = document.querySelector('.pd-col[data-status="done"]')
             const count = col ? col.querySelectorAll('.pd-task-wrap').length : 0
             if (count === 0) return
             const msg = _t('pd.archiveDoneConfirm', 'Archive all {n} done tasks? They move to the project archives (restorable).').replace('{n}', B().faDig(count))
-            if (!confirm(msg)) return
+            if (!await window.hibana.confirm(msg, { title: _t('pd.archiveDone', 'Archive done tasks'), confirmLabel: _t('pd.archiveDone', 'Archive') })) return
             window.hibanaFetch('/api/projects/' + projectId + '/devtasks/archive-done', { method: 'POST' })
               .then((r) => r.ok ? r.json() : null)
               .then((body) => {
@@ -760,11 +835,12 @@
           // "Clear Done" button — HARD-DELETES done tasks (no archive). Destructive.
           const clearBtn = e.target.closest('[data-db-clear-done]')
           if (clearBtn) {
+            closeAllColMenus()
             const col = document.querySelector('.pd-col[data-status="done"]')
             const count = col ? col.querySelectorAll('.pd-task-wrap').length : 0
             if (count === 0) return
             const msg = _t('pd.clearDoneConfirm', 'PERMANENTLY delete all {n} done tasks? This cannot be undone. Use "Archive" to keep them.').replace('{n}', B().faDig(count))
-            if (!confirm(msg)) return
+            if (!await window.hibana.confirm(msg, { title: _t('pd.clearDone', 'Clear done (delete)'), danger: true, confirmLabel: _t('pd.clearDone', 'Delete all') })) return
             // Delete each task individually (no bulk-delete endpoint — keeps it simple)
             const ids = Array.from(col.querySelectorAll('.pd-task-wrap')).map((c) => c.dataset.taskCard)
             Promise.all(ids.map((id) => window.hibanaFetch('/api/devtasks/' + id, { method: 'DELETE' })))
@@ -781,6 +857,47 @@
         let drag = null
         let over = null
         const clearOver = () => { if (over) { over.classList.remove('drag-over'); over = null } }
+        // S210 (owner: "lower tasks can't be dragged to another section — only the top
+        // ones move"): the old drop read the destination from the dragged card's CURRENT
+        // parent (after a fragile live-reorder). A pointer over a column's empty lower
+        // area — below the last card, on a short column, or on the Add-task strip — never
+        // matched a [data-task-card], so the live-reorder skipped it, the card stayed in
+        // its origin column, and the drop silently no-oped the status change. The column
+        // under the POINTER now names the destination (e.target first, then a real
+        // elementFromPoint hit-test for the live mouse drag).
+        const colAt = (e) => {
+          const t = e.target instanceof Element ? e.target : null
+          const direct = t && t.closest ? t.closest('.pd-col') : null
+          if (direct) return direct
+          // synthetic DnD (the e2e suite) dispatches directly on .pd-col → `direct` is
+          // set; the hit-test only runs for a real pointer that landed on empty column
+          // space (the column body, not a card).
+          if (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return null
+          const hit = document.elementFromPoint(e.clientX, e.clientY)
+          return hit && hit.closest ? hit.closest('.pd-col') : null
+        }
+        // Live-place the dragged card inside a column's list (visual feedback + ensures
+        // the drop below reads the destination the pointer named, not the card's origin).
+        const placeInList = (col, x, y) => {
+          const list = col.querySelector('.pd-tasks')
+          if (!list || !drag) return
+          const hit = (Number.isFinite(x) && Number.isFinite(y)) ? document.elementFromPoint(x, y) : null
+          const target = hit && hit.closest ? hit.closest('[data-task-card]') : null
+          const addBtn = list.querySelector('.pd-task-add')
+          // guard list.contains(target): elementFromPoint can return a card that lives
+          // in a DIFFERENT column (a tall neighbor bleeding into the pointer) —
+          // insertBefore would throw NotFoundError. Only place relative to a target that
+          // is genuinely a child of THIS list.
+          if (target && target !== drag && list.contains(target)) {
+            const r = target.getBoundingClientRect()
+            const after = y > r.top + r.height / 2
+            list.insertBefore(drag, after ? target.nextSibling : target)
+          } else if (addBtn) {
+            list.insertBefore(drag, addBtn) // append to the end (just above Add task)
+          } else {
+            list.appendChild(drag)
+          }
+        }
         ctx.on('dragstart', (e) => {
           const card = e.target.closest('[data-task-card]')
           if (!card) return
@@ -791,35 +908,54 @@
         })
         ctx.on('dragover', (e) => {
           if (!drag) return
+          // allow the drop FIRST — the browser refuses drop where dragover didn't
+          // preventDefault, and a pointer over a column's empty lower area must still
+          // accept the card (the original returned before preventDefault when
+          // e.target wasn't inside a .pd-col, so the whole column body below the last
+          // card rejected drops).
           e.preventDefault()
           // S136: the drop CUE is the COLUMN (.pd-col.drag-over — the pd recipe,
           // project-header.css), not a dashed body outline; the live-reorder still
           // inserts inside the column's .pd-tasks list.
-          const col = e.target.closest('.pd-col')
+          const col = colAt(e)
           if (!col) return
           const list = col.querySelector('.pd-tasks')
           if (!list) return
           clearOver()
           over = col
           col.classList.add('drag-over')
-          // live-reorder inside the column for visual feedback
-          const target = e.target.closest('[data-task-card]')
-          const addBtn = list.querySelector('.pd-task-add')
-          if (target && target !== drag) {
-            const r = target.getBoundingClientRect()
-            const after = e.clientY > r.top + r.height / 2
-            list.insertBefore(drag, after ? target.nextSibling : target)
-          } else if (!target && addBtn) {
-            list.insertBefore(drag, addBtn)
-          }
+          placeInList(col, e.clientX, e.clientY)
         })
         ctx.on('drop', async (e) => {
           if (!drag) return
           e.preventDefault()
           const id = drag.dataset.taskCard
-          const list = drag.closest('[data-pd-tasks]')
+          // The destination is the column under the POINTER (not the dragged card's
+          // current parent — the live placement above usually relocates it, but a drop
+          // on an area the pointer crossed without a matching .pd-col still needs the
+          // right status read). Falls back to the card's own column only when no column
+          // can be resolved at all (a drop outside the board).
+          const col = colAt(e) || drag.closest('.pd-col')
+          const list = (col && col.querySelector('.pd-tasks')) || drag.closest('[data-pd-tasks]')
           const newStatus = list ? list.dataset.pdTasks : null
           const task = B().findTask(id)
+          // If the live placement didn't relocate the card into the destination list
+          // (a drop straight onto the column body, or an edge the pointer crossed
+          // without firing a matching dragover), do it now so the order array below
+          // reflects the intended drop position.
+          if (list && drag.closest('[data-pd-tasks]') !== list) {
+            const hit = (Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) ? document.elementFromPoint(e.clientX, e.clientY) : null
+            const target = hit && hit.closest ? hit.closest('[data-task-card]') : null
+            if (target && target !== drag && list.contains(target)) {
+              const r = target.getBoundingClientRect()
+              const after = e.clientY > r.top + r.height / 2
+              list.insertBefore(drag, after ? target.nextSibling : target)
+            } else {
+              const addBtn = list.querySelector('.pd-task-add')
+              if (addBtn) list.insertBefore(drag, addBtn)
+              else list.appendChild(drag)
+            }
+          }
           // S30 batch 4 (user request: "drop into the urgent zone of the column"):
           // a SAME-COLUMN drop ADOPTS the priority of the card it landed next to —
           // the columns are priority-sorted, so the neighbor IS the tier zone. The

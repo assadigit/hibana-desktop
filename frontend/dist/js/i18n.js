@@ -51,7 +51,7 @@ window.hibanaI18n = (() => {
     if (faDictPromise) return faDictPromise
     faDictPromise = new Promise((resolve) => {
       const s = document.createElement('script')
-      s.src = '/js/i18n-fa.js?v=95'
+      s.src = '/js/i18n-fa.js?v=96'
       s.onload = () => { dict.fa = window.__hibanaDictFA || {}; resolve() }
       s.onerror = () => { dict.fa = {}; resolve() } // graceful: t() falls back to EN
       document.head.appendChild(s)

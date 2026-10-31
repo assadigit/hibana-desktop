@@ -1233,7 +1233,7 @@
     const delBtn = el.querySelector('[data-db-del]')
     if (delBtn) {
       delBtn.onclick = async () => {
-        if (!window.confirm(t('db.delConfirm', 'Delete this task?'))) return
+        if (!await window.hibana.confirm(t('db.delConfirm', 'Delete this task?'), { title: 'Delete task', danger: true, confirmLabel: 'Delete' })) return
         try {
           await deleteTask(modalCtx.taskId)
           window.hibana && window.hibana.toast(t('db.taskDeleted', 'Task deleted'), 'ok')
@@ -1333,6 +1333,23 @@
       '<div class="row spread"><h3>' + esc(t('db.labelsTitle', 'Labels')) + '</h3>' +
         '<button type="button" class="ghost" data-lbl-close aria-label="' + esc(t('common.close', 'Close')) + '">✕</button></div>' +
       '<p class="muted small">' + esc(t('db.labelsHint', 'Rename merges onto an existing name; colors are yours to pick; unused labels can be deleted.')) + '</p>' +
+      // S211 (owner: "the labels do not have an option to delete/create new label"):
+      // the dialog had rename/merge/recolor/delete-unused but NO way to CREATE a new
+      // label. A create row now sits at the top of the list: color swatch (click →
+      // palette) + name input + Create button (or Enter). POST /api/tags {name,color}.
+      '<div class="db-label-row db-label-create">' +
+        '<span class="db-label-swatch" id="lbl-create-swatch" style="background:#f6d365" title="' + esc(t('db.labelsColor', 'Recolor')) + '"></span>' +
+        '<input class="db-label-name" id="lbl-create-name" placeholder="' + esc(t('db.labelsCreatePh', 'New label name…')) + '" maxlength="60" dir="auto" aria-label="' + esc(t('db.labelsName', 'Label name')) + '">' +
+        '<span class="db-label-actions">' +
+          '<button type="button" class="ghost small" id="lbl-create-color" title="' + esc(t('db.labelsColor', 'Recolor')) + '" aria-label="' + esc(t('db.labelsColor', 'Recolor')) + '">🎨</button>' +
+        '</span>' +
+        '<button type="button" class="btn small" id="lbl-create-btn">' + esc(t('db.labelsCreate', 'Create')) + '</button>' +
+        '<span class="pd-tag-colors db-label-palette" id="lbl-create-palette" hidden>' +
+          ['#8AB8F0', '#E8B27D', '#E59AA5', '#8FD3A9', '#B3A5D6', '#7CC7C1', '#F2D58A', '#C9CDD2'].map(function (c) {
+            return '<button type="button" class="pd-swatch" data-lbl-create-pick data-color="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>'
+          }).join('') +
+        '</span>' +
+      '</div>' +
       '<div class="db-labels-list">' + (tags.length ? tags.map(function (tg) {
         return '<div class="db-label-row" data-tag-id="' + esc(tg.id) + '">' +
           '<span class="db-label-swatch" style="background:' + esc(tg.color) + '"></span>' +
@@ -1362,7 +1379,41 @@
     d.querySelector('[data-lbl-close]').onclick = close
     el.onclick = function (ev) { if (ev.target === el) close() }
 
-    const rows = Array.prototype.slice.call(d.querySelectorAll('.db-label-row'))
+    // S211: the create-new-label row — color swatch (palette toggle) + name input
+    // (Enter creates) + Create button. POST /api/tags {name, color} → 201 {ok,id}
+    // or 409 on duplicate name (the API's INSERT OR IGNORE refuses a dupe).
+    var createName = d.querySelector('#lbl-create-name')
+    var createSwatch = d.querySelector('#lbl-create-swatch')
+    var createPaletteBtn = d.querySelector('#lbl-create-color')
+    var createPalette = d.querySelector('#lbl-create-palette')
+    var createBtn = d.querySelector('#lbl-create-btn')
+    var createColor = '#f6d365'
+    if (createPaletteBtn) createPaletteBtn.onclick = function () { if (createPalette) createPalette.hidden = !createPalette.hidden }
+    if (createSwatch) createSwatch.onclick = function () { if (createPalette) createPalette.hidden = !createPalette.hidden }
+    Array.prototype.slice.call(d.querySelectorAll('[data-lbl-create-pick]')).forEach(function (sw) {
+      sw.onclick = function () {
+        createColor = sw.dataset.color
+        if (createSwatch) createSwatch.style.background = createColor
+        if (createPalette) createPalette.hidden = true
+      }
+    })
+    async function doCreate() {
+      var name = createName ? createName.value.trim() : ''
+      if (!name) { createName && createName.focus(); return }
+      try {
+        var res = await window.hibanaFetch('/api/tags', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, color: createColor }) })
+        if (res.status === 409) { window.hibana && window.hibana.toast(t('db.labelsExists', 'A label with that name already exists'), 'err'); return }
+        if (!res.ok) throw new Error('create failed')
+        window.hibana && window.hibana.toast(t('db.labelsCreated', 'Label created'), 'ok')
+        refresh()
+      } catch (e) { window.hibana && window.hibana.toast(t('sparks.saveFailed', "Couldn't save"), 'err') }
+    }
+    if (createBtn) createBtn.onclick = doCreate
+    if (createName) createName.onkeydown = function (ev) {
+      if (ev.key === 'Enter' && !ev.isComposing) { ev.preventDefault(); doCreate() }
+    }
+
+    const rows = Array.prototype.slice.call(d.querySelectorAll('.db-label-row[data-tag-id]'))
     rows.forEach(function (row) {
       const id = row.dataset.tagId
       // rename (Enter) — a colliding name merges (the API doubles as merge)
@@ -1407,7 +1458,7 @@
         if (!into) return
         const targetName = mergeSel.options[mergeSel.selectedIndex].textContent
         const msg = t('db.labelsMergeConfirm', 'Merge this label into {name}? Every link moves.').split('{name}').join(targetName)
-        if (!window.confirm(msg)) { mergeSel.value = ''; return }
+        if (!await window.hibana.confirm(msg, { title: 'Merge label', confirmLabel: 'Merge' })) { mergeSel.value = ''; return }
         try {
           const res = await window.hibanaFetch('/api/tags/' + id + '/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ into: into }) })
           if (!res.ok) throw new Error('merge failed')

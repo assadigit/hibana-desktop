@@ -360,3 +360,88 @@ html[data-theme='claude-dark'] .toast.ok {
 }
 .theme-floater:hover { background: var(--bg-soft); }
 
+/* --- Hibana confirm modal (S210) -------------------------------------------
+   The app used window.confirm() for every destructive/verify action — a native
+   OS box that broke the design language (square corners, no backdrop, top-anchored,
+   themed by the OS, not Hibana). window.hibana.confirm(message, opts) builds a
+   centered, themed dialog from the SAME tokens the task editor (.db-modal-card)
+   and the toast use: --card surface, --line hairline, --radius corners,
+   --shadow-dropdown depth, --cta primary + .ghost/.ghost.danger secondaries.
+   Centered with grid place-items center (the robust viewport-center pattern —
+   works under RTL + light/dark + mobile keyboards). Backdrop dims + blurs like
+   every other Hibana overlay (.zen-overlay, .modal-bg). */
+.hib-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;            /* above toasts (z-index:600) + the rail/panels */
+  display: grid;
+  place-items: center;     /* the CENTERED contract — both axes, viewport-relative */
+  padding: 1rem;
+  background: rgb(15 12 8 / 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: hibConfirmFade 0.15s ease-out;
+}
+@keyframes hibConfirmFade { from { opacity: 0 } to { opacity: 1 } }
+.hib-confirm-overlay[hidden] { display: none; }
+.hib-confirm-card {
+  /* S186: ONE primary CTA per view — here the primary is the confirm action (or
+     the danger action when danger:true). The card is a centered, themed surface,
+     not a CTA, so it stays neutral (--card) and lets the buttons carry the grammar. */
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);                 /* 20px — the design-system card radius */
+  box-shadow: var(--shadow-dropdown);
+  padding: 1.25rem 1.3rem;
+  inline-size: min(26rem, 100%);                /* matches the task editor's compact dialog register */
+  max-block-size: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  animation: hibConfirmPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  /* keep the card centered even when content is tall — never overflows the viewport */
+  margin: 0;
+}
+@keyframes hibConfirmPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98) }
+  to   { opacity: 1; transform: translateY(0) scale(1) }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hib-confirm-overlay, .hib-confirm-card { animation: none }
+}
+.hib-confirm-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.hib-confirm-title .icon { inline-size: 1.25rem; block-size: 1.25rem; flex: none; }
+/* the danger variant tints the title's icon so a destructive action reads at a glance */
+.hib-confirm-card.is-danger .hib-confirm-title .icon { color: var(--danger); }
+.hib-confirm-message {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--muted);
+  word-break: break-word;
+}
+.hib-confirm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;   /* S186: the primary sits at the trailing end */
+  gap: 0.5rem;
+  margin-block-start: 0.2rem;
+}
+body.rtl .hib-confirm-actions { justify-content: flex-start; }
+.hib-confirm-actions button { min-block-size: 2.5rem; }   /* 40px touch floor */
+/* mobile: the actions stretch full-width, primary trailing — keeps both taps reachable */
+@media (max-width: 480px) {
+  .hib-confirm-card { padding: 1.1rem 1rem; }
+  .hib-confirm-actions { flex-direction: column-reverse; }
+  .hib-confirm-actions button { inline-size: 100%; }
+}
+

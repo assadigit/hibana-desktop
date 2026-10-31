@@ -670,6 +670,13 @@ window.__hibanaDictFA = {
       'db.newTask': 'کار جدید', 'db.editTask': 'ویرایش کار', 'db.title': 'عنوان',
       'db.titlePh': 'چه چیزی باید ساخته شود؟', 'db.status': 'وضعیت', 'db.priority': 'اولویت',
       'db.st.idea': 'ایده‌های جدید', 'db.st.planned': 'برنامه‌ها', 'db.st.inprog': 'در حال انجام', 'db.st.done': 'انجام‌شده', 'db.st.bug': 'مشکلات',
+      // UI-redesign: per-lane empty-state copy + the column ellipsis menu + the bottom helper hint.
+      'db.empty.idea.title': 'هنوز ایده‌ای نیست', 'db.empty.idea.text': 'ایده‌های جدید و بهبودهای احتمالی را اینجا ثبت کن.',
+      'db.empty.bug.title': 'هنوز مشکلی نیست', 'db.empty.bug.text': 'مسائل و موانع را اینجا پیگیری کن.',
+      'db.empty.planned.title': 'هنوز برنامه‌ای نیست', 'db.empty.planned.text': 'کارهای پیش‌رو را برنامه‌ریزی و قدم‌های بعد را تعریف کن.',
+      'db.empty.inprog.title': 'چیزی در حال انجام نیست', 'db.empty.inprog.text': 'وقتی کاری را شروع کردی اینجا بیاور.',
+      'db.empty.done.title': 'کاری انجام نشده است', 'db.empty.done.text': 'کارهای انجام‌شده اینجا نمایش داده می‌شوند.',
+      'db.colMenu': 'عملیات ستون', 'db.helperHint': 'برای جلو بردن کارت، با افزودن یک کار شروع کن.',
       'db.pr.low': 'کم', 'db.pr.medium': 'متوسط', 'db.pr.high': 'زیاد', 'db.pr.urgent': 'فوری',
       'db.category': 'دسته‌بندی', 'db.uncategorized': 'دسته‌بندی‌نشده', 'db.newCategory': 'دسته‌بندی جدید…',
       'db.categoryName': 'نام دسته‌بندی (توسعهٔ قابلیت…)', 'db.renameCategory': 'تغییر نام دسته‌بندی',
@@ -803,6 +810,7 @@ window.__hibanaDictFA = {
       'db.labelsName': 'نام برچسب', 'db.labelsColor': 'تغییر رنگ', 'db.labelsMerge': 'ادغام در…', 'db.labelsMergePh': 'ادغام در…',
       'db.labelsMergeConfirm': 'این برچسب در «{name}» ادغام شود؟ همهٔ پیوندها منتقل می‌شوند.', 'db.labelsMerged': 'در برچسب موجود ادغام شد',
       'db.labelsDel': 'حذف برچسب بلااستفاده', 'db.labelsDeleted': 'برچسب حذف شد', 'db.labelsEmpty': 'هنوز برچسبی نیست — از یک کار اضافه کن.',
+      'db.labelsCreate': 'ایجاد', 'db.labelsCreatePh': 'نام برچسب جدید…', 'db.labelsCreated': 'برچسب ایجاد شد', 'db.labelsExists': 'برچسبی با این نام از قبل وجود دارد',
       'db.usedTimes': '{n} بار استفاده',
       // S30 بستهٔ ۳: تحلیل کارهای گزارش + نوار فوریِ داشبورد
       'reports.tasksHeading': 'تحلیل کارها', 'reports.openTasks': 'باز', 'reports.openTasks2': 'باز',

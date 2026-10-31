@@ -84,8 +84,19 @@ main.board-shell .db-frame { min-block-size: calc(100dvh - 1.5rem); }
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr)); /* 0031: red Problems column; batch (s) ⑩: second slot */
   gap: 0.8rem;
-  align-items: start;
+  /* S210 (owner: "lower tasks can't be dragged to another section"): columns STRETCH
+     to the tallest sibling's height. With align-items:start a short column left dead
+     grid space below it that belonged to .db-cols (not .pd-col), so a drop in that
+     lower area never matched e.target.closest('.pd-col') → the status read fell back
+     to the dragged card's origin and silently no-oped. Stretch makes the whole column
+     body — top to bottom, including the empty area beneath the last card — one valid
+     .pd-col drop zone. (Standard kanban behavior: every column shares one height.) */
+  align-items: stretch;
 }
+/* S210: an empty / near-empty column still offers a real drop target. align-items:stretch
+   already grows the .pd-col box to full height; this floor keeps the .pd-tasks region
+   usable even on a single short row (the 1-col phone layout, or a board with one card). */
+.db-cols > .pd-col { min-block-size: 8rem; }
 @media (max-width: 1100px) { .db-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .db-cols { grid-template-columns: 1fr; } }
 /* S136 (owner report: the fullscreen board drifted from the project page's .pd-board):
@@ -921,6 +932,15 @@ main.shell.sp-shell .sp-wrap { min-block-size: min(64vh, 30rem); }
 /* ---- S30 batch 4: the label-manager dialog (board toolbar → Labels) ------------ */
 .db-labels-card { max-inline-size: 46rem; }
 .db-labels-list { display: grid; gap: 0.4rem; margin-block: 0.6rem; max-block-size: 24rem; overflow-y: auto; }
+/* S211: the create-new-label row sits ABOVE the list — a subtle accent border
+   separates it from the existing labels so it reads as an action, not data. */
+.db-label-row.db-label-create {
+  border-style: dashed;
+  border-color: var(--line-strong);
+  margin-block-end: 0.2rem;
+}
+.db-label-row.db-label-create #lbl-create-btn { flex: none; }
+.db-label-row.db-label-create .db-label-swatch { cursor: pointer; }
 .db-label-row {
   display: flex;
   align-items: center;
@@ -1100,4 +1120,215 @@ main.shell.sp-shell .sp-wrap { min-block-size: min(64vh, 30rem); }
 @media (max-width: 640px) {
   /* the toolbar wraps on phones already (flex-wrap); the popover stays viewport-fit */
   .db-switch-pop { inline-size: min(20rem, calc(100vw - 1.2rem)); }
+}
+
+/* ============================================================================
+   UI-REDESIGN (hibana-kanban-ui-redesign-handoff) — the five-lane board pass.
+   Spec: docs/UI-REDESIGN-SPEC.md + DESIGN-SYSTEM.md. Token discipline: reuse the
+   existing --pd-* lane tokens (idea/bug/planned/in_progress/done) defined in
+   project-header.css + variables.css + claude-dark-theme.css; NO second token
+   system. What changed visually: the Project Progress summary is gone; each lane
+   header carries ONE ellipsis menu (Copy/Export + Archive/Clear preserved); empty
+   lanes show the supplied monochrome illustration + heading + copy + a lane-colored
+   outlined Add task; a quiet monochrome helper hint sits below the board.
+   ============================================================================ */
+
+/* §3.3 board geometry: five equal full-height lanes, consistent gutters, subtle
+   borders, rounded corners. The columns already stretch (align-items: stretch) and
+   .db-frame sets the 100dvh floor — this tunes the gap + radius + min lane width so
+   the board never crushes a column: at widths where five usable lanes cannot fit,
+   the board scrolls horizontally (spec §3.3: "do not silently hide columns"). */
+.db-cols {
+  gap: 0.75rem;                 /* 12px — within the 10–14px target */
+  /* minmax keeps each lane usable; below the ~1000px floor the grid overflows and
+     .db-frame's overflow-x scrolls it (added below) rather than collapsing lanes. */
+  grid-template-columns: repeat(5, minmax(11rem, 1fr));
+}
+/* Horizontal board scrolling at constrained widths — five lanes stay readable. The
+   .db-frame is the scroll container (it owns the board surface + the toolbar above).
+   Only the columns row scrolls, never the toolbar. */
+main.board-shell .db-frame { overflow-x: auto; overflow-y: visible; }
+.db-cols { min-inline-size: min-content; } /* let the grid grow past the container */
+/* Retire the old collapse-to-2/1 breakpoints for the BOARD shell — the desktop min
+   window is 1100×720 and the spec mandates five visible lanes there. The phone stack
+   still applies to the project-page EMBEDDED board (.pd-board-grid) which keeps its
+   own responsive rules in project-header.css. */
+main.board-shell .db-cols { grid-template-columns: repeat(5, minmax(11rem, 1fr)); }
+
+/* The lane surface — subtle border tinted toward the accent, no heavy shadow. The
+   existing .pd-col border (project-header.css) already tints via --pd-c; this adds
+   the rounded corner + neutral body so the lane reads as one anchored surface. */
+.db-cols > .pd-col {
+  border-radius: var(--radius-sm);   /* 14px — within the 12–16px target */
+  border-width: 1px;
+  border-style: solid;
+  box-shadow: none;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;                 /* allow the body to scroll within a tall lane */
+}
+/* The header strip already uses --pd-h tint (project-header.css); keep it light and
+   rounded to match the lane corner. */
+.db-cols > .pd-col > .pd-col-head {
+  border-radius: calc(var(--radius-sm) - 1px) calc(var(--radius-sm) - 1px) 0 0;
+}
+/* The task list grows to fill the lane; a tall lane's overflow scrolls inside it
+   (no nested scroll trap: the lane itself is the scroll context for its cards). */
+.db-cols > .pd-col > .pd-tasks {
+  flex: 1 1 auto;
+  min-block-size: 6rem;
+}
+
+/* ---- §4 the column ellipsis (⋯) menu --------------------------------------- */
+.db-col-menu-wrap { position: relative; display: inline-flex; margin-inline-start: auto; }
+.db-col-menu-btn { padding: 0.25rem 0.4rem; min-block-size: 28px; min-inline-size: 28px;
+  display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm, 14px); }
+.db-col-menu-btn .icon { inline-size: 1.05rem; block-size: 1.05rem; }
+.db-col-menu-btn[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.db-col-menu {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-end: 0;                 /* RTL-aware: anchors on the inline-end edge */
+  z-index: 40;
+  min-inline-size: 12rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.db-col-menu[hidden] { display: none; }
+.db-col-menu-item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: start;
+  padding: 0.45rem 0.55rem;
+  border-radius: calc(var(--radius-sm) - 4px);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.db-col-menu-item .icon { inline-size: 1rem; block-size: 1rem; color: var(--muted); flex: none; }
+.db-col-menu-item:hover { background: var(--statcard-bg); }
+.db-col-menu-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.db-col-menu-item.danger { color: var(--danger); }
+.db-col-menu-item.danger .icon { color: var(--danger); }
+.db-col-menu-item.danger:hover { background: var(--danger-soft); }
+/* Ensure the menu is never clipped by a lane's overflow — the .pd-tasks scrolls, but
+   the menu lives in the header (.pd-col-head, no overflow). Lift above neighbors. */
+.pd-col-head { position: relative; z-index: 5; }
+
+/* ---- §5 the per-lane empty-state group ------------------------------------ */
+/* illustration → heading → copy → lane-colored outlined Add task. The group is
+   centered in the lane body and hidden the moment a task lands (board-page.js drops
+   it from the render when items.length > 0). */
+.pd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
+  padding: 1.4rem 0.75rem 1rem;
+  margin: auto 0;                     /* center vertically in the grown lane body */
+}
+.pd-empty-icon {
+  inline-size: 112px;
+  block-size: 112px;
+  object-fit: contain;
+  opacity: 0.60;                      /* spec §6: start ~0.60, tune per theme */
+  /* keep the art monochrome + square; never tint with the lane accent */
+  filter: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.pd-empty-title {
+  margin: 0;
+  font-size: 1.0625rem;               /* 17px — within the 16–18px target */
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+.pd-empty-text {
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--muted);
+  line-height: 1.5;
+  max-inline-size: 22ch;
+}
+/* The lane-colored outlined Add task — border + text in --pd-dot, transparent fill,
+   quiet hover. Same data-add contract as the bottom .pd-task-add (board-page.js). */
+.pd-empty-add {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-block-start: 0.35rem;
+  padding: 0.55rem 0.95rem;
+  min-block-size: 42px;               /* 42–44px target */
+  inline-size: auto;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--pd-dot, var(--accent-ink));
+  background: transparent;
+  border: 1.5px solid color-mix(in srgb, var(--pd-dot, var(--accent)) 55%, var(--line));
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pd-empty-add .icon { inline-size: 0.95rem; block-size: 0.95rem; }
+.pd-empty-add:hover {
+  background: color-mix(in srgb, var(--pd-dot, var(--accent)) 8%, transparent);
+  border-color: var(--pd-dot, var(--accent));
+}
+.pd-empty-add:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ---- §7 the bottom board helper hint -------------------------------------- */
+/* monochrome, low emphasis, never in a colored pill. A quiet persistent nudge. */
+.db-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.85rem 0 0.4rem;
+  padding: 0;
+  font-size: var(--fs-sm);           /* 12–13px target */
+  color: #7B8491;                    /* spec §7 starting point */
+  opacity: 0.66;                      /* 0.62–0.68 target */
+  line-height: 1.5;
+  text-align: center;
+}
+.db-hint .icon { inline-size: 0.95rem; block-size: 0.95rem; flex: none; opacity: 0.9; }
+.db-hint span { /* the text node sits in a span for clean RTL ordering */ }
+
+/* ---- §10 dark theme tuning ------------------------------------------------ */
+/* The illustrations must stay visible but quiet on dark surfaces. The light-theme
+   opacity 0.60 reads too dark on a near-black lane, so raise it slightly on the dark
+   theme (a theme-specific opacity, NOT an accent filter — spec §10/§6). */
+html[data-theme="claude-dark"] .pd-empty-icon,
+:root[data-theme="claude-dark"] .pd-empty-icon { opacity: 0.46; }
+html[data-theme="claude-dark"] .pd-empty-title,
+:root[data-theme="claude-dark"] .pd-empty-title { color: var(--text); }
+html[data-theme="claude-dark"] .pd-empty-text,
+:root[data-theme="claude-dark"] .pd-empty-text { color: var(--muted); }
+/* The helper hint lifts to a lighter gray + slightly higher opacity for contrast on dark. */
+html[data-theme="claude-dark"] .db-hint,
+:root[data-theme="claude-dark"] .db-hint { color: #9AA3AF; opacity: 0.72; }
+/* The ellipsis menu surface on dark: use the dark card + line tokens. */
+html[data-theme="claude-dark"] .db-col-menu,
+:root[data-theme="claude-dark"] .db-col-menu { background: var(--card); border-color: var(--line); box-shadow: 0 6px 24px rgb(0 0 0 / 0.45); }
+
+/* ---- reduced motion ------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .pd-empty-add, .db-col-menu-btn { transition: none; }
 }
