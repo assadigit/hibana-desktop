@@ -1305,8 +1305,10 @@
   // S30 batch 4 (user request — "rename/merge/recolor/delete-unused tags, powered by
   // fixing B2"): a dialog listing every user tag with its LIVE usage_count. Row actions:
   // rename (Enter; a colliding name MERGES onto the existing tag), recolor (8-swatch
-  // palette), merge (a select of the other tags), delete (only usage 0). Owned here so
-  // any surface can open it; board.html's toolbar is the first.
+  // palette), merge (a select of the other tags), delete. S232 (owner: "two labels
+  // that can't be deleted") — delete is now on EVERY row: a used label confirms first
+  // (the count rides the message) and sends ?force=1 so the server cascades the
+  // unlink. Owned here so any surface can open it; board.html's toolbar is the first.
   let labelsEl = null
   let labelsCtx = null // open-flag ({ onChanged } shape kept for renderLabels' guard)
   // The changed-callback lives OUTSIDE the close lifecycle: Esc racing an in-flight
@@ -1332,7 +1334,7 @@
     d.innerHTML =
       '<div class="row spread"><h3>' + esc(t('db.labelsTitle', 'Labels')) + '</h3>' +
         '<button type="button" class="ghost" data-lbl-close aria-label="' + esc(t('common.close', 'Close')) + '">✕</button></div>' +
-      '<p class="muted small">' + esc(t('db.labelsHint', 'Rename merges onto an existing name; colors are yours to pick; unused labels can be deleted.')) + '</p>' +
+      '<p class="muted small">' + esc(t('db.labelsHint', 'Rename merges onto an existing name; colors are yours to pick; deleting a used label removes it from its tasks.')) + '</p>' +
       // S211 (owner: "the labels do not have an option to delete/create new label"):
       // the dialog had rename/merge/recolor/delete-unused but NO way to CREATE a new
       // label. A create row now sits at the top of the list: color swatch (click →
@@ -1361,9 +1363,9 @@
               '<option value="">' + esc(t('db.labelsMergePh', 'merge into…')) + '</option>' +
               tags.filter(function (o) { return o.id !== tg.id }).map(function (o) { return '<option value="' + esc(o.id) + '">' + esc(o.name) + '</option>' }).join('') +
             '</select>' +
-            ((tg.usage_count == null ? 0 : tg.usage_count) === 0
-              ? '<button type="button" class="ghost small danger" data-lbl-del title="' + esc(t('db.labelsDel', 'Delete unused label')) + '" aria-label="' + esc(t('db.labelsDel', 'Delete unused label')) + '">✕</button>'
-              : '') +
+            // S232: the ✕ rides EVERY row — a used label deletes through the confirm
+            // dialog (the count is in the message); an unused one deletes at once.
+            '<button type="button" class="ghost small danger" data-lbl-del title="' + esc(t('db.labelsDel', 'Delete label')) + '" aria-label="' + esc(t('db.labelsDel', 'Delete label')) + '">✕</button>' +
           '</span>' +
           '<span class="pd-tag-colors db-label-palette" hidden>' +
             ['#8AB8F0', '#E8B27D', '#E59AA5', '#8FD3A9', '#B3A5D6', '#7CC7C1', '#F2D58A', '#C9CDD2'].map(function (c) {
@@ -1416,6 +1418,8 @@
     const rows = Array.prototype.slice.call(d.querySelectorAll('.db-label-row[data-tag-id]'))
     rows.forEach(function (row) {
       const id = row.dataset.tagId
+      // the row's OWN tag record (the confirm message quotes the real name + count)
+      const tg = tags.find(function (x) { return x.id === id }) || { name: '', usage_count: 0 }
       // rename (Enter) — a colliding name merges (the API doubles as merge)
       const nameIn = row.querySelector('.db-label-name')
       nameIn.onkeydown = async function (ev) {
@@ -1466,11 +1470,23 @@
           refresh()
         } catch (e) { window.hibana && window.hibana.toast(t('sparks.saveFailed', "Couldn't save"), 'err') }
       }
-      // delete (unused only — the row only renders the button then)
+      // delete (S232) — every row carries the ✕. A USED label confirms first (the
+      // count is in the message; danger grammar) and rides ?force=1 so the server
+      // cascades the unlink from its tasks; an unused one deletes at once, as ever.
+      // A 409 back means the tag came back into use between load and click — surface
+      // it instead of the generic save-failed toast.
       const delBtn = row.querySelector('[data-lbl-del]')
       if (delBtn) delBtn.onclick = async function () {
+        const used = (tg.usage_count == null ? 0 : tg.usage_count) > 0
+        if (used) {
+          const msg = t('db.labelsDelConfirm', 'Delete "{name}"? It is used by {n} tasks — the label will be removed from those tasks.')
+            .split('{name}').join(tg.name)
+            .split('{n}').join(String(tg.usage_count == null ? 0 : tg.usage_count))
+          if (!await window.hibana.confirm(msg, { title: t('db.labelsDelTitle', 'Delete label'), danger: true })) return
+        }
         try {
-          const res = await window.hibanaFetch('/api/tags/' + id, { method: 'DELETE' })
+          const res = await window.hibanaFetch('/api/tags/' + id + (used ? '?force=1' : ''), { method: 'DELETE' })
+          if (res.status === 409) { window.hibana && window.hibana.toast(t('db.labelsInUse', 'That label is in use — reopen Labels and try again'), 'err'); return }
           if (!res.ok) throw new Error('delete failed')
           window.hibana && window.hibana.toast(t('db.labelsDeleted', 'Label deleted'), 'ok')
           refresh()

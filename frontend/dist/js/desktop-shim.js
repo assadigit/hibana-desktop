@@ -19,7 +19,17 @@
 //   3. window.hibana.toast — the app.js toast component contract (app.js:243-323 @
 //      e6661c8), reimplemented 1:1 as WEB TOASTS (identical in WebView2 —
 //      UI-UX-REPLICATION-SPEC.md §7.2). ZERO network use.
-//   4. window.__hibanaPage — the minimal page-lifecycle consumer (mount + ctx.on),
+//   4. window.hibana.confirm — the S210 design-system confirm modal (app.js:339-400),
+//      ported 1:1. v0.1.29 (S232): the island's five S210 confirm call sites — devboard.js's
+//      task-editor delete (:1236) + label merge (:1465) + label delete (S232, :1485)
+//      and board-page.js's archive-done/clear-done (:834/:853) — had NO
+//      implementation here since the S210 round (app.js is stripped by §3.2, the
+//      shim only carried toast), so every 'await window.hibana.confirm(...)' threw
+//      "not a function" and the action died silently. The markup/classes are the
+//      web modal's own (.hib-confirm-overlay/-card/is-danger/[data-hib-confirm]) —
+//      components.css ships those styles in the island already, so it renders
+//      identically; labels resolve through the island's i18n dict (EN fallbacks).
+//   5. window.__hibanaPage — the minimal page-lifecycle consumer (mount + ctx.on),
 //      ported verbatim from nav.js:24-54 + boot.js:185-208, BECAUSE guide §3.2 strips
 //      nav.js, boot.js AND vendor/alpine.min.js — the only three owners of that
 //      contract in the web app. board-page.js registers its page def through
@@ -297,7 +307,82 @@
     document.body.appendChild(el)
     if (ms > 0) setTimeout(() => { if (el.parentNode) el.remove() }, ms)
   }
-  window.hibana = { toast }
+  // ------------------------------------------------ window.hibana.confirm
+  // The S210 design-system confirm modal, ported 1:1 from app.js:339-400 (see the
+  // header's item 4 for WHY the island needs it here). Contract (identical):
+  //   confirm(message, { title?, danger?, confirmLabel?, cancelLabel? }) -> Promise<boolean>
+  // One overlay at a time (a second call supersedes — the first resolves false);
+  // Escape cancels, Enter confirms, backdrop click cancels; message + labels are
+  // escaped (they render as text, never HTML); the danger grammar paints the OK
+  // button in the danger palette. The styles are the island's OWN components.css
+  // (.hib-confirm-* — byte-identical to the web modal, WebView2 renders it as-is).
+  var escText = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    })
+  }
+  var hibLabel = function (key, fb) {
+    try {
+      var v = window.hibanaI18n && typeof window.hibanaI18n.t === 'function' ? window.hibanaI18n.t(key) : null
+      return v && v !== key ? v : fb
+    } catch (e) { return fb }
+  }
+  var confirmOverlay = null
+  function confirm(message, opts) {
+    var o = opts || {}
+    var title = o.title ? escText(o.title) : ''
+    var confirmLabel = o.confirmLabel ? escText(o.confirmLabel) : (o.danger ? hibLabel('common.delete', 'Delete') : hibLabel('common.ok', 'OK'))
+    var cancelLabel = o.cancelLabel ? escText(o.cancelLabel) : hibLabel('common.cancel', 'Cancel')
+    if (confirmOverlay) {
+      if (confirmOverlay._resolve) confirmOverlay._resolve(false)
+      confirmOverlay.remove()
+      confirmOverlay = null
+    }
+    return new Promise(function (resolve) {
+      var overlay = document.createElement('div')
+      overlay.className = 'hib-confirm-overlay'
+      overlay.setAttribute('role', 'dialog')
+      overlay.setAttribute('aria-modal', 'true')
+      overlay.setAttribute('aria-labelledby', title ? 'hib-confirm-title' : 'hib-confirm-msg')
+      var card = document.createElement('div')
+      card.className = 'hib-confirm-card' + (o.danger ? ' is-danger' : '')
+      var iconSvg = o.danger
+        ? '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
+        : '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>'
+      card.innerHTML =
+        (title ? '<h2 class="hib-confirm-title" id="hib-confirm-title">' + iconSvg + title + '</h2>' : '') +
+        '<p class="hib-confirm-message" id="hib-confirm-msg">' + escText(message) + '</p>' +
+        '<div class="hib-confirm-actions">' +
+          '<button type="button" class="ghost" data-hib-confirm="cancel">' + cancelLabel + '</button>' +
+          '<button type="button" data-hib-confirm="ok">' + confirmLabel + '</button>' +
+        '</div>'
+      if (o.danger) {
+        var okBtn = card.querySelector('[data-hib-confirm="ok"]')
+        if (okBtn) { okBtn.className = 'ghost danger'; okBtn.style.background = ''; okBtn.style.color = '' }
+      }
+      overlay.appendChild(card)
+      document.body.appendChild(overlay)
+      confirmOverlay = overlay
+      overlay._resolve = function (val) { resolve(val); confirmOverlay = null }
+      var close = function (val) {
+        if (!overlay.parentNode) return
+        overlay._resolve(val)
+        overlay.remove()
+      }
+      card.querySelector('[data-hib-confirm="cancel"]').addEventListener('click', function () { close(false) })
+      card.querySelector('[data-hib-confirm="ok"]').addEventListener('click', function () { close(true) })
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false) })
+      overlay.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false) }
+        else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); close(true) }
+      })
+      requestAnimationFrame(function () {
+        var focusTarget = card.querySelector('[data-hib-confirm="ok"]')
+        if (focusTarget) focusTarget.focus()
+      })
+    })
+  }
+  window.hibana = { toast: toast, confirm: confirm }
 
   // ----------------------------------------------------- window.__hibanaPage
   // The minimal mount consumer (see the header WHY). The contract below is nav.js's

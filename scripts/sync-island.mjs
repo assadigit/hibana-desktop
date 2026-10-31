@@ -82,8 +82,19 @@ import { fileURLToPath } from 'node:url'
 // row), 56px lane headers, 14px board titles, one lane-tinted 40px Add-task recipe,
 // 120px @ 0.70/0.78 empty-state art. Only devboard.css changed (v37) in the manifest —
 // board-page.js and every seam/anchor string are byte-identical to the S230 pin.
-const PIN_REF = '6037d8f'
-const PIN_PACKAGE_VERSION = '0.4.1.39'
+// S232 (delete any label): the pin moved to 2157a33 (web v0.4.1.40) — the labels
+// dialog's ✕ rides every row now (a used label confirms + DELETE ?force=1 cascades
+// the unlink server-side); devboard.js v30 / i18n-en v103 / i18n-fa v97 / board-page
+// v25 / sprint-page v22 / project-page v78 / i18n v156 are the cache-busted surfaces.
+// The label-DELETE seam patch was RE-RECORDED (the find-string grew the force
+// expression), the shim-insert anchor moved to devboard.js?v=30, and — the round's
+// desktop-owned addition — the shim now owns window.hibana.confirm (app.js is stripped
+// by §3.2, so the island's four S210 confirm call sites — task-editor delete, label
+// merge, label delete, archive/clear-done — had NO implementation on the desktop and
+// threw silently; the markup rides the island's own components.css .hib-confirm-*
+// styles, byte-identical to the web modal).
+const PIN_REF = '2157a33'
+const PIN_PACKAGE_VERSION = '0.4.1.40'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -286,7 +297,7 @@ const HTML_STRIP_LINES = [
 const HTML_INSERT = {
   name: 'insert /js/desktop-shim.js before devboard.js',
   cite: 'guide §3.2 + §4.3',
-  anchor: '<script src="/js/devboard.js?v=29" defer></script>',
+  anchor: '<script src="/js/devboard.js?v=30" defer></script>',
   insert: '<script src="/js/desktop-shim.js"></script>',
 }
 
@@ -1306,10 +1317,12 @@ const SEAM_PATCHES = [
     replace: "const res = await window.hibanaFetch('/api/tags/' + id + '/merge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ into: into }) })",
   },
   {
+    // S232 (delete any label): the DELETE grew the force expression — a USED label
+    // rides ?force=1 (the confirm dialog's cascade request); unused stays bare.
     file: 'js/devboard.js',
-    name: 'label manager: DELETE unused tag — devboard.js:1390 (guide §4.1 site 6)',
-    find: "const res = await fetch('/api/tags/' + id, { method: 'DELETE' })",
-    replace: "const res = await window.hibanaFetch('/api/tags/' + id, { method: 'DELETE' })",
+    name: 'label manager: DELETE tag (+?force=1 when used) — devboard.js:1488 (S232; guide §4.1 site 6)',
+    find: "const res = await fetch('/api/tags/' + id + (used ? '?force=1' : ''), { method: 'DELETE' })",
+    replace: "const res = await window.hibanaFetch('/api/tags/' + id + (used ? '?force=1' : ''), { method: 'DELETE' })",
   },
   {
     // XHR site 1 of 2 — the raw-bytes upload path (S208 uploader). Unique context: the
@@ -1400,7 +1413,17 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
 //   3. window.hibana.toast — the app.js toast component contract (app.js:243-323 @
 //      e6661c8), reimplemented 1:1 as WEB TOASTS (identical in WebView2 —
 //      UI-UX-REPLICATION-SPEC.md §7.2). ZERO network use.
-//   4. window.__hibanaPage — the minimal page-lifecycle consumer (mount + ctx.on),
+//   4. window.hibana.confirm — the S210 design-system confirm modal (app.js:339-400),
+//      ported 1:1. v0.1.29 (S232): the island's five S210 confirm call sites — devboard.js's
+//      task-editor delete (:1236) + label merge (:1465) + label delete (S232, :1485)
+//      and board-page.js's archive-done/clear-done (:834/:853) — had NO
+//      implementation here since the S210 round (app.js is stripped by §3.2, the
+//      shim only carried toast), so every 'await window.hibana.confirm(...)' threw
+//      "not a function" and the action died silently. The markup/classes are the
+//      web modal's own (.hib-confirm-overlay/-card/is-danger/[data-hib-confirm]) —
+//      components.css ships those styles in the island already, so it renders
+//      identically; labels resolve through the island's i18n dict (EN fallbacks).
+//   5. window.__hibanaPage — the minimal page-lifecycle consumer (mount + ctx.on),
 //      ported verbatim from nav.js:24-54 + boot.js:185-208, BECAUSE guide §3.2 strips
 //      nav.js, boot.js AND vendor/alpine.min.js — the only three owners of that
 //      contract in the web app. board-page.js registers its page def through
@@ -1678,7 +1701,82 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
     document.body.appendChild(el)
     if (ms > 0) setTimeout(() => { if (el.parentNode) el.remove() }, ms)
   }
-  window.hibana = { toast }
+  // ------------------------------------------------ window.hibana.confirm
+  // The S210 design-system confirm modal, ported 1:1 from app.js:339-400 (see the
+  // header's item 4 for WHY the island needs it here). Contract (identical):
+  //   confirm(message, { title?, danger?, confirmLabel?, cancelLabel? }) -> Promise<boolean>
+  // One overlay at a time (a second call supersedes — the first resolves false);
+  // Escape cancels, Enter confirms, backdrop click cancels; message + labels are
+  // escaped (they render as text, never HTML); the danger grammar paints the OK
+  // button in the danger palette. The styles are the island's OWN components.css
+  // (.hib-confirm-* — byte-identical to the web modal, WebView2 renders it as-is).
+  var escText = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    })
+  }
+  var hibLabel = function (key, fb) {
+    try {
+      var v = window.hibanaI18n && typeof window.hibanaI18n.t === 'function' ? window.hibanaI18n.t(key) : null
+      return v && v !== key ? v : fb
+    } catch (e) { return fb }
+  }
+  var confirmOverlay = null
+  function confirm(message, opts) {
+    var o = opts || {}
+    var title = o.title ? escText(o.title) : ''
+    var confirmLabel = o.confirmLabel ? escText(o.confirmLabel) : (o.danger ? hibLabel('common.delete', 'Delete') : hibLabel('common.ok', 'OK'))
+    var cancelLabel = o.cancelLabel ? escText(o.cancelLabel) : hibLabel('common.cancel', 'Cancel')
+    if (confirmOverlay) {
+      if (confirmOverlay._resolve) confirmOverlay._resolve(false)
+      confirmOverlay.remove()
+      confirmOverlay = null
+    }
+    return new Promise(function (resolve) {
+      var overlay = document.createElement('div')
+      overlay.className = 'hib-confirm-overlay'
+      overlay.setAttribute('role', 'dialog')
+      overlay.setAttribute('aria-modal', 'true')
+      overlay.setAttribute('aria-labelledby', title ? 'hib-confirm-title' : 'hib-confirm-msg')
+      var card = document.createElement('div')
+      card.className = 'hib-confirm-card' + (o.danger ? ' is-danger' : '')
+      var iconSvg = o.danger
+        ? '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
+        : '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>'
+      card.innerHTML =
+        (title ? '<h2 class="hib-confirm-title" id="hib-confirm-title">' + iconSvg + title + '</h2>' : '') +
+        '<p class="hib-confirm-message" id="hib-confirm-msg">' + escText(message) + '</p>' +
+        '<div class="hib-confirm-actions">' +
+          '<button type="button" class="ghost" data-hib-confirm="cancel">' + cancelLabel + '</button>' +
+          '<button type="button" data-hib-confirm="ok">' + confirmLabel + '</button>' +
+        '</div>'
+      if (o.danger) {
+        var okBtn = card.querySelector('[data-hib-confirm="ok"]')
+        if (okBtn) { okBtn.className = 'ghost danger'; okBtn.style.background = ''; okBtn.style.color = '' }
+      }
+      overlay.appendChild(card)
+      document.body.appendChild(overlay)
+      confirmOverlay = overlay
+      overlay._resolve = function (val) { resolve(val); confirmOverlay = null }
+      var close = function (val) {
+        if (!overlay.parentNode) return
+        overlay._resolve(val)
+        overlay.remove()
+      }
+      card.querySelector('[data-hib-confirm="cancel"]').addEventListener('click', function () { close(false) })
+      card.querySelector('[data-hib-confirm="ok"]').addEventListener('click', function () { close(true) })
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false) })
+      overlay.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false) }
+        else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); close(true) }
+      })
+      requestAnimationFrame(function () {
+        var focusTarget = card.querySelector('[data-hib-confirm="ok"]')
+        if (focusTarget) focusTarget.focus()
+      })
+    })
+  }
+  window.hibana = { toast: toast, confirm: confirm }
 
   // ----------------------------------------------------- window.__hibanaPage
   // The minimal mount consumer (see the header WHY). The contract below is nav.js's
@@ -5317,6 +5415,25 @@ function verifyDist(outDir, fileMap) {
   if (!shimJs.includes('bridge(self._id, self._method')) problems.push('js/desktop-shim.js: the Upload call must carry the callID (progress correlation key) first')
   if (!shimJs.includes("EventsOn('hibana:upload-progress'")) problems.push('js/desktop-shim.js: the hibana:upload-progress listener is missing')
   if (!shimJs.includes('lengthComputable: true')) problems.push('js/desktop-shim.js: the synthetic progress event must be lengthComputable (the uploader gates on it)')
+
+  // (1c) THE S232 CONFIRM MODAL (the round's desktop-owned addition): the shim must
+  // OWN window.hibana.confirm — the island's five S210 call sites (devboard.js's
+  // task-editor delete + label merge + the new label delete, board-page.js's
+  // archive-done/clear-done) depend on it, and the web's app.js that owns it on the
+  // web is stripped by §3.2. Without it every confirm await threw "not a function"
+  // and the action died silently.
+  if (!shimJs.includes('window.hibana = { toast: toast, confirm: confirm }')) problems.push('js/desktop-shim.js: window.hibana must carry the confirm implementation (S232)')
+  if (!shimJs.includes('data-hib-confirm="ok"') || !shimJs.includes('data-hib-confirm="cancel"')) problems.push('js/desktop-shim.js: the confirm modal actions are missing')
+  if (!shimJs.includes('hib-confirm-overlay') || !shimJs.includes('is-danger')) problems.push('js/desktop-shim.js: the confirm modal must ride the web .hib-confirm-* grammar (components.css ships it)')
+  if (!shimJs.includes("hibLabel('common.delete', 'Delete')")) problems.push('js/desktop-shim.js: the danger confirm label must resolve through the island i18n (EN fallback)')
+
+  // (1d) THE S232 DELETE-ANY-LABEL round on the island side: the ✕ rides every row,
+  // the used-delete confirm exists, and the DELETE carries the force expression
+  // (the re-recorded seam patch above rewrote it to hibanaFetch — the count gate (1)
+  // still expects exactly 7).
+  if (!devboard.includes('db.labelsDelConfirm')) problems.push('js/devboard.js: the S232 used-label delete confirm is missing')
+  if (!devboard.includes("(used ? '?force=1' : '')")) problems.push('js/devboard.js: the S232 force-delete expression is missing')
+  if (count(devboard, 'data-lbl-del') < 2) problems.push('js/devboard.js: the delete affordance must render on the row template AND wire the handler')
 
   // (2) the HTML adaptation (guide §3.2)
   for (const banned of ['htmx', 'idiomorph', 'boot.js', 'app.js', 'hib-init', 'touch-drag', 'nav.js', 'command-palette',

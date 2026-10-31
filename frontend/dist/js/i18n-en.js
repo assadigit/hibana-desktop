@@ -808,11 +808,11 @@ window.__hibanaDictEN = {
       'cmdk.notes': 'Notes',
       // S62: the vault group (long-form notes) — خزانه, the safe.
       'cmdk.vault': 'Vault',
-      // S30 batch 4: the label manager
-      'db.labelsTitle': 'Labels', 'db.labelsHint': 'Rename merges onto an existing name; colors are yours to pick; unused labels can be deleted.',
+      // S30 batch 4: the label manager (S232: delete-everywhere — a used label confirms + force-deletes)
+      'db.labelsTitle': 'Labels', 'db.labelsHint': 'Rename merges onto an existing name; colors are yours to pick; deleting a used label removes it from its tasks.',
       'db.labelsName': 'Label name', 'db.labelsColor': 'Recolor', 'db.labelsMerge': 'Merge into…', 'db.labelsMergePh': 'merge into…',
       'db.labelsMergeConfirm': 'Merge this label into {name}? Every link moves.', 'db.labelsMerged': 'Merged into the existing label',
-      'db.labelsDel': 'Delete unused label', 'db.labelsDeleted': 'Label deleted', 'db.labelsEmpty': 'No labels yet — add one from a task.',
+      'db.labelsDel': 'Delete label', 'db.labelsDelTitle': 'Delete label', 'db.labelsDelConfirm': 'Delete "{name}"? It is used by {n} tasks — the label will be removed from those tasks.', 'db.labelsInUse': 'That label is in use — reopen Labels and try again', 'db.labelsDeleted': 'Label deleted', 'db.labelsEmpty': 'No labels yet — add one from a task.',
       'db.labelsCreate': 'Create', 'db.labelsCreatePh': 'New label name…', 'db.labelsCreated': 'Label created', 'db.labelsExists': 'A label with that name already exists',
       'db.usedTimes': 'used {n}×',
       // S30 batch 3: reports task analytics + the dashboard urgent strip
