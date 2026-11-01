@@ -176,6 +176,7 @@ const JS_FILES = [
   'js/devboard.js',        // v29 (v0.4.1.37) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked()
   'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
   'js/board-page.js',      // v24 (v0.4.1.38) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion (inline EN fallbacks, solid ⋯ dots)
+  'js/sprint-page.js',     // v22 (v0.4.1.40) — the /sprint.html page; the S235 embed (the owner ask: "When clicking on sprints, the app becomes problematic" — the sprint link 404'd on the desktop because sprint.html was never in the island). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
   'js/i18n-en.js',         // v102 (v0.4.1.38) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign empty-state / menu / helper keys
   'js/i18n.js',            // v155 (v0.4.1.37) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below)
   'js/i18n-fa.js',         // v96 (v0.4.1.38) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA empty-state / menu / helper keys
@@ -1302,6 +1303,132 @@ function adaptBoardHtml(html) {
       log.push('inserted: ' + op.name)
     }
   }
+  return { html: lines.join('\n'), log }
+}
+
+// ---------------------------------------------------------------------------
+// S235 (the owner ask: "When clicking on sprints, the app becomes problematic.
+// fix it please." — the screenshot: wails.localhost/sprint.html?project=... returns
+// HTTP 404). The desktop island embedded ONLY board.html; the sprint timeline page
+// (sprint.html) was never in the island, so the board's "Sprints" link (board-page.js:
+// `#db-sprint-link`.href = '/sprint.html?project=' + projectId) 404'd on every click.
+//
+// THE FIX: embed sprint.html in the island alongside index.html. sprint-page.js (the
+// page logic) uses window.HibanaBoard (devboard.js — already in the island) for ALL
+// data access — ZERO direct fetch() calls (verified: grep returns nothing). So the
+// page works with a MINIMAL desktop-owned chain: the shim (for hibanaFetch), audio
+// (for sound cues), theme (for light/dark), and the login gate (for unauthed boot).
+// The board-specific desktop UI (sync button, logout, newproject, refresh, update,
+// settings — all anchor on board toolbar markup that sprint.html does not have) is
+// NOT injected; the sprint page has its OWN toolbar (back-link, title, time-nav,
+// zoom, board-link, define-sprint, finish-sprint).
+//
+// The strip ops are IDENTICAL to board.html's HTML_STRIP_LINES — sprint.html@pin
+// carries the SAME web-chrome scripts (htmx, idiomorph, boot, alpine, app, hib-init,
+// touch-drag, nav, command-palette, mobile-nav, zen-mode, micro-interactions, go-to)
+// AND the same page-loader div + nav div. The insert ops anchor on elements sprint.html
+// ALSO carries (the devboard.js tag, the manrope link, the viewport meta, <body>).
+// ---------------------------------------------------------------------------
+const SPRINT_INSERTS = [
+  // The favicon (sprint.html has no favicon link — same as board.html pre-op).
+  {
+    name: 'insert /icon.svg favicon link after the viewport meta (sprint page)',
+    anchor: '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    insert: '  <link rel="icon" type="image/svg+xml" href="/icon.svg">',
+    position: 'after',
+  },
+  // desktop-login.css — the login gate's styles (rides the manrope sheet, same as board).
+  {
+    name: 'insert /css/desktop-login.css after the manrope font sheet (sprint page)',
+    anchor: '<link rel="stylesheet" href="/vendor/manrope/font-face.css">',
+    insert: '  <link rel="stylesheet" href="/css/desktop-login.css?v=2">',
+    position: 'after',
+  },
+  // The desktop-owned script block — inserted BEFORE devboard.js (the same contract
+  // as board.html: the shim MUST evaluate before the deferred island scripts). The
+  // theme script is FIRST (pre-paint theme resolution), then the shim (hibanaFetch +
+  // __hibanaPage + hibana toast/confirm), then audio (wraps hibanaFetch for cues),
+  // then login (the auth gate controller). board-page.js is NOT here — sprint.html
+  // loads sprint-page.js instead (from its own body <script> tag, kept verbatim).
+  {
+    name: 'insert the desktop-owned script block (theme + shim + audio + login) before devboard.js (sprint page)',
+    anchor: '<script src="/js/devboard.js?v=31" defer></script>',
+    insert: '<script src="/js/desktop-theme.js"></script>\n<script src="/js/desktop-shim.js"></script>\n<script src="/js/desktop-audio.js"></script>\n<script src="/js/desktop-login.js"></script>',
+    position: 'before',
+  },
+  // The login gate markup — same as board.html (anchors on <body>).
+  {
+    name: 'insert the login gate markup after <body> (sprint page)',
+    anchor: '<body>',
+    insert: HTML_LOGIN_GATE,
+    position: 'after',
+  },
+]
+
+// The cross-page link interceptor: sprint.html's "Back to project" link points to
+// /project.html?id=... and the "Plan" buttons point to /project.html?id=...&sprint=...
+// — neither page is in the island (project.html has its own huge JS/CSS/vendor graph).
+// On the desktop, these links would 404. This inline script catches clicks on ANY
+// link whose href starts with /project.html, /projects.html, /login.html, /reset.html,
+// /signup.html — prevents the navigation, and redirects to /kanban (the board, which
+// IS in the island). A toast explains the redirect so the user understands why they
+// didn't land on the project page. This keeps the sprint page self-contained without
+// expanding the island's surface area to project.html.
+const SPRINT_LINK_INTERCEPTOR = [
+  '<script>',
+  '(function(){',
+  '  document.addEventListener("click",function(e){',
+  '    var a=e.target.closest("a[href]");if(!a)return;',
+  '    var h=a.getAttribute("href")||"";',
+  '    if(h.indexOf("/project.html")===0||h.indexOf("/projects.html")===0||h.indexOf("/login.html")===0||h.indexOf("/reset.html")===0||h.indexOf("/signup.html")===0){',
+  '      e.preventDefault();e.stopPropagation();',
+  '      if(window.hibana&&window.hibana.toast){window.hibana.toast("The project detail page is on hibana.ir — returning to the board.","info",4000)}',
+  '      setTimeout(function(){window.location.href="/kanban"+(window.location.search||"")},300)',
+  '    }',
+  '  })',
+  '})();',
+  '</script>',
+].join('\n')
+
+function generateSprintHtml(html) {
+  const lines = html.split('\n')
+  const log = []
+  // Strip: the SAME web-chrome lines as board.html (verified identical between
+  // board.html@pin and sprint.html@pin — same ?v= numbers, same line text).
+  for (const op of HTML_STRIP_LINES) {
+    const hits = lines.filter((l) => l.trim() === op.line)
+    if (hits.length !== 1) {
+      fail('SPRINT HTML op "' + op.name + '" (' + op.cite + ') matched ' + hits.length +
+        ' lines (expected exactly 1) at ref ' + PIN_REF + ' — sprint.html drifted; re-record the op in sync-island.mjs.')
+    }
+    const idx = lines.findIndex((l) => l.trim() === op.line)
+    lines.splice(idx, 1)
+    log.push('stripped : [sprint] ' + op.name)
+  }
+  // Insert: the sprint-specific ops (favicon, login css, desktop script block, gate).
+  for (const op of SPRINT_INSERTS) {
+    const hits = lines.map((l, i) => (l.includes(op.anchor) ? i : -1)).filter((i) => i !== -1)
+    if (hits.length !== 1) {
+      fail('SPRINT HTML op "' + op.name + '": anchor found ' + hits.length +
+        ' times (expected exactly 1) at ref ' + PIN_REF + ' — sprint.html drifted; re-record the op in sync-island.mjs.')
+    }
+    // position: 'before' (default) inserts AT the anchor index (pushing it down —
+    // used for the desktop script block, which must load BEFORE devboard.js);
+    // position: 'after' inserts at anchor+1 (used for the favicon, the login css,
+    // and the login gate markup).
+    const insertAt = op.position === 'after' ? hits[0] + 1 : hits[0]
+    lines.splice(insertAt, 0, op.insert)
+    log.push('inserted: [sprint] ' + op.name)
+  }
+  // Insert: the cross-page link interceptor — right before </body> (the last thing
+  // the page loads, so it catches all link clicks after the DOM is ready). sprint.html
+  // has a single </body> tag at the end.
+  const bodyCloseIdx = lines.findIndex((l) => l.trim() === '</body>')
+  if (bodyCloseIdx === -1 || lines.filter((l) => l.trim() === '</body>').length !== 1) {
+    fail('SPRINT HTML op "insert the cross-page link interceptor before </body>": </body> tag not found (or not unique) at ref ' + PIN_REF + ' — sprint.html drifted.')
+  }
+  lines.splice(bodyCloseIdx, 0, SPRINT_LINK_INTERCEPTOR)
+  log.push('inserted: [sprint] the cross-page link interceptor (catches /project.html + /projects.html + /login.html etc. → /kanban)')
   return { html: lines.join('\n'), log }
 }
 
@@ -5546,6 +5673,7 @@ function verifyDist(outDir, fileMap) {
   const devboard = fileMap['js/devboard.js']
   const boardPage = fileMap['js/board-page.js']
   const indexHtml = fileMap['index.html']
+  const sprintHtml = fileMap['sprint.html'] || ''
   const devboardCss = fileMap['css/devboard.css'] || ''
 
   // (1z) THE UI-REDESIGN ISLAND SET (hibana-kanban-ui-redesign-handoff @ 073bb95 —
@@ -5657,6 +5785,42 @@ function verifyDist(outDir, fileMap) {
   for (const kept of ['id="db-toolbar"', 'id="db-loading"', 'id="db-board"', 'data-i18n="db.board"', 'data-i18n="db.backToProject"',
     'js/i18n-en.js', 'js/i18n.js', 'vendor/jalaali.min.js', 'js/chip-render.js', 'vendor/general-sans/GeneralSans-400.woff2']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: kept markup/manifest missing "' + kept + '"')
+  }
+
+  // (2s) S235 — the sprint.html embed: the SAME strip discipline (no web-chrome) +
+  // the MINIMAL desktop-owned chain (theme + shim + audio + login) + the login gate +
+  // the cross-page link interceptor. sprint.html does NOT carry the board-specific
+  // desktop UI (sync/logout/newproject/refresh/update/settings) — its own toolbar
+  // (back-link, time-nav, zoom, board-link, define-sprint, finish-sprint) is kept
+  // verbatim from the pin.
+  if (!sprintHtml) {
+    problems.push('sprint.html: missing from dist (the S235 sprint-page embed — the owner ask: "When clicking on sprints, the app becomes problematic")')
+  } else {
+    for (const banned of ['htmx', 'idiomorph', 'boot.js', 'app.js', 'hib-init', 'touch-drag', 'nav.js', 'command-palette',
+      'mobile-nav', 'zen-mode', 'micro-interactions', 'go-to.js', 'alpine', 'hibana-page-loader', 'data-nav']) {
+      if (sprintHtml.includes(banned)) problems.push('sprint.html still references stripped chrome: "' + banned + '"')
+    }
+    for (const kept of [
+      'js/desktop-theme.js', 'js/desktop-shim.js', 'js/desktop-audio.js', 'js/desktop-login.js',
+      'css/desktop-login.css', 'js/sprint-page.js', 'js/devboard.js',
+      'id="login-gate"', 'id="login-gate-form"', 'class="auth-split"',
+      'id="sp-wrap"', 'id="sp-timeline"', 'id="sp-new-sprint"',
+      'rel="icon" type="image/svg+xml" href="/icon.svg"',
+      'The project detail page is on hibana.ir', // the cross-page link interceptor's toast
+    ]) {
+      if (!sprintHtml.includes(kept)) problems.push('sprint.html: the S235 embed is missing "' + kept + '"')
+    }
+    // The blocking head chain for sprint: theme → shim → audio → login → devboard
+    // (sprint-page.js is in the body, not the head — same as board-page.js in board.html).
+    const spThemeIdx = sprintHtml.indexOf('/js/desktop-theme.js')
+    const spShimIdx = sprintHtml.indexOf('/js/desktop-shim.js')
+    const spAudioIdx = sprintHtml.indexOf('/js/desktop-audio.js')
+    const spLoginIdx = sprintHtml.indexOf('/js/desktop-login.js')
+    const spDevIdx = sprintHtml.indexOf('/js/devboard.js')
+    if (!(spThemeIdx !== -1 && spShimIdx !== -1 && spAudioIdx !== -1 && spLoginIdx !== -1 && spDevIdx !== -1 &&
+        spThemeIdx < spShimIdx && spShimIdx < spAudioIdx && spAudioIdx < spLoginIdx && spLoginIdx < spDevIdx)) {
+      problems.push('sprint.html: desktop-theme.js → desktop-shim.js → desktop-audio.js → desktop-login.js → devboard.js order broken (got indices ' + spThemeIdx + '/' + spShimIdx + '/' + spAudioIdx + '/' + spLoginIdx + '/' + spDevIdx + ')')
+    }
   }
   // The login gate (guide §5.5): the markup + both desktop-owned files must be
   // exactly what this script generates — a hand-edit anywhere in the chain fails here.
@@ -6167,6 +6331,7 @@ function main() {
   const blobs = {} // rel -> Buffer (verbatim copies)
   for (const rel of COPY_MANIFEST) blobs[rel] = gitShow(src, PIN_REF, rel)
   const boardHtmlRaw = gitShow(src, PIN_REF, 'board.html')
+  const sprintHtmlRaw = gitShow(src, PIN_REF, 'sprint.html') // S235: the sprint timeline page joins the island
 
   // Patchable files as utf8 strings (the patches are exact recorded replaces).
   // css/devboard.css joins the utf8 map VERBATIM (no patches) — verifyDist's
@@ -6177,6 +6342,11 @@ function main() {
   // The HTML adaptation (guide §3.2).
   const adapted = adaptBoardHtml(boardHtmlRaw.toString('utf8'))
   fileMap['index.html'] = adapted.html
+
+  // S235: the sprint page adaptation (same strip discipline + a MINIMAL desktop-owned
+  // chain — theme + shim + audio + login + the cross-page link interceptor).
+  const sprintAdapted = generateSprintHtml(sprintHtmlRaw.toString('utf8'))
+  fileMap['sprint.html'] = sprintAdapted.html
 
   // The seam patches (guide §4.1/§4.2) — copies only, never the source.
   const patchLog = applySeamPatches(fileMap)
@@ -6229,9 +6399,10 @@ function main() {
 
   // Report.
   for (const line of adapted.log) process.stdout.write('  ' + line + '\n')
+  for (const line of sprintAdapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
-  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + js/desktop-shim.js + js/desktop-audio.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + js/desktop-update.js + css/desktop-update.css + js/desktop-settings.js + css/desktop-settings.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the seven synthesized cues + the seam observer (S234: archive + create cues + the collection-path classifier — archive-done, create-task/sprint/category, restore-archived-task, delete-archived-task, delete-category, restore-project), the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines) + the v0.1.19 test-connection button (TestGithubConnection, the typed/saved/anonymous verdict lines, the private-repo signal) + the apply-failure release-page note (#db-update-fallback, the pageOpened flag, both language pairs), no-storage), no-404 asset loop, node --check\n')
+  process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + sprint.html (S235) + js/desktop-shim.js + js/desktop-audio.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + js/desktop-update.js + css/desktop-update.css + js/desktop-settings.js + css/desktop-settings.css + icon.svg + web-ref.json\n')
+  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the seven synthesized cues + the seam observer (S234: archive + create cues + the collection-path classifier — archive-done, create-task/sprint/category, restore-archived-task, delete-archived-task, delete-category, restore-project), the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines) + the v0.1.19 test-connection button (TestGithubConnection, the typed/saved/anonymous verdict lines, the private-repo signal) + the apply-failure release-page note (#db-update-fallback, the pageOpened flag, both language pairs), no-storage), no-404 asset loop, S235 sprint.html embed (the strip ops + the desktop-owned chain + the cross-page link interceptor), node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }
