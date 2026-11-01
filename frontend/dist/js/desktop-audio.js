@@ -1,14 +1,20 @@
 // desktop-audio.js — the sound round (v0.1.13 — the owner ask: "I want some
 // sound engineering, some modern, futurist and low-key sounds. for this:
 // 1. when you login. 2. when you delete a task 3. when you fulfill a tasks
-// 4. when you move a task to another state 5. when syncing complete").
+// 4. when you move a task to another state 5. when syncing complete";
+// S234 (the owner ask: "Make sure all important interactions in hibana desktop
+// have sound. for example currently for archiving tasks (after done) there is
+// no sound") extended the surface to seven cues + the collection-path
+// mutations the v0.1.13 single-segment regex never saw — archive-done,
+// create-task/sprint/category, restore-archived-task, delete-archived-task,
+// delete-category, restore-project.
 // GENERATED FILE — do not hand-edit (guide §3.3.4): emitted by scripts/sync-island.mjs
 // into frontend/dist/js/ and checksummed in frontend/island.checksums.json.
 // Loads blocking, right AFTER desktop-shim.js (it wraps the seam the shim
 // just defined) and BEFORE every deferred island script.
 //
 // WHAT THIS FILE OWNS (the desktop-owned sound layer):
-//   1. window.hibanaAudio.play(name) — the five cues, synthesized live via
+//   1. window.hibanaAudio.play(name) — the seven cues, synthesized live via
 //      the Web Audio API (WebView2 = Chromium; window.AudioContext always
 //      exists there). NO audio files ship: every sound is a few oscillator
 //      voices + envelopes, so the whole engine is ~5KB of text and nothing
@@ -32,6 +38,16 @@
 //        sync    — the all-clear: a stacked-fifth arpeggio A4 -> E5 -> B5
 //                  with a glassy E6 tail over an A3 bed (~1.1s; the sonic
 //                  twin of the green "Everything synced" panel).
+//        archive — the drawer settle (S234): a descending fifth E5 -> A4 over
+//                  a soft A3 bed with a gentle band-passed puff tail (~0.55s;
+//                  the sound of something being put away — never a delete's
+//                  thock, never a fulfill's ding; the "Archive done tasks"
+//                  POST /api/projects/:id/devtasks/archive-done fires it).
+//        create  — the spark (S234): an ascending fifth A4 -> E5 with a high
+//                  E6 sparkle over a soft A3 bed (~0.45s; bright but brief —
+//                  distinct from fulfill's longer ding; a new task, sprint, or
+//                  category POST /api/projects/:id/{devtasks,sprints,categories}
+//                  fires it).
 //   2. The task-action OBSERVER on the transport seam: it wraps
 //      window.hibanaFetch (the shim's ONE seam — every task mutation the
 //      island makes crosses it) and classifies BEFORE the call (the island
@@ -46,15 +62,34 @@
 //        (a PATCH whose status equals the current status — the editor's
 //        every-save resend — is a plain edit and stays silent; same-name
 //        cues within 150ms coalesce, so "Clear done" sounds ONCE).
+//        — S234: the collection-path mutations the v0.1.13 single-segment
+//        regex never matched. The owner's example — "archiving tasks (after
+//        done) there is no sound" — crosses the seam as POST
+//        /api/projects/:id/devtasks/archive-done, which the original regex
+//        never saw. The rest of the kanban's mutation surface is classified
+//        by path shape + method, never inspecting the body (these calls are
+//        idempotent by shape — a POST archive-done is always an archive):
+//        POST   /api/projects/:id/devtasks/archive-done       -> 'archive'
+//        POST   /api/projects/:id/devtasks                    -> 'create'  (new task)
+//        POST   /api/projects/:id/sprints                     -> 'create'  (new sprint)
+//        POST   /api/projects/:id/categories                  -> 'create'  (new category)
+//        POST   /api/projects/:id/archives/:aid/restore       -> 'fulfill' (reuse — restore is a positive)
+//        POST   /api/projects/:id/restore                     -> 'fulfill' (reuse — restore archived project)
+//        DELETE /api/projects/:id/archives/:aid               -> 'delete'  (reuse — archived task delete)
+//        DELETE /api/projects/:id/categories/:cid             -> 'delete'  (reuse — category delete)
+//        (a query string is stripped before matching — the S232 label-delete
+//        ?force=1 cascade stays classified; the 150ms coalesce still wins
+//        when a bulk "Clear done" fires many DELETEs in a Promise.all loop.)
 //   3. The gesture unlock: Chromium gates audio behind a user activation —
 //      the first pointerdown/keydown warms the context (resume()), and
-//      every play() re-checks it; all five call sites inherently follow a
-//      real gesture (submit, confirm, drag, the Sync click).
+//      every play() re-checks it; all seven call sites inherently follow a
+//      real gesture (submit, confirm, drag, the Sync click, the Archive/Clear
+//      menu confirm, the Add-task save).
 //
 // WHAT IT MUST NEVER OWN: no island bytes (the wrapper touches nothing the
 // island ships — it observes the seam the shim already owns), no storage
 // (the Go mirror owns persistence), no network of its own, no volume UI
-// (the ask is the five cues; nothing else).
+// (the ask is the seven cues; nothing else).
 (function () {
   'use strict'
 
@@ -136,7 +171,7 @@
     src.stop(o.t + o.dur + 0.02)
   }
 
-  // The five cues (frequencies in Hz, A4=440 — the intervals are perfect
+  // The seven cues (frequencies in Hz, A4=440 — the intervals are perfect
   // fifths by design: the futurist, weightless sonority).
   var SOUNDS = {
     login: function (t) {
@@ -166,6 +201,34 @@
       tone({ f0: 987.77, type: 'sine', t: t + 0.26, dur: 0.8, peak: 0.065, lp: 3400 })
       tone({ f0: 1318.51, type: 'sine', t: t + 0.42, dur: 0.7, peak: 0.02, lp: 6000 })
     },
+    // S234 (the owner ask: "Make sure all important interactions in hibana
+    // desktop have sound. for example currently for archiving tasks (after
+    // done) there is no sound"): the drawer settle — a descending fifth
+    // E5 -> A4 over a soft A3 bed with a gentle band-passed puff tail. The
+    // sound of something being PUT AWAY, not destroyed (that's the delete
+    // thock) and not completed (that's the fulfill ding): the archive-after-
+    // done is a tidy, deliberate action that deserves its own whisper. Same
+    // grammar as the five original cues: sine + triangle partials, perfect
+    // fifth (E5 -> A4 is the same interval as login's E5 -> B5 octave-fifth,
+    // inverted downward), lowpass shaping, exponential envelope, peaks under
+    // 0.07 so it lands around -20dBFS like its siblings.
+    archive: function (t) {
+      tone({ f0: 220, type: 'triangle', t: t, dur: 0.45, peak: 0.024, lp: 900 })
+      tone({ f0: 659.25, f1: 440, type: 'sine', t: t, dur: 0.4, peak: 0.065, lp: 2400 })
+      tone({ f0: 880, type: 'sine', t: t + 0.16, dur: 0.22, peak: 0.028, lp: 3800 })
+      puff({ t: t + 0.06, dur: 0.18, freq: 520, peak: 0.022 })
+    },
+    // S234: the spark — an ascending fifth A4 -> E5 with a high E6 sparkle
+    // over a soft A3 bed. Bright but brief: distinct from fulfill's longer
+    // ding (which celebrates the completion of an EXISTING thing) — create
+    // celebrates a NEW thing arriving. Same grammar, same headroom: peaks
+    // under 0.07, the sine partials carry the fifth, the triangle bed anchors
+    // the low end, the high sine sparkle is the futurist glint.
+    create: function (t) {
+      tone({ f0: 220, type: 'triangle', t: t, dur: 0.32, peak: 0.022, lp: 1000 })
+      tone({ f0: 440, f1: 659.25, type: 'sine', t: t, dur: 0.32, peak: 0.07, lp: 2800 })
+      tone({ f0: 1318.51, type: 'sine', t: t + 0.12, dur: 0.22, peak: 0.04, lp: 6000 })
+    },
   }
 
   function play(name) {
@@ -187,26 +250,70 @@
   // PREVIOUS status while the request is in flight) and play ONLY on a 2xx
   // resolve — a failed mutation is silent. The wrapper returns the ORIGINAL
   // promise untouched, so the callers' error/abort semantics are byte-ident.
+  //
+  // S234 (the owner ask: "Make sure all important interactions in hibana
+  // desktop have sound. for example currently for archiving tasks (after done)
+  // there is no sound"): the v0.1.13 single-segment regex never matched the
+  // collection-path mutations (archive-done, create-task/sprint/category,
+  // restore-archived-task, delete-archived-task, delete-category, restore-
+  // project). This now classifies by PATH SHAPE + METHOD, never inspecting
+  // the body (these calls are idempotent by shape — a POST archive-done is
+  // always an archive, never anything else). The query string is stripped
+  // before matching so the S232 ?force=1 cascade stays classified; the 150ms
+  // coalesce still wins when a bulk "Clear done" fires many DELETEs in a
+  // Promise.all loop.
   function classify(path, opts) {
     if (!path || typeof path !== 'string') return null
     var method = ((opts && opts.method) || 'GET').toUpperCase()
+    // Strip the query string + hash (e.g., DELETE /api/labels/9?force=1) so
+    // anchored path regexes match cleanly. The fragment is never sent to
+    // the server, but the query IS — and the v0.1.13 single-segment regex
+    // quietly relied on devtasks never carrying one.
+    var q = path.indexOf('?')
+    if (q >= 0) path = path.slice(0, q)
+    var h = path.indexOf('#')
+    if (h >= 0) path = path.slice(0, h)
+    // (1) The single-segment devtask mutation — the v0.1.13 surface (DELETE +
+    // PATCH status-change). The only branch that inspects the body, because
+    // PATCH /api/devtasks/:id carries the new status field the classifier
+    // must compare against the prior.
     var m = /^\/api\/devtasks\/([^\/?]+)$/.exec(path)
-    if (!m) return null
-    if (method === 'DELETE') return 'delete'
-    if (method === 'PATCH') {
-      var body = opts && opts.body
-      var parsed = null
-      if (typeof body === 'string') { try { parsed = JSON.parse(body) } catch (e) { return null } }
-      else if (body && typeof body === 'object') parsed = body
-      if (!parsed || typeof parsed.status !== 'string') return null
-      var prior = null
-      try {
-        var HB = window.HibanaBoard
-        var task = HB && typeof HB.findTask === 'function' ? HB.findTask(m[1]) : null
-        if (task && typeof task.status === 'string') prior = task.status
-      } catch (e) { /* a missing board never blocks the cue */ }
-      if (parsed.status === prior) return null // the editor's same-status resend: a plain edit
-      return parsed.status === 'done' ? 'fulfill' : 'move'
+    if (m) {
+      if (method === 'DELETE') return 'delete'
+      if (method === 'PATCH') {
+        var body = opts && opts.body
+        var parsed = null
+        if (typeof body === 'string') { try { parsed = JSON.parse(body) } catch (e) { return null } }
+        else if (body && typeof body === 'object') parsed = body
+        if (!parsed || typeof parsed.status !== 'string') return null
+        var prior = null
+        try {
+          var HB = window.HibanaBoard
+          var task = HB && typeof HB.findTask === 'function' ? HB.findTask(m[1]) : null
+          if (task && typeof task.status === 'string') prior = task.status
+        } catch (e) { /* a missing board never blocks the cue */ }
+        if (parsed.status === prior) return null // the editor's same-status resend: a plain edit
+        return parsed.status === 'done' ? 'fulfill' : 'move'
+      }
+      return null
+    }
+    // (2) The collection-path mutations (S234) — the kanban's mutation surface
+    // the v0.1.13 regex never saw. The owner's example: POST
+    // /api/projects/:id/devtasks/archive-done — never matched (the regex
+    // anchored at /api/devtasks/:id). These are classified by shape alone.
+    if (method === 'POST') {
+      if (/^\/api\/projects\/([^\/?]+)\/devtasks\/archive-done$/.test(path)) return 'archive'
+      if (/^\/api\/projects\/([^\/?]+)\/devtasks$/.test(path)) return 'create'        // new task
+      if (/^\/api\/projects\/([^\/?]+)\/sprints$/.test(path)) return 'create'          // new sprint
+      if (/^\/api\/projects\/([^\/?]+)\/categories$/.test(path)) return 'create'       // new category
+      if (/^\/api\/projects\/([^\/?]+)\/archives\/([^\/?]+)\/restore$/.test(path)) return 'fulfill'  // restore archived task — reuse the completion ding
+      if (/^\/api\/projects\/([^\/?]+)\/restore$/.test(path)) return 'fulfill'          // restore archived project
+      return null
+    }
+    if (method === 'DELETE') {
+      if (/^\/api\/projects\/([^\/?]+)\/archives\/([^\/?]+)$/.test(path)) return 'delete'    // delete archived task — reuse the thock
+      if (/^\/api\/projects\/([^\/?]+)\/categories\/([^\/?]+)$/.test(path)) return 'delete'  // delete category
+      return null
     }
     return null
   }

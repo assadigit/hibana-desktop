@@ -305,9 +305,12 @@ async function main() {
     check('the engine loads on the unauthed boot (window.hibanaAudio.play)', engineThere)
 
     // The five cues schedule real oscillators, with the cue-specific f0s.
+    // S234 extended the palette to SEVEN cues — archive + create — with the
+    // same futurist grammar (sine/triangle partials, perfect fifths, lowpass
+    // shaping, exponential envelopes, -20dBFS peaks).
     const perCue = await page.evaluate(() => {
       const out = {}
-      for (const name of ['login', 'delete', 'fulfill', 'move', 'sync']) {
+      for (const name of ['login', 'delete', 'fulfill', 'move', 'sync', 'archive', 'create']) {
         window.__audioOps.starts = 0
         window.__audioOps.freqs = []
         out[name] = { played: window.hibanaAudio.play(name), starts: window.__audioOps.starts, freqs: window.__audioOps.freqs.slice() }
@@ -319,6 +322,8 @@ async function main() {
     check('cue fulfill schedules the completion ding', perCue.fulfill.played === true && perCue.fulfill.starts >= 3 && perCue.fulfill.freqs.includes(784) && perCue.fulfill.freqs.includes(1175), JSON.stringify(perCue.fulfill))
     check('cue move schedules the micro tick', perCue.move.played === true && perCue.move.starts >= 1 && perCue.move.freqs.includes(540), JSON.stringify(perCue.move))
     check('cue sync schedules the all-clear', perCue.sync.played === true && perCue.sync.starts >= 4 && perCue.sync.freqs.includes(440) && perCue.sync.freqs.includes(988), JSON.stringify(perCue.sync))
+    check('cue archive schedules the drawer settle (S234)', perCue.archive.played === true && perCue.archive.starts >= 3 && perCue.archive.freqs.includes(220) && perCue.archive.freqs.includes(659) && perCue.archive.freqs.includes(880), JSON.stringify(perCue.archive))
+    check('cue create schedules the spark (S234)', perCue.create.played === true && perCue.create.starts >= 3 && perCue.create.freqs.includes(220) && perCue.create.freqs.includes(440) && perCue.create.freqs.includes(1319), JSON.stringify(perCue.create))
     const bogus = await page.evaluate(() => window.hibanaAudio.play('nope'))
     check('an unknown cue name is a silent no-op', bogus === false)
     // Let the cue loop's lastPlay stamps age past the 150ms coalescing window
@@ -411,6 +416,97 @@ async function main() {
     await page.waitForTimeout(300)
     const tagChime = await audioStats(page)
     check('the /tags/:tagId delete (a different path) is SILENT', tagChime.starts === 0, JSON.stringify(tagChime))
+
+    // =======================================================================
+    // LEG 5.5 — the S234 collection-path classifier (the owner ask: "Make
+    // sure all important interactions in hibana desktop have sound. for
+    // example currently for archiving tasks (after done) there is no
+    // sound"). The v0.1.13 single-segment regex never matched the
+    // collection-path mutations; the S234 round extended the classifier to
+    // cover them. Each path below is fired through the REAL seam
+    // (window.hibanaFetch — exactly the call the island makes), the mock
+    // returns 200, and the seam observer's `if (res.ok) play(verdict)` fires
+    // the matching cue. The 300ms wait between calls clears the 150ms
+    // coalescing window so each cue is heard distinctly.
+    // =======================================================================
+    console.log('\n— leg 5.5: the S234 collection-path classifier (archive + create + the restore/delete reuses)')
+    // POST /api/projects/:id/devtasks/archive-done -> 'archive' (the owner's example)
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/devtasks/archive-done', { method: 'POST' }), P1)
+    await page.waitForTimeout(300)
+    const archiveChime = await audioStats(page)
+    check("POST /api/projects/:id/devtasks/archive-done schedules the archive cue (the owner's example)", archiveChime.starts >= 3 && archiveChime.freqs.includes(220) && archiveChime.freqs.includes(659), JSON.stringify(archiveChime))
+
+    // POST /api/projects/:id/devtasks -> 'create' (new task)
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/devtasks', { method: 'POST', body: JSON.stringify({ title: 'A new task', status: 'idea' }) }), P1)
+    await page.waitForTimeout(300)
+    const createTaskChime = await audioStats(page)
+    check('POST /api/projects/:id/devtasks schedules the create cue (new task)', createTaskChime.starts >= 3 && createTaskChime.freqs.includes(220) && createTaskChime.freqs.includes(440), JSON.stringify(createTaskChime))
+
+    // POST /api/projects/:id/sprints -> 'create' (new sprint)
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/sprints', { method: 'POST', body: JSON.stringify({ name: 'Sprint 1' }) }), P1)
+    await page.waitForTimeout(300)
+    const createSprintChime = await audioStats(page)
+    check('POST /api/projects/:id/sprints schedules the create cue (new sprint)', createSprintChime.starts >= 3 && createSprintChime.freqs.includes(220) && createSprintChime.freqs.includes(440), JSON.stringify(createSprintChime))
+
+    // POST /api/projects/:id/categories -> 'create' (new category)
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/categories', { method: 'POST', body: JSON.stringify({ name: 'Backend' }) }), P1)
+    await page.waitForTimeout(300)
+    const createCatChime = await audioStats(page)
+    check('POST /api/projects/:id/categories schedules the create cue (new category)', createCatChime.starts >= 3 && createCatChime.freqs.includes(220) && createCatChime.freqs.includes(440), JSON.stringify(createCatChime))
+
+    // POST /api/projects/:id/archives/:aid/restore -> 'fulfill' (reuse — restore is a positive)
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/archives/arch-1/restore', { method: 'POST' }), P1)
+    await page.waitForTimeout(300)
+    const restoreChime = await audioStats(page)
+    check('POST /api/projects/:id/archives/:aid/restore schedules the fulfill cue (reuse — restore is a positive)', restoreChime.starts >= 3 && restoreChime.freqs.includes(784), JSON.stringify(restoreChime))
+
+    // DELETE /api/projects/:id/archives/:aid -> 'delete' (reuse — archived task delete)
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/archives/arch-1', { method: 'DELETE' }), P1)
+    await page.waitForTimeout(300)
+    const delArchChime = await audioStats(page)
+    check('DELETE /api/projects/:id/archives/:aid schedules the delete cue (reuse — archived task delete)', delArchChime.starts >= 2 && delArchChime.freqs.includes(320), JSON.stringify(delArchChime))
+
+    // DELETE /api/projects/:id/categories/:cid -> 'delete' (reuse — category delete)
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/categories/cat-1', { method: 'DELETE' }), P1)
+    await page.waitForTimeout(300)
+    const delCatChime = await audioStats(page)
+    check('DELETE /api/projects/:id/categories/:cid schedules the delete cue (reuse — category delete)', delCatChime.starts >= 2 && delCatChime.freqs.includes(320), JSON.stringify(delCatChime))
+
+    // POST /api/projects/:id/restore -> 'fulfill' (reuse — restore archived project)
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/restore', { method: 'POST' }), P1)
+    await page.waitForTimeout(300)
+    const restoreProjChime = await audioStats(page)
+    check('POST /api/projects/:id/restore schedules the fulfill cue (reuse — restore archived project)', restoreProjChime.starts >= 3 && restoreProjChime.freqs.includes(784), JSON.stringify(restoreProjChime))
+
+    // The query-string strip: DELETE /api/projects/:id/categories/:cid?force=1
+    // must STILL match (the S232 ?force=1 cascade stays classified). Without
+    // the strip, the anchored regex `([^/?]+)$` would fail on the `?`.
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/categories/cat-2?force=1', { method: 'DELETE' }), P1)
+    await page.waitForTimeout(300)
+    const forceChime = await audioStats(page)
+    check('DELETE with ?force=1 query string STILL fires (the strip holds the S232 cascade)', forceChime.starts >= 2 && forceChime.freqs.includes(320), JSON.stringify(forceChime))
+
+    // The SILENCE rule for the new surface: a 4xx response is silent. The
+    // mock returns 401 when unauthed; we toggle the probe's authed flag to
+    // simulate a stale session, fire archive-done, and assert SILENCE —
+    // proving the cue plays ONLY on a 2xx resolve (a failed mutation never
+    // sounds, the same rule the v0.1.13 five cues follow).
+    probe.authed = false
+    await resetAudio(page)
+    await page.evaluate((pid) => window.hibanaFetch('/api/projects/' + pid + '/devtasks/archive-done', { method: 'POST' }), P1)
+    await page.waitForTimeout(300)
+    const failChime = await audioStats(page)
+    check('a 401 (failed mutation) is SILENT — the cue plays only on a 2xx resolve', failChime.starts === 0, JSON.stringify(failChime))
+    probe.authed = true
 
     // =======================================================================
     // LEG 6 — THE HERO + cue #5: the sync modal's living emblem, driven live
