@@ -660,7 +660,11 @@
     dlg.className = 'dialog'
     dlg.innerHTML =
       '<form class="modal" method="dialog">' +
-        '<h3>' + esc(t('project.shotNoteTitle', 'Note — what & where to work')) + '</h3>' +
+        // S233 (every modal carries a close on its top right): the note editor's
+        // title row joins the task editor / labels / pinned-pictures grammar —
+        // h3 on the inline start, the ✕ on the inline end (the Cancel twin).
+        '<div class="row spread"><h3>' + esc(t('project.shotNoteTitle', 'Note — what & where to work')) + '</h3>' +
+        '<button type="button" class="ghost" data-note-x aria-label="' + esc(t('common.close', 'Close')) + '">✕</button></div>' +
         '<textarea class="pd-shot-note-ta" rows="6" maxlength="1000" dir="auto" placeholder="' + esc(t('project.shotNotePh', 'What is broken & where — the exact spot to work on…')) + '"></textarea>' +
         '<div class="row" style="justify-content:flex-end;gap:.5rem;margin-top:1rem">' +
           '<button type="button" class="ghost" data-note-cancel>' + esc(t('common.cancel', 'Cancel')) + '</button>' +
@@ -671,6 +675,7 @@
     const ta = dlg.querySelector('textarea')
     ta.value = current || ''
     dlg.querySelector('[data-note-cancel]').onclick = () => dlg.close()
+    dlg.querySelector('[data-note-x]').onclick = () => dlg.close()
     dlg.querySelector('[data-note-save]').onclick = async () => {
       try {
         await patchShot(shotId, { caption: ta.value.trim() })

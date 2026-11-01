@@ -93,8 +93,20 @@ import { fileURLToPath } from 'node:url'
 // merge, label delete, archive/clear-done — had NO implementation on the desktop and
 // threw silently; the markup rides the island's own components.css .hib-confirm-*
 // styles, byte-identical to the web modal).
-const PIN_REF = '2157a33'
-const PIN_PACKAGE_VERSION = '0.4.1.40'
+// S233 (every modal carries a top-right close — the owner's settings-sheet screenshot
+// ask): the pin moved to 8fbc8fa (web v0.4.1.41) — the S210 confirm card grows a head
+// row with the corner ✕ (close(false), never the confirm), and the board's shot-note
+// editor + delete-task confirm join the row-spread ✕ grammar; app.js v221 /
+// devboard.js v31 / board-page v26 / components.css v10 are the cache-busted surfaces.
+// Two anchors were RE-RECORDED (the app.js strip line v220 → v221; the shim-insert
+// anchor devboard.js v30 → v31); the seam patch find-strings are byte-identical (the
+// fetch sites did not move). The round's desktop-owned half: the FIVE native dialogs
+// (sync / logout / new-project / update / settings — the screenshot's own) grow the
+// same top-right ✕ (the bottom button's twin — logout/newproject delegate to the
+// cancel button so the busy guards hold), and the shim's confirm port keeps its 1:1
+// app.js contract (head row + ✕).
+const PIN_REF = '8fbc8fa'
+const PIN_PACKAGE_VERSION = '0.4.1.41'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -273,7 +285,7 @@ const HTML_STRIP_LINES = [
   { name: 'strip vendor/idiomorph-ext.min.js', cite: 'guide §3.2 (board.html:31)', line: '<script src="/vendor/idiomorph-ext.min.js" defer></script>' },
   { name: 'strip js/boot.js (SW registration)', cite: 'guide §3.2 (board.html:32; UI-UX §7.3)', line: '<script src="/js/boot.js?v=7"></script>' },
   { name: 'strip vendor/alpine.min.js', cite: 'guide §3.2 (board.html:33)', line: '<script src="/vendor/alpine.min.js" defer></script>' },
-  { name: 'strip js/app.js (the web shell — its toast contract moves to desktop-shim.js)', cite: 'guide §3.1+§3.2+§4.3 (board.html:34)', line: '<script src="/js/app.js?v=220" defer></script>' },
+  { name: 'strip js/app.js (the web shell — its toast contract moves to desktop-shim.js)', cite: 'guide §3.1+§3.2+§4.3 (board.html:34; S233 re-record: app.js v220 → v221 — the confirm ✕ round bumped the carrier)', line: '<script src="/js/app.js?v=221" defer></script>' },
   { name: 'strip js/hib-init.js', cite: 'guide §3.2 (board.html:35)', line: '<script src="/js/hib-init.js?v=13" defer></script>' },
   { name: 'strip js/touch-drag.js (touch long-press — irrelevant on desktop)', cite: 'guide §3.2 (board.html:36; UI-UX §7.2)', line: '<script src="/js/touch-drag.js?v=1" defer></script>' },
   { name: 'strip js/nav.js (browser-history rail; its __hibanaPage mount consumer is re-owned by desktop-shim.js)', cite: 'guide §3.2 (board.html:37)', line: '<script src="/js/nav.js?v=45" defer></script>' },
@@ -297,7 +309,7 @@ const HTML_STRIP_LINES = [
 const HTML_INSERT = {
   name: 'insert /js/desktop-shim.js before devboard.js',
   cite: 'guide §3.2 + §4.3',
-  anchor: '<script src="/js/devboard.js?v=30" defer></script>',
+  anchor: '<script src="/js/devboard.js?v=31" defer></script>',
   insert: '<script src="/js/desktop-shim.js"></script>',
 }
 
@@ -478,6 +490,12 @@ const HTML_SYNC_OPS = [
        hibana:sync-progress events light the step rows live. -->
   <dialog class="dialog" id="db-sync-dialog" aria-labelledby="db-sync-title">
     <form class="modal db-sync-modal" method="dialog">
+      <!-- S233 (the owner's ask — every modal carries a close on its top right):
+           the corner ✕, a slim row ABOVE the hero so the v0.1.13 emblem
+           choreography stays untouched. It is the Close/Done buttons' twin
+           (a plain dlg.close()); a mid-round close leaves the Go round
+           finishing unseen, exactly like the bottom Close always did. -->
+      <div class="row"><button type="button" class="ghost" id="db-sync-x" data-i18n-aria-label="common.close" aria-label="Close" style="margin-inline-start:auto">✕</button></div>
       <!-- v0.1.13 (the owner ask: "also in modal i want syncing animation with
            icons and animation") — the HERO: the round's living emblem, an
            aria-hidden stage above the factual step rows. One 4.6rem emblem
@@ -608,7 +626,12 @@ const HTML_LOGOUT_OPS = [
        secondary ahead of it, trailing primary under RTL too). -->
   <dialog class="dialog" id="db-logout-dialog" aria-labelledby="db-logout-title">
     <form class="modal db-logout-modal" method="dialog">
-      <h2 id="db-logout-title" data-i18n="nav.signout">Sign out</h2>
+      <!-- S233 (the owner's ask — every modal carries a close on its top right):
+           the title rides a row spread with the corner ✕ on the inline end —
+           the Cancel button's twin (the controller's busy guard holds: an
+           in-flight sign-out cannot be dropped from the corner either). -->
+      <div class="row spread"><h2 id="db-logout-title" data-i18n="nav.signout">Sign out</h2>
+      <button type="button" class="ghost" id="db-logout-x" data-i18n-aria-label="common.close" aria-label="Close">✕</button></div>
       <p class="small muted" id="db-logout-body">Your boards live safe on the Hibana cloud — sign in again any time to load them back.</p>
       <p id="db-logout-error" class="error" role="alert" hidden></p>
       <div class="db-logout-actions">
@@ -735,7 +758,12 @@ const HTML_NEWPROJECT_OPS = [
        the very switcher it was created from). -->
   <dialog class="dialog" id="db-newproject-dialog" aria-labelledby="db-newproject-title">
     <form class="modal db-newproject-modal" id="db-newproject-form" method="dialog" novalidate>
-      <h2 id="db-newproject-title" data-i18n="cmdk.newProject">New project</h2>
+      <!-- S233 (the owner's ask — every modal carries a close on its top right):
+           the title rides a row spread with the corner ✕ on the inline end —
+           the Cancel button's twin through delegation (the controller's busy
+           guard holds: an in-flight create is never dropped from the corner). -->
+      <div class="row spread"><h2 id="db-newproject-title" data-i18n="cmdk.newProject">New project</h2>
+      <button type="button" class="ghost" id="db-newproject-x" data-i18n-aria-label="common.close" aria-label="Close">✕</button></div>
       <p class="small muted" id="db-newproject-body">Name the project — it is created on the Hibana cloud (hibana.ir) and its Kanban board opens right here.</p>
       <label><span data-i18n="sparks.title">Title</span>
         <input type="text" id="db-newproject-title-input" maxlength="200" autocomplete="off" spellcheck="false" dir="auto" required></label>
@@ -901,7 +929,12 @@ const HTML_UPDATE_OPS = [
        own .db-sync-panel grammar. -->
   <dialog class="dialog" id="db-update-dialog" aria-labelledby="db-update-title">
     <form class="modal db-update-modal" method="dialog">
-      <h2 id="db-update-title">A new version is available</h2>
+      <!-- S233 (the owner's ask — every modal carries a close on its top right):
+           the title rides a row spread with the corner ✕ on the inline end —
+           the Later button's twin (a plain dlg.close(); the apply, once
+           started, runs Go-side to the swap regardless). -->
+      <div class="row spread"><h2 id="db-update-title">A new version is available</h2>
+      <button type="button" class="ghost" id="db-update-x" data-i18n-aria-label="common.close" aria-label="Close">✕</button></div>
       <p id="db-update-version">Hibana 0.1.13 → 0.1.14</p>
       <p class="small muted" id="db-update-kind">Portable update — 7.6 MB from GitHub</p>
       <p class="small muted" id="db-update-body">Your boards and your sign-in stay exactly as they are — Hibana just restarts into the new version.</p>
@@ -1046,7 +1079,13 @@ const HTML_SETTINGS_OPS = [
        post-flip reload is seamless. -->
   <dialog class="dialog dialog-wide" id="db-settings-dialog" aria-labelledby="db-settings-title">
     <form class="modal db-settings-modal" method="dialog">
-      <h2 id="db-settings-title" data-i18n="nav.settings">Settings</h2>
+      <!-- S233 (the owner's ask, with THIS sheet's screenshot: "Make sure all
+           modals, like the screenshot, which is settings, have close button on
+           top right."): the title rides a row spread with the corner ✕ on the
+           inline end — the Done button's twin (a plain dlg.close(); the gear
+           re-opens it any time). -->
+      <div class="row spread"><h2 id="db-settings-title" data-i18n="nav.settings">Settings</h2>
+      <button type="button" class="ghost" id="db-settings-x" data-i18n-aria-label="common.close" aria-label="Close">✕</button></div>
 
       <!-- 1. SYNC (the owner's first section): the copy names the cadence,
            the CTA delegates to the proven round. -->
@@ -1744,7 +1783,15 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
         ? '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
         : '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>'
       card.innerHTML =
-        (title ? '<h2 class="hib-confirm-title" id="hib-confirm-title">' + iconSvg + title + '</h2>' : '') +
+        // S233 (the owner ask: every modal carries a close on its top right):
+        // the head row — title (when present) on the inline start, the ✕ on
+        // the inline end. The ✕ is the cancel path's corner twin (close(false))
+        // with its OWN data value (the e2e cancel locators stay single-match);
+        // kept 1:1 with app.js's confirm (the drift gate pins the twins).
+        '<div class="hib-confirm-head">' +
+          (title ? '<h2 class="hib-confirm-title" id="hib-confirm-title">' + iconSvg + title + '</h2>' : '') +
+          '<button type="button" class="ghost hib-confirm-x" data-hib-confirm="x" aria-label="' + hibLabel('common.close', 'Close') + '">✕</button>' +
+        '</div>' +
         '<p class="hib-confirm-message" id="hib-confirm-msg">' + escText(message) + '</p>' +
         '<div class="hib-confirm-actions">' +
           '<button type="button" class="ghost" data-hib-confirm="cancel">' + cancelLabel + '</button>' +
@@ -1765,6 +1812,8 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
       }
       card.querySelector('[data-hib-confirm="cancel"]').addEventListener('click', function () { close(false) })
       card.querySelector('[data-hib-confirm="ok"]').addEventListener('click', function () { close(true) })
+      // S233: the corner ✕ — the cancel path's top-right twin (never the confirm)
+      card.querySelector('[data-hib-confirm="x"]').addEventListener('click', function () { close(false) })
       overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false) })
       overlay.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false) }
@@ -2581,6 +2630,11 @@ const DESKTOP_SYNC_JS = `// desktop-sync.js — the manual sync button + its pro
     btn.addEventListener('click', openSync)
     if (closeBtn) closeBtn.addEventListener('click', function () { dlg.close() })
     if (doneBtn) doneBtn.addEventListener('click', function () { dlg.close() })
+    // S233: the corner ✕ — the Close/Done buttons' twin (the round continues
+    // Go-side if closed mid-flight; the close listener below still honors the
+    // pulled-boards reload verdict).
+    var xBtn = document.getElementById('db-sync-x')
+    if (xBtn) xBtn.addEventListener('click', function () { dlg.close() })
     if (retryBtn) retryBtn.addEventListener('click', function () {
       if (panel) panel.hidden = true
       if (retryBtn) retryBtn.hidden = true
@@ -3210,6 +3264,10 @@ const DESKTOP_LOGOUT_JS = `// desktop-logout.js — the sign-out option + its co
     })
 
     if (cancelBtn) cancelBtn.addEventListener('click', function () { if (!busy) dlg.close() })
+    // S233: the corner ✕ — the Cancel button's twin through delegation, so the
+    // busy guard holds on BOTH paths (an in-flight sign-out is never dropped).
+    var xBtn = document.getElementById('db-logout-x')
+    if (xBtn) xBtn.addEventListener('click', function () { if (cancelBtn) cancelBtn.click(); else if (!busy) dlg.close() })
     btn.addEventListener('click', function () {
       if (busy) return
       localize()
@@ -3461,6 +3519,10 @@ const DESKTOP_NEWPROJECT_JS = `// desktop-newproject.js — the new-project roun
 
     if (createBtn) createBtn.addEventListener('click', function (e) { e.preventDefault(); create() })
     if (cancelBtn) cancelBtn.addEventListener('click', function () { if (!busy) dlg.close() })
+    // S233: the corner ✕ — the Cancel button's twin through delegation, so the
+    // busy guard holds on BOTH paths (an in-flight create is never dropped).
+    var xBtn = document.getElementById('db-newproject-x')
+    if (xBtn) xBtn.addEventListener('click', function () { if (cancelBtn) cancelBtn.click(); else if (!busy) dlg.close() })
     var form = document.getElementById('db-newproject-form')
     if (form) form.addEventListener('submit', function (e) { e.preventDefault(); create() })
     // Esc cannot drop an in-flight create — the POST's outcome is unknown until
@@ -3958,6 +4020,10 @@ const DESKTOP_UPDATE_JS = `// desktop-update.js — the auto-update round (v0.1.
     btn.addEventListener('click', openModal)
     if (goBtn) goBtn.addEventListener('click', run)
     if (laterBtn) laterBtn.addEventListener('click', function () { dlg.close() })
+    // S233: the corner ✕ — the Later button's twin (a plain close; the apply,
+    // once started, runs Go-side to the swap regardless).
+    var xBtn = document.getElementById('db-update-x')
+    if (xBtn) xBtn.addEventListener('click', function () { dlg.close() })
 
     // THE GO SHELL'S RELAYS (main.go SetUpdateEmit → EventsEmit):
     // hibana:update-available reveals the pill (and repaints an open modal's
@@ -4492,6 +4558,10 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
     if (signoutBtn) signoutBtn.addEventListener('click', function () { delegate('db-logout-button') })
     var doneBtn = document.getElementById('db-settings-done')
     if (doneBtn) doneBtn.addEventListener('click', function () { dlg.close() })
+    // S233: the corner ✕ — the Done button's twin (a plain close; the sheet's
+    // sections own no unsaved state — every control saves on its own click).
+    var xBtn = document.getElementById('db-settings-x')
+    if (xBtn) xBtn.addEventListener('click', function () { dlg.close() })
 
     // ---- SECTION 2's manual check (the auto-update loop keeps its boot+2h
     //      cadence untouched; this row is the manual trigger + the idle-time
@@ -5426,6 +5496,7 @@ function verifyDist(outDir, fileMap) {
   if (!shimJs.includes('data-hib-confirm="ok"') || !shimJs.includes('data-hib-confirm="cancel"')) problems.push('js/desktop-shim.js: the confirm modal actions are missing')
   if (!shimJs.includes('hib-confirm-overlay') || !shimJs.includes('is-danger')) problems.push('js/desktop-shim.js: the confirm modal must ride the web .hib-confirm-* grammar (components.css ships it)')
   if (!shimJs.includes("hibLabel('common.delete', 'Delete')")) problems.push('js/desktop-shim.js: the danger confirm label must resolve through the island i18n (EN fallback)')
+  if (!shimJs.includes('data-hib-confirm="x"') || !shimJs.includes('hib-confirm-x') || !shimJs.includes('hib-confirm-head')) problems.push('js/desktop-shim.js: the S233 confirm corner ✕ is missing (the head row + data-hib-confirm="x" — kept 1:1 with app.js)')
 
   // (1d) THE S232 DELETE-ANY-LABEL round on the island side: the ✕ rides every row,
   // the used-delete confirm exists, and the DELETE carries the force expression
@@ -5523,7 +5594,7 @@ function verifyDist(outDir, fileMap) {
     const dsCss = fileMap['css/desktop-sync.css'] || ''
     if (!dsCss.includes('.db-sync-count')) problems.push('css/desktop-sync.css: the §9 count badge styles are missing')
   }
-  for (const kept of ['id="db-sync-button"', 'class="small db-sync-cta"', 'id="db-sync-btn-label"', 'id="db-sync-dialog"', 'id="db-sync-steps"', 'id="db-sync-panel"', 'aria-label="Sync now"']) {
+  for (const kept of ['id="db-sync-button"', 'class="small db-sync-cta"', 'id="db-sync-btn-label"', 'id="db-sync-dialog"', 'id="db-sync-steps"', 'id="db-sync-panel"', 'aria-label="Sync now"', 'id="db-sync-x"', 'data-i18n-aria-label="common.close"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the sync round is missing "' + kept + '"')
   }
   {
@@ -5561,7 +5632,7 @@ function verifyDist(outDir, fileMap) {
   // common.cancel cancel; the controller must resolve the Go Logout binding
   // at CLICK time and reload into the login card on ok; and the body copy must
   // ship in BOTH languages.
-  for (const kept of ['id="db-logout-button"', 'id="db-logout-btn-label"', 'data-i18n="nav.signout"', 'data-i18n-aria-label="nav.signout"', 'data-i18n="common.cancel"', 'id="db-logout-dialog"', 'id="db-logout-title"', 'id="db-logout-confirm"', 'id="db-logout-cancel"', 'id="db-logout-body"', 'id="db-logout-error"', 'css/desktop-logout.css',
+  for (const kept of ['id="db-logout-button"', 'id="db-logout-btn-label"', 'data-i18n="nav.signout"', 'data-i18n-aria-label="nav.signout"', 'data-i18n="common.cancel"', 'id="db-logout-dialog"', 'id="db-logout-title"', 'id="db-logout-confirm"', 'id="db-logout-cancel"', 'id="db-logout-x"', 'id="db-logout-body"', 'id="db-logout-error"', 'css/desktop-logout.css',
     // The S186 CTA grammar: the confirm is the BARE <button> (the view's one
     // solid primary — the login gate's own "Sign in" shape), Cancel the
     // neutral secondary ahead of it.
@@ -5581,6 +5652,7 @@ function verifyDist(outDir, fileMap) {
   if (!logoutJs.includes('location.reload()')) problems.push('js/desktop-logout.js: the ok-resolve must location.reload() into the login card (data-desktop-authed="false" at first paint)')
   if (!logoutJs.includes('sign in again any time to load them back.')) problems.push('js/desktop-logout.js: the EN sign-out body copy is missing')
   if (!logoutJs.includes('ابر هیبانا امن')) problems.push('js/desktop-logout.js: the FA sign-out body copy is missing')
+  if (!logoutJs.includes("getElementById('db-logout-x')")) problems.push('js/desktop-logout.js: the S233 corner ✕ wiring is missing (the Cancel twin through delegation)')
   const logoutCss = fileMap['css/desktop-logout.css'] || ''
   if (!logoutCss.includes('#db-logout-button')) problems.push('css/desktop-logout.css: the toolbar Log out button rule is missing (the twin-metrics icon+label pill)')
   if (!fs.existsSync(path.join(outDir, 'css/desktop-logout.css'))) problems.push('css/desktop-logout.css: missing from dist')
@@ -5597,7 +5669,7 @@ function verifyDist(outDir, fileMap) {
   // ok resolve, inject the switcher row via MutationObserver, intercept the
   // dead /projects.html links, and touch NO storage; the sheet must hide the
   // dead "All projects →" link + own the create-row accent.
-  for (const kept of ['id="db-newproject-dialog"', 'id="db-newproject-title"', 'id="db-newproject-body"', 'id="db-newproject-title-input"', 'id="db-newproject-description"', 'id="db-newproject-error"', 'id="db-newproject-create"', 'id="db-newproject-cancel"', 'id="db-newproject-form"',
+  for (const kept of ['id="db-newproject-dialog"', 'id="db-newproject-title"', 'id="db-newproject-body"', 'id="db-newproject-title-input"', 'id="db-newproject-description"', 'id="db-newproject-error"', 'id="db-newproject-create"', 'id="db-newproject-cancel"', 'id="db-newproject-x"', 'id="db-newproject-form"',
     'data-i18n="cmdk.newProject"', 'data-i18n="sparks.title"', 'data-i18n="sparks.description"', 'data-i18n="cat.quickAdd"', 'data-i18n="common.cancel"', 'css/desktop-newproject.css',
     // The S186 CTA grammar: Create is the BARE <button> (the view's one solid
     // primary — the sign-out confirm's shape), Cancel the neutral secondary.
@@ -5613,6 +5685,7 @@ function verifyDist(outDir, fileMap) {
   if (!newProjectJs.includes('location.assign(')) problems.push('js/desktop-newproject.js: the fresh-board deep-link boot (location.assign) is missing')
   if (!newProjectJs.includes('created on the Hibana cloud')) problems.push('js/desktop-newproject.js: the EN create body copy is missing')
   if (!newProjectJs.includes('ابر هیبانا')) problems.push('js/desktop-newproject.js: the FA create body copy is missing')
+  if (!newProjectJs.includes("getElementById('db-newproject-x')")) problems.push('js/desktop-newproject.js: the S233 corner ✕ wiring is missing (the Cancel twin through delegation)')
   const newProjectCss = fileMap['css/desktop-newproject.css'] || ''
   if (!newProjectCss.includes('.db-switch-all { display: none; }')) problems.push('css/desktop-newproject.css: the dead All-projects link hide rule is missing (the desktop serves no projects page)')
   if (!newProjectCss.includes('.db-switch-new')) problems.push('css/desktop-newproject.css: the switcher New-project row accent rule is missing')
@@ -5707,7 +5780,7 @@ function verifyDist(outDir, fileMap) {
   // ok with NO reload (the Go process restarts the island).
   for (const kept of ['id="db-update-button"', 'class="small db-update-cta"', 'id="db-update-btn-label"', 'id="db-update-dialog"', 'id="db-update-version"',
     'id="db-update-kind"', 'id="db-update-progress"', 'id="db-update-fill"', 'id="db-update-note"', 'id="db-update-panel"', 'id="db-update-later"', 'id="db-update-go"',
-    'aria-label="Update Hibana now"', 'id="db-update-fallback"']) {
+    'id="db-update-x"', 'aria-label="Update Hibana now"', 'id="db-update-fallback"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the auto-update round is missing "' + kept + '" (the owner ask: a button for update)')
   }
   if (!indexHtml.includes('id="db-update-button" hidden')) problems.push('index.html: the Update pill must be HIDDEN at boot — no update = no button (the honest default)')
@@ -5725,6 +5798,7 @@ function verifyDist(outDir, fileMap) {
   if (!updateJs.includes("resolveBoundMethod('ApplyUpdate')")) problems.push('js/desktop-update.js: the bridge must resolve ApplyUpdate at CLICK time, not at parse time')
   if (!updateJs.includes('btn.hidden = false')) problems.push('js/desktop-update.js: the pill reveal is missing')
   if (!updateJs.includes('if (dlg.open) paintIntro()')) problems.push('js/desktop-update.js: an open modal must repaint with the fresh available facts')
+  if (!updateJs.includes("getElementById('db-update-x')")) problems.push('js/desktop-update.js: the S233 corner ✕ wiring is missing (the Later twin)')
   if (!updateJs.includes('panel.hidden = false')) problems.push('js/desktop-update.js: the restarting verdict panel is missing')
   if (updateJs.includes('location.reload')) problems.push('js/desktop-update.js: NO reload on ok — the Go process restarts the whole island (a reload would race the quit)')
   if (!updateJs.includes('Update now')) problems.push('js/desktop-update.js: the EN label pair is missing')
@@ -5762,7 +5836,7 @@ function verifyDist(outDir, fileMap) {
     'id="db-settings-account-heading"', 'id="db-settings-account"', 'id="db-settings-signout"', 'data-i18n="nav.signout"',
     'id="db-settings-appearance-heading"', 'id="db-settings-lang-seg"', 'data-seg-lang="en"', 'data-seg-lang="fa"',
     'id="db-settings-theme-seg"', 'data-seg-theme="light"', 'data-seg-theme="claude-dark"', 'data-seg-theme="system"',
-    'id="db-settings-done"', 'css/desktop-settings.css',
+    'id="db-settings-done"', 'id="db-settings-x"', 'css/desktop-settings.css',
     'id="db-settings-token-input"', 'type="password"', 'id="db-settings-token-save"', 'id="db-settings-token-clear"',
     'id="db-settings-token-test"', 'id="db-settings-token-status"', 'id="db-settings-token-error"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the settings round is missing "' + kept + '"')
@@ -5799,6 +5873,7 @@ function verifyDist(outDir, fileMap) {
   if (!settingsJs.includes("resolveBoundMethod('SetGithubToken')")) problems.push("js/desktop-settings.js: the GitHub-access row must resolve the Go SetGithubToken binding at CLICK time (v0.1.18 — the owner's credentials ask)")
   if (!settingsJs.includes("resolveBoundMethod('GithubTokenState')")) problems.push('js/desktop-settings.js: the GitHub-access row must resolve the Go GithubTokenState binding at OPEN time')
   if (!settingsJs.includes("resolveBoundMethod('TestGithubConnection')")) problems.push("js/desktop-settings.js: the GitHub-access row must resolve the Go TestGithubConnection binding at CLICK time (v0.1.19 — the owner's test-connection ask)")
+  if (!settingsJs.includes("getElementById('db-settings-x')")) problems.push('js/desktop-settings.js: the S233 corner ✕ wiring is missing (the Done twin — the screenshot sheet carries the top-right close)')
   if (!settingsJs.includes("test(value)")) problems.push('js/desktop-settings.js: the Test round must send the FIELD\'s value (empty = the stored-or-anonymous round Go-side decides)')
   if (!settingsJs.includes('els.tokenTest.disabled = on')) problems.push('js/desktop-settings.js: the busy guard must cover the Test button (a round in flight refuses a second test)')
   if (!settingsJs.includes('the repository is public — no token needed')) problems.push("js/desktop-settings.js: the EN anonymous-test verdict line is missing (the row must say the tokenless round WORKS)")

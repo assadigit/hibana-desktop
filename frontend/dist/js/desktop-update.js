@@ -272,6 +272,10 @@
     btn.addEventListener('click', openModal)
     if (goBtn) goBtn.addEventListener('click', run)
     if (laterBtn) laterBtn.addEventListener('click', function () { dlg.close() })
+    // S233: the corner ✕ — the Later button's twin (a plain close; the apply,
+    // once started, runs Go-side to the swap regardless).
+    var xBtn = document.getElementById('db-update-x')
+    if (xBtn) xBtn.addEventListener('click', function () { dlg.close() })
 
     // THE GO SHELL'S RELAYS (main.go SetUpdateEmit → EventsEmit):
     // hibana:update-available reveals the pill (and repaints an open modal's

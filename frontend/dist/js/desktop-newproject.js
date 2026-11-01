@@ -191,6 +191,10 @@
 
     if (createBtn) createBtn.addEventListener('click', function (e) { e.preventDefault(); create() })
     if (cancelBtn) cancelBtn.addEventListener('click', function () { if (!busy) dlg.close() })
+    // S233: the corner ✕ — the Cancel button's twin through delegation, so the
+    // busy guard holds on BOTH paths (an in-flight create is never dropped).
+    var xBtn = document.getElementById('db-newproject-x')
+    if (xBtn) xBtn.addEventListener('click', function () { if (cancelBtn) cancelBtn.click(); else if (!busy) dlg.close() })
     var form = document.getElementById('db-newproject-form')
     if (form) form.addEventListener('submit', function (e) { e.preventDefault(); create() })
     // Esc cannot drop an in-flight create — the POST's outcome is unknown until

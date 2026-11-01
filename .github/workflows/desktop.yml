@@ -21,8 +21,8 @@ on:
   workflow_dispatch: {}
 
 env:
-  WEB_REF: 2157a33          # the island pin (must match scripts/sync-island.mjs) — the S232 delete-any-label ref (v0.4.1.40)
-  WEB_VERSION: "0.4.1.40"   # the pin's package version (Release notes carry BOTH)
+  WEB_REF: 8fbc8fa          # the island pin (must match scripts/sync-island.mjs) — the S233 every-modal-close ref (v0.4.1.41)
+  WEB_VERSION: "0.4.1.41"   # the pin's package version (Release notes carry BOTH)
 
 jobs:
   build:
@@ -127,7 +127,7 @@ jobs:
           if ($env:GITHUB_REF -like 'refs/tags/v*') {
             $v = ($env:GITHUB_REF -replace '^refs/tags/v', '') -replace '-desktop$', ''
           } else {
-            $v = '0.1.29-dev'
+            $v = '0.1.30-dev'
           }
           Add-Content $env:GITHUB_ENV "BUILD_VERSION=$v"
           Write-Host "BUILD_VERSION=$v"

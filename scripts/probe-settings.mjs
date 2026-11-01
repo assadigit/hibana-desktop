@@ -388,6 +388,12 @@ async function main() {
       return {
         title: (g('db-settings-title') || {}).textContent || '',
         heads,
+        // S233: the sheet's top-right close — the ✕ rides the title row's inline
+        // end (the Done button's twin). The probe pins it: present, aria'd, and
+        // it actually CLOSES the sheet.
+        xPresent: !!g('db-settings-x'),
+        xAria: (g('db-settings-x') || {}).getAttribute('aria-label') || '',
+        xInTitleRow: !!(g('db-settings-x') || {}).closest('.row.spread') && !!(g('db-settings-x') || {}).closest('.row.spread').querySelector('#db-settings-title'),
         version: (g('db-settings-version') || {}).textContent || '',
         status: (g('db-settings-update-status') || {}).textContent || '',
         account: (g('db-settings-account') || {}).textContent || '',
@@ -402,6 +408,15 @@ async function main() {
       }
     })
     check('the sheet title rides the pin\'s own nav.settings key', sheet.title === 'Settings', JSON.stringify(sheet.title))
+    // S233: the owner's ask — every modal carries a close on its top right.
+    check('the sheet carries the S233 top-right ✕ (the Done twin)', sheet.xPresent, 'the #db-settings-x button is missing')
+    check('the ✕ aria rides the pin\'s own common.close key', sheet.xAria === 'Close', JSON.stringify(sheet.xAria))
+    check('the ✕ sits in the title row (the row-spread grammar)', sheet.xInTitleRow)
+    await page.click('#db-settings-x')
+    await page.waitForFunction(() => (document.getElementById('db-settings-dialog') || {}).open === false, null, { timeout: 5000 })
+    check('the ✕ CLOSES the sheet (re-openable via the gear)', true)
+    await page.click('#db-settings-button')
+    await page.waitForFunction(() => (document.getElementById('db-settings-dialog') || {}).open === true, null, { timeout: 5000 })
     check('the owner\'s four sections render IN ORDER (1. Sync 2. Update app 3. Account 4. Appearance)',
       sheet.heads[0] === 'Sync' && sheet.heads[1] === 'Update app' && sheet.heads[2] === 'Account' && sheet.heads[3] === 'Appearance',
       JSON.stringify(sheet.heads))

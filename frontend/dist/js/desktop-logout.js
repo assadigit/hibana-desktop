@@ -126,6 +126,10 @@
     })
 
     if (cancelBtn) cancelBtn.addEventListener('click', function () { if (!busy) dlg.close() })
+    // S233: the corner ✕ — the Cancel button's twin through delegation, so the
+    // busy guard holds on BOTH paths (an in-flight sign-out is never dropped).
+    var xBtn = document.getElementById('db-logout-x')
+    if (xBtn) xBtn.addEventListener('click', function () { if (cancelBtn) cancelBtn.click(); else if (!busy) dlg.close() })
     btn.addEventListener('click', function () {
       if (busy) return
       localize()

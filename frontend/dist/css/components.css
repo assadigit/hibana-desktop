@@ -422,6 +422,24 @@ html[data-theme='claude-dark'] .toast.ok {
 .hib-confirm-title .icon { inline-size: 1.25rem; block-size: 1.25rem; flex: none; }
 /* the danger variant tints the title's icon so a destructive action reads at a glance */
 .hib-confirm-card.is-danger .hib-confirm-title .icon { color: var(--danger); }
+/* S233 (the owner ask: every modal carries a close on its top right): the head
+   row — title (when present) on the inline start, the ✕ on the inline end. The
+   ✕ carries its OWN auto margin so a title-less confirm keeps the corner too;
+   it is the cancel path's twin (close(false)), never the confirm. */
+.hib-confirm-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.hib-confirm-x {
+  margin-inline-start: auto; /* the corner even when no title rides the row */
+  flex: none;
+  min-inline-size: 2.25rem;  /* 36px tap floor for a glyph-only control */
+  min-block-size: 2rem;
+  padding: 0.2rem 0.55rem;
+  line-height: 1.2;
+}
 .hib-confirm-message {
   margin: 0;
   font-size: var(--fs-sm);

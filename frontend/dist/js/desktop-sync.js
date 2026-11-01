@@ -338,6 +338,11 @@
     btn.addEventListener('click', openSync)
     if (closeBtn) closeBtn.addEventListener('click', function () { dlg.close() })
     if (doneBtn) doneBtn.addEventListener('click', function () { dlg.close() })
+    // S233: the corner ✕ — the Close/Done buttons' twin (the round continues
+    // Go-side if closed mid-flight; the close listener below still honors the
+    // pulled-boards reload verdict).
+    var xBtn = document.getElementById('db-sync-x')
+    if (xBtn) xBtn.addEventListener('click', function () { dlg.close() })
     if (retryBtn) retryBtn.addEventListener('click', function () {
       if (panel) panel.hidden = true
       if (retryBtn) retryBtn.hidden = true

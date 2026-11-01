@@ -350,7 +350,15 @@
         ? '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
         : '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>'
       card.innerHTML =
-        (title ? '<h2 class="hib-confirm-title" id="hib-confirm-title">' + iconSvg + title + '</h2>' : '') +
+        // S233 (the owner ask: every modal carries a close on its top right):
+        // the head row — title (when present) on the inline start, the ✕ on
+        // the inline end. The ✕ is the cancel path's corner twin (close(false))
+        // with its OWN data value (the e2e cancel locators stay single-match);
+        // kept 1:1 with app.js's confirm (the drift gate pins the twins).
+        '<div class="hib-confirm-head">' +
+          (title ? '<h2 class="hib-confirm-title" id="hib-confirm-title">' + iconSvg + title + '</h2>' : '') +
+          '<button type="button" class="ghost hib-confirm-x" data-hib-confirm="x" aria-label="' + hibLabel('common.close', 'Close') + '">✕</button>' +
+        '</div>' +
         '<p class="hib-confirm-message" id="hib-confirm-msg">' + escText(message) + '</p>' +
         '<div class="hib-confirm-actions">' +
           '<button type="button" class="ghost" data-hib-confirm="cancel">' + cancelLabel + '</button>' +
@@ -371,6 +379,8 @@
       }
       card.querySelector('[data-hib-confirm="cancel"]').addEventListener('click', function () { close(false) })
       card.querySelector('[data-hib-confirm="ok"]').addEventListener('click', function () { close(true) })
+      // S233: the corner ✕ — the cancel path's top-right twin (never the confirm)
+      card.querySelector('[data-hib-confirm="x"]').addEventListener('click', function () { close(false) })
       overlay.addEventListener('click', function (e) { if (e.target === overlay) close(false) })
       overlay.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false) }

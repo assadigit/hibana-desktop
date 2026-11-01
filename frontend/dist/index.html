@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/css/layout.css?v=67">
   <link rel="stylesheet" href="/css/dashboard.css?v=43">
   <link rel="stylesheet" href="/css/dashboard-todo.css?v=25">
-  <link rel="stylesheet" href="/css/components.css?v=9">
+  <link rel="stylesheet" href="/css/components.css?v=10">
   <link rel="stylesheet" href="/css/canvas.css?v=11">
   <link rel="stylesheet" href="/css/quicknotes.css?v=50">
   <link rel="stylesheet" href="/css/to-do-list.css?v=13">
@@ -50,7 +50,7 @@
 <script src="/js/desktop-refresh.js"></script>
 <script src="/js/desktop-update.js"></script>
 <script src="/js/desktop-settings.js"></script>
-<script src="/js/devboard.js?v=30" defer></script>
+<script src="/js/devboard.js?v=31" defer></script>
 </head>
 <body>
   <!-- The desktop login gate (guide §5.5 — the M2 pick LANDED; v0.1.2: the WEB LOGIN
@@ -101,6 +101,12 @@
        hibana:sync-progress events light the step rows live. -->
   <dialog class="dialog" id="db-sync-dialog" aria-labelledby="db-sync-title">
     <form class="modal db-sync-modal" method="dialog">
+      <!-- S233 (the owner's ask — every modal carries a close on its top right):
+           the corner ✕, a slim row ABOVE the hero so the v0.1.13 emblem
+           choreography stays untouched. It is the Close/Done buttons' twin
+           (a plain dlg.close()); a mid-round close leaves the Go round
+           finishing unseen, exactly like the bottom Close always did. -->
+      <div class="row"><button type="button" class="ghost" id="db-sync-x" data-i18n-aria-label="common.close" aria-label="Close" style="margin-inline-start:auto">✕</button></div>
       <!-- v0.1.13 (the owner ask: "also in modal i want syncing animation with
            icons and animation") — the HERO: the round's living emblem, an
            aria-hidden stage above the factual step rows. One 4.6rem emblem
@@ -159,7 +165,12 @@
        secondary ahead of it, trailing primary under RTL too). -->
   <dialog class="dialog" id="db-logout-dialog" aria-labelledby="db-logout-title">
     <form class="modal db-logout-modal" method="dialog">
-      <h2 id="db-logout-title" data-i18n="nav.signout">Sign out</h2>
+      <!-- S233 (the owner's ask — every modal carries a close on its top right):
+           the title rides a row spread with the corner ✕ on the inline end —
+           the Cancel button's twin (the controller's busy guard holds: an
+           in-flight sign-out cannot be dropped from the corner either). -->
+      <div class="row spread"><h2 id="db-logout-title" data-i18n="nav.signout">Sign out</h2>
+      <button type="button" class="ghost" id="db-logout-x" data-i18n-aria-label="common.close" aria-label="Close">✕</button></div>
       <p class="small muted" id="db-logout-body">Your boards live safe on the Hibana cloud — sign in again any time to load them back.</p>
       <p id="db-logout-error" class="error" role="alert" hidden></p>
       <div class="db-logout-actions">
@@ -190,7 +201,12 @@
        the very switcher it was created from). -->
   <dialog class="dialog" id="db-newproject-dialog" aria-labelledby="db-newproject-title">
     <form class="modal db-newproject-modal" id="db-newproject-form" method="dialog" novalidate>
-      <h2 id="db-newproject-title" data-i18n="cmdk.newProject">New project</h2>
+      <!-- S233 (the owner's ask — every modal carries a close on its top right):
+           the title rides a row spread with the corner ✕ on the inline end —
+           the Cancel button's twin through delegation (the controller's busy
+           guard holds: an in-flight create is never dropped from the corner). -->
+      <div class="row spread"><h2 id="db-newproject-title" data-i18n="cmdk.newProject">New project</h2>
+      <button type="button" class="ghost" id="db-newproject-x" data-i18n-aria-label="common.close" aria-label="Close">✕</button></div>
       <p class="small muted" id="db-newproject-body">Name the project — it is created on the Hibana cloud (hibana.ir) and its Kanban board opens right here.</p>
       <label><span data-i18n="sparks.title">Title</span>
         <input type="text" id="db-newproject-title-input" maxlength="200" autocomplete="off" spellcheck="false" dir="auto" required></label>
@@ -226,7 +242,12 @@
        own .db-sync-panel grammar. -->
   <dialog class="dialog" id="db-update-dialog" aria-labelledby="db-update-title">
     <form class="modal db-update-modal" method="dialog">
-      <h2 id="db-update-title">A new version is available</h2>
+      <!-- S233 (the owner's ask — every modal carries a close on its top right):
+           the title rides a row spread with the corner ✕ on the inline end —
+           the Later button's twin (a plain dlg.close(); the apply, once
+           started, runs Go-side to the swap regardless). -->
+      <div class="row spread"><h2 id="db-update-title">A new version is available</h2>
+      <button type="button" class="ghost" id="db-update-x" data-i18n-aria-label="common.close" aria-label="Close">✕</button></div>
       <p id="db-update-version">Hibana 0.1.13 → 0.1.14</p>
       <p class="small muted" id="db-update-kind">Portable update — 7.6 MB from GitHub</p>
       <p class="small muted" id="db-update-body">Your boards and your sign-in stay exactly as they are — Hibana just restarts into the new version.</p>
@@ -287,7 +308,13 @@
        post-flip reload is seamless. -->
   <dialog class="dialog dialog-wide" id="db-settings-dialog" aria-labelledby="db-settings-title">
     <form class="modal db-settings-modal" method="dialog">
-      <h2 id="db-settings-title" data-i18n="nav.settings">Settings</h2>
+      <!-- S233 (the owner's ask, with THIS sheet's screenshot: "Make sure all
+           modals, like the screenshot, which is settings, have close button on
+           top right."): the title rides a row spread with the corner ✕ on the
+           inline end — the Done button's twin (a plain dlg.close(); the gear
+           re-opens it any time). -->
+      <div class="row spread"><h2 id="db-settings-title" data-i18n="nav.settings">Settings</h2>
+      <button type="button" class="ghost" id="db-settings-x" data-i18n-aria-label="common.close" aria-label="Close">✕</button></div>
 
       <!-- 1. SYNC (the owner's first section): the copy names the cadence,
            the CTA delegates to the proven round. -->
@@ -500,6 +527,6 @@
     <div class="db-board" id="db-board" hidden></div>
     </div>
   </main>
-  <script src="/js/board-page.js?v=25" defer></script>
+  <script src="/js/board-page.js?v=26" defer></script>
 </body>
 </html>

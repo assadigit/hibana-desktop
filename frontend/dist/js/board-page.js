@@ -636,7 +636,11 @@
             delConfirmDlg.className = 'dialog'
             delConfirmDlg.innerHTML =
               '<form class="modal" method="dialog">' +
-                '<h3>' + B().esc(_t('db.delConfirm', 'Delete this task?')) + '</h3>' +
+                // S233 (every modal carries a close on its top right): the title
+                // row joins the task editor / labels / pinned-pictures grammar —
+                // h3 on the inline start, the ✕ on the inline end (the Cancel twin).
+                '<div class="row spread"><h3>' + B().esc(_t('db.delConfirm', 'Delete this task?')) + '</h3>' +
+                '<button type="button" class="ghost" id="db-del-x" aria-label="' + B().esc(_t('common.close', 'Close')) + '">✕</button></div>' +
                 '<p class="muted small" id="db-del-title"></p>' +
                 '<p class="muted small">' + B().esc(_t('db.delConfirmHint', 'This cannot be undone.')) + '</p>' +
                 '<div class="row" style="justify-content:flex-end;gap:.5rem;margin-top:1rem">' +
@@ -647,6 +651,7 @@
             document.body.appendChild(delConfirmDlg)
             delConfirmDlg.addEventListener('click', (e) => { if (e.target === delConfirmDlg) delConfirmDlg.close() })
             delConfirmDlg.querySelector('#db-del-cancel').onclick = () => delConfirmDlg.close()
+            delConfirmDlg.querySelector('#db-del-x').onclick = () => delConfirmDlg.close()
             delConfirmDlg.querySelector('#db-del-ok').onclick = async () => {
               const id = delConfirmDlg.dataset.tid
               if (!id) return
@@ -1048,7 +1053,7 @@
             if (window.HibanaBoard) return resolve(true)
             if (!injected && waited >= 1200) {
               injected = true
-              inject('/js/devboard.js?v=30') // keep in sync with the <head> tag + sw SHELL
+              inject('/js/devboard.js?v=31') // keep in sync with the <head> tag + sw SHELL
               if (!window.HibanaChips) inject('/js/chip-render.js?v=13') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
               if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA
             }

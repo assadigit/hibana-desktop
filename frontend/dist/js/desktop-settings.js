@@ -27,7 +27,7 @@
   // The sealed pin's package version (the sync script interpolates it at emit
   // time — the AppInfo binding carries version + webRef, and the island's own
   // package version rides the web-ref.json the script already knows).
-  var PIN_PACKAGE_VERSION = '0.4.1.40'
+  var PIN_PACKAGE_VERSION = '0.4.1.41'
 
   // The desktop-owned strings. The title rides the pin's own nav.settings key
   // and Sign out rides nav.signout (both in the markup via data-i18n); every
@@ -365,6 +365,10 @@
     if (signoutBtn) signoutBtn.addEventListener('click', function () { delegate('db-logout-button') })
     var doneBtn = document.getElementById('db-settings-done')
     if (doneBtn) doneBtn.addEventListener('click', function () { dlg.close() })
+    // S233: the corner ✕ — the Done button's twin (a plain close; the sheet's
+    // sections own no unsaved state — every control saves on its own click).
+    var xBtn = document.getElementById('db-settings-x')
+    if (xBtn) xBtn.addEventListener('click', function () { dlg.close() })
 
     // ---- SECTION 2's manual check (the auto-update loop keeps its boot+2h
     //      cadence untouched; this row is the manual trigger + the idle-time
