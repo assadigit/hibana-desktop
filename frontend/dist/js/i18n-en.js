@@ -679,6 +679,13 @@ window.__hibanaDictEN = {
       'db.empty.inprog.title': 'Nothing in progress', 'db.empty.inprog.text': 'Move tasks here when you start working.',
       'db.empty.done.title': 'No completed tasks', 'db.empty.done.text': 'Completed tasks will appear here.',
       'db.colMenu': 'Column actions', 'db.helperHint': 'Start by adding a task to move your work forward.',
+      // S237 (Focus Mode): the settings toggle + the two per-lane head buttons +
+      // the enlarge sheet strings. Every call site carries the inline EN fallback.
+      'db.focus.mode': 'Focus mode', 'db.focus.hint': 'Adds focus and enlarge controls to each board column. Off by default.',
+      'db.focus.toggle': 'Focus this column', 'db.focus.exit': 'Exit focus (Esc)',
+      'db.focus.enlarge': 'Enlarge this column',
+      'db.focus.sheetAdd': 'Add a task to this column…', 'db.focus.sheetTitle': '{lane} — {n} tasks',
+      'db.focus.on': 'Focus mode on', 'db.focus.off': 'Focus mode off',
       'db.pr.low': 'Low', 'db.pr.medium': 'Medium', 'db.pr.high': 'High', 'db.pr.urgent': 'Urgent',
       'db.category': 'Category', 'db.uncategorized': 'Uncategorized', 'db.newCategory': 'New category…',
       'db.categoryName': 'Category name (Feature Development…)', 'db.renameCategory': 'Rename category',

@@ -105,8 +105,27 @@ import { fileURLToPath } from 'node:url'
 // same top-right ✕ (the bottom button's twin — logout/newproject delegate to the
 // cancel button so the busy guards hold), and the shim's confirm port keeps its 1:1
 // app.js contract (head row + ✕).
-const PIN_REF = '8fbc8fa'
-const PIN_PACKAGE_VERSION = '0.4.1.41'
+// S237 (Focus Mode): the pin moved to dac869f (web v0.4.1.42) — the board's per-lane
+// focus layer: a settings-gated toggle (localStorage hibana-focus-mode, default off,
+// live via the hibana:focus-mode event) grows two head buttons per lane (blur-focus +
+// enlarge sheet) + the F/[/]/Esc keyboard layer. The NEW js/focus-core.js (the pure
+// decision core) JOINS the manifest — board.html @ the pin carries its own
+// <script src="/js/focus-core.js?v=1" defer> tag between sync-state.js and
+// devboard.js (kept verbatim — nothing strips or anchors it). The cache-busted
+// surfaces: board-page.js v27 / devboard.css v38 / i18n-en.js v104 / i18n.js v157
+// (its lazy i18n-fa.js?v=98 injector literal) / i18n-fa.js v98 / focus-core.js v1.
+// ZERO strip/insert anchors moved (no op anchors on any bumped line — the strip list
+// is app.js/boot/nav/…, untouched) and the seam patch find-strings are byte-identical
+// (the focus block adds no fetch — the quick-add rides devboard's createTask through
+// the existing api() choke point; the exactly-4 hibanaFetch count gate still holds).
+// The round's desktop-owned half: the settings panel's Appearance section gains the
+// Focus-mode row (writes the SAME key + dispatches hibana:focus-mode — the board
+// controller's own listener re-renders live; no Go binding), and probe-focus.mjs
+// becomes the 11th probe. NOTE: S236 (sprint-page optimistic mutations) was lost with
+// its sandbox (never pushed, never deployed) — the desktop ladder RESERVES its 0.1.33
+// slot (this round ships 0.1.34) so the documented ladder stays truthful.
+const PIN_REF = 'dac869f'
+const PIN_PACKAGE_VERSION = '0.4.1.42'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -175,7 +194,8 @@ const JS_FILES = [
   'js/sync-state.js',      // v2 (v0.4.1.37) — the per-card sync tracker (hibana-sync-status-spec §14: ONE source; devboard.js's task mutations report in, the badges + the Sync button count derive from it)
   'js/devboard.js',        // v29 (v0.4.1.37) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked()
   'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
-  'js/board-page.js',      // v24 (v0.4.1.38) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion (inline EN fallbacks, solid ⋯ dots)
+  'js/board-page.js',      // v24 (v0.4.1.38) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion (inline EN fallbacks, solid ⋯ dots) + the S237 focus block (the two per-lane head buttons, the enlarge sheet, the F/[/]/Esc capture layer — adds ZERO fetch: the quick-add rides devboard's createTask through the patched api() choke point)
+  'js/focus-core.js',      // v1 (v0.4.1.42, S237 NEW) — the focus decision core (parseToggle/cycleLane/escLayer/autoRestore/resolveFKey — pure, zero DOM). board.html @ the pin carries its own <script> tag between sync-state.js and devboard.js (kept verbatim); board-page.js's ensureLib self-heals it at the same ?v=1.
   'js/sprint-page.js',     // v22 (v0.4.1.40) — the /sprint.html page; the S235 embed (the owner ask: "When clicking on sprints, the app becomes problematic" — the sprint link 404'd on the desktop because sprint.html was never in the island). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
   'js/i18n-en.js',         // v102 (v0.4.1.38) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign empty-state / menu / helper keys
   'js/i18n.js',            // v155 (v0.4.1.37) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below)
@@ -1177,6 +1197,22 @@ const HTML_SETTINGS_OPS = [
             <button type="button" class="db-settings-seg-btn" id="db-settings-theme-system" data-seg-theme="system" aria-pressed="false">System</button>
           </div>
         </div>
+        <!-- S237 (Focus Mode): the board's focus toggle — the SAME localStorage key the
+             web settings page writes (hibana-focus-mode = 'on'|'off', default off — two
+             codebases, one switch). PURE client pref, no Go binding: the controller
+             writes the key + dispatches hibana:focus-mode, and the board controller's
+             own listener re-renders the five lane heads LIVE (the head buttons appear/
+             disappear without a reload). On: each lane header grows a focus button
+             (blur the other four lanes) + an enlarge button (the lane as a centered
+             sheet with a quick-add); F/[/]/Esc join the keyboard layer. -->
+        <div class="db-settings-row">
+          <span class="db-settings-row-label" id="db-settings-focus-label">Focus mode</span>
+          <div class="db-settings-seg" id="db-settings-focus-seg" role="group" aria-labelledby="db-settings-focus-label">
+            <button type="button" class="db-settings-seg-btn" id="db-settings-focus-on" data-seg-focus="on" aria-pressed="false">On</button>
+            <button type="button" class="db-settings-seg-btn" id="db-settings-focus-off" data-seg-focus="off" aria-pressed="true">Off</button>
+          </div>
+        </div>
+        <p class="small muted" id="db-settings-focus-hint">Adds focus and enlarge controls to each board column.</p>
       </section>
 
       <div class="db-settings-actions db-settings-footer">
@@ -4411,6 +4447,11 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       themeLight: 'Light',
       themeDark: 'Dark',
       themeSystem: 'System',
+      // S237 (Focus Mode) — the Appearance section's focus row.
+      focusLabel: 'Focus mode',
+      focusOn: 'On',
+      focusOff: 'Off',
+      focusHint: 'Adds focus and enlarge controls to each board column. Off by default.',
       langUnreachable: "Couldn't reach hibana.ir — the language is unchanged.",
       langSession: 'Your session expired — sign in again.',
       done: 'Done'
@@ -4465,6 +4506,11 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       themeLight: 'روشن',
       themeDark: 'تیره',
       themeSystem: 'سیستم',
+      // S237 (حالت تمرکز) — ردیف تمرکش بخش ظاهر.
+      focusLabel: 'حالت تمرکز',
+      focusOn: 'روشن',
+      focusOff: 'خاموش',
+      focusHint: 'کنترل‌های تمرکز و بزرگ‌نمایی به هر ستون برد اضافه می‌کند. پیش‌فرض خاموش است.',
       langUnreachable: 'اتصال به hibana.ir برقرار نشد — زبان تغییر نکرد.',
       langSession: 'نشست شما منقضی شده — دوباره وارد شوید.',
       done: 'انجام شد'
@@ -4543,7 +4589,9 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       langFa: document.getElementById('db-settings-lang-fa'),
       themeLight: document.getElementById('db-settings-theme-light'),
       themeDark: document.getElementById('db-settings-theme-claude-dark'),
-      themeSystem: document.getElementById('db-settings-theme-system')
+      themeSystem: document.getElementById('db-settings-theme-system'),
+      focusOn: document.getElementById('db-settings-focus-on'),
+      focusOff: document.getElementById('db-settings-focus-off')
     }
 
     // The Go shell's last check verdict (display state — the Update-now
@@ -4592,6 +4640,10 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       if (els.themeLight) els.themeLight.textContent = t('themeLight')
       if (els.themeDark) els.themeDark.textContent = t('themeDark')
       if (els.themeSystem) els.themeSystem.textContent = t('themeSystem')
+      setText('db-settings-focus-label', t('focusLabel'))
+      setText('db-settings-focus-hint', t('focusHint'))
+      if (els.focusOn) els.focusOn.textContent = t('focusOn')
+      if (els.focusOff) els.focusOff.textContent = t('focusOff')
       setText('db-settings-done-label', t('done'))
       if (versionInfo) paintVersion()
       if (accountInfo) paintAccount()
@@ -5017,6 +5069,32 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
     if (els.themeDark) els.themeDark.addEventListener('click', onThemePick)
     if (els.themeSystem) els.themeSystem.addEventListener('click', onThemePick)
 
+    // S237 (Focus Mode) — the board's focus toggle. PURE client pref (the SAME
+    // hibana-focus-mode key the web settings page writes): click writes the key +
+    // dispatches hibana:focus-mode on the document; the BOARD controller's own
+    // listener re-reads the key and re-renders the five lane heads LIVE (no Go
+    // binding, no reload). The segmented state mirrors localStorage at OPEN time
+    // and after every pick (the tray-radio aria-pressed grammar).
+    function currentFocusMode() {
+      try { return localStorage.getItem('hibana-focus-mode') === 'on' ? 'on' : 'off' } catch (e) { return 'off' }
+    }
+    function paintFocusSeg() {
+      var cur = currentFocusMode()
+      setSeg(els.focusOn, cur === 'on')
+      setSeg(els.focusOff, cur === 'off')
+    }
+    function onFocusPick(ev) {
+      var btn = ev.currentTarget
+      var next = btn.getAttribute('data-seg-focus')
+      if (next !== 'on' && next !== 'off') return
+      if (next === currentFocusMode()) return
+      try { localStorage.setItem('hibana-focus-mode', next) } catch (e) { /* private mode */ }
+      document.dispatchEvent(new CustomEvent('hibana:focus-mode', { detail: { on: next === 'on' } }))
+      paintFocusSeg()
+    }
+    if (els.focusOn) els.focusOn.addEventListener('click', onFocusPick)
+    if (els.focusOff) els.focusOff.addEventListener('click', onFocusPick)
+
     // ---- THE GO SHELL'S RELAYS (main.go's emit wiring): the tray and this
     //      sheet must agree on both segmented controls, and the update loop's
     //      verdict reaches the status line the same way the pill does. ----
@@ -5048,6 +5126,7 @@ const DESKTOP_SETTINGS_JS = `// desktop-settings.js — the settings page contro
       paintUpdateStatus()
       paintLangSeg()
       paintThemeSeg()
+      paintFocusSeg()
       resolveLive()
       dlg.showModal()
     }
@@ -6179,14 +6258,54 @@ function verifyDist(outDir, fileMap) {
     if (!settingsCss.includes(kept)) problems.push('css/desktop-settings.css: the settings style layer is missing "' + kept + '"')
   }
   if (!fs.existsSync(path.join(outDir, 'css/desktop-settings.css'))) problems.push('css/desktop-settings.css: missing from dist')
+
+  // (1s7) THE S237 FOCUS-MODE ROUND: the NEW pure decision core ships in the
+  // island (board.html @ the pin carries its own <script> tag — kept verbatim,
+  // loading BEFORE devboard.js), the copied board-page.js carries the focus
+  // layer (the two head buttons + the enlarge sheet + the keyboard layer —
+  // ZERO new fetch sites, the exactly-4 gate above still holds), the copied
+  // devboard.css carries the dim recipe + the sheet, and the settings panel's
+  // Appearance section grows the Focus-mode row — the SAME localStorage key +
+  // hibana:focus-mode event the web settings page writes (two codebases, one
+  // switch; no Go binding).
+  if (!fs.existsSync(path.join(outDir, 'js/focus-core.js'))) problems.push('js/focus-core.js: missing from dist (the S237 decision core)')
+  if (!indexHtml.includes('/js/focus-core.js?v=')) problems.push('index.html: the S237 focus-core.js <script> tag is missing')
+  {
+    const coreIdx = indexHtml.indexOf('/js/focus-core.js?v=')
+    if (coreIdx === -1 || coreIdx > indexHtml.indexOf('/js/devboard.js?v=')) {
+      problems.push('index.html: focus-core.js must load BEFORE devboard.js (board-page.js consumes window.HibanaFocusCore)')
+    }
+  }
+  for (const kept of ['HibanaFocusCore', 'hibana:focus-mode', 'data-db-focus', 'data-db-focus-sheet', 'db-focus-overlay', 'db-focus-sheet', 'focusState', 'stopImmediatePropagation']) {
+    if (!boardPage.includes(kept)) problems.push('js/board-page.js: the S237 focus layer is missing "' + kept + '"')
+  }
+  for (const kept of ['.db-cols[data-focus-active] .pd-col.db-dim', '.db-focus-overlay', '.db-focus-cards.db-cols', '@media (max-width: 799px)']) {
+    if (!devboardCss.includes(kept)) problems.push('css/devboard.css: the S237 focus recipe is missing "' + kept + '"')
+  }
+  for (const kept of ['id="db-settings-focus-seg"', 'data-seg-focus="on"', 'data-seg-focus="off"', 'id="db-settings-focus-hint"', 'id="db-settings-focus-label"']) {
+    if (!indexHtml.includes(kept)) problems.push('index.html: the S237 focus-mode settings row is missing "' + kept + '"')
+  }
+  if (!settingsJs.includes("localStorage.setItem('hibana-focus-mode'")) problems.push("js/desktop-settings.js: the focus row must write the SAME hibana-focus-mode key the web settings page writes")
+  if (!settingsJs.includes("dispatchEvent(new CustomEvent('hibana:focus-mode'")) problems.push('js/desktop-settings.js: the focus row must dispatch hibana:focus-mode (the board controller re-renders live on it)')
+  if (!settingsJs.includes('focusLabel') || !settingsJs.includes('حالت تمرکز')) problems.push('js/desktop-settings.js: the focus row STR pair is missing (EN + FA labels)')
   if (!fs.existsSync(path.join(outDir, 'js/desktop-settings.js'))) problems.push('js/desktop-settings.js: missing from dist')
 
   // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the
   // persisted mirror-meta pref is Go-side; the island never forks it). The bare WORD
   // may appear in comments (desktop-theme.js's header says "NO localStorage:"), so
   // the gate greps for USAGE — a member/index access on the store.
+  // ONE documented exception (S237, the spec's explicit call): the settings panel's
+  // Focus-mode row writes the pure-client 'hibana-focus-mode' key — the SAME key
+  // the web settings page writes and the COPIED board-page.js reads (two
+  // codebases, one switch, no Go binding). It is a UI preference, not mirror-meta
+  // state — a Go round-trip would ADD a divergence surface, not remove one. The
+  // exception is LINE-PRECISE: every other localStorage usage still fails.
   for (const rel of ['js/desktop-shim.js', 'js/desktop-audio.js', 'js/desktop-login.js', 'js/desktop-theme.js', 'js/desktop-sync.js', 'js/desktop-logout.js', 'js/desktop-newproject.js', 'js/desktop-refresh.js', 'js/desktop-update.js', 'js/desktop-settings.js', 'css/desktop-login.css', 'css/desktop-sync.css', 'css/desktop-logout.css', 'css/desktop-newproject.css', 'css/desktop-refresh.css', 'css/desktop-update.css', 'css/desktop-settings.css', 'index.html']) {
-    if (/\blocalStorage\s*[.[]/.test(fileMap[rel] || '')) problems.push(rel + ': localStorage usage — the island must never touch storage (the Go mirror owns persistence)')
+    let gated = fileMap[rel] || ''
+    if (rel === 'js/desktop-settings.js' && gated) {
+      gated = gated.split('\n').filter((l) => l.indexOf("'hibana-focus-mode'") === -1).join('\n')
+    }
+    if (/\blocalStorage\s*[.[]/.test(gated)) problems.push(rel + ': localStorage usage — the island must never touch storage (the Go mirror owns persistence; the ONLY line-precise exception is the S237 focus-mode row\'s hibana-focus-mode writes)')
   }
 
   // CSS url()/@import refs that are DEFINED in kept sheets but NEVER APPLIED on the
@@ -6402,7 +6521,7 @@ function main() {
   for (const line of sprintAdapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
   process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + sprint.html (S235) + js/desktop-shim.js + js/desktop-audio.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + js/desktop-update.js + css/desktop-update.css + js/desktop-settings.js + css/desktop-settings.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the seven synthesized cues + the seam observer (S234: archive + create cues + the collection-path classifier — archive-done, create-task/sprint/category, restore-archived-task, delete-archived-task, delete-category, restore-project), the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines) + the v0.1.19 test-connection button (TestGithubConnection, the typed/saved/anonymous verdict lines, the private-repo signal) + the apply-failure release-page note (#db-update-fallback, the pageOpened flag, both language pairs), no-storage), no-404 asset loop, S235 sprint.html embed (the strip ops + the desktop-owned chain + the cross-page link interceptor), node --check\n')
+  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the seven synthesized cues + the seam observer (S234: archive + create cues + the collection-path classifier — archive-done, create-task/sprint/category, restore-archived-task, delete-archived-task, delete-category, restore-project), the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines) + the v0.1.19 test-connection button (TestGithubConnection, the typed/saved/anonymous verdict lines, the private-repo signal) + the apply-failure release-page note (#db-update-fallback, the pageOpened flag, both language pairs), no-storage (the S237 line-precise hibana-focus-mode exception)), the S237 focus-mode round (focus-core.js in the manifest + its tag + load order before devboard.js, the board-page focus layer markers, the devboard.css dim/sheet recipe, the settings panel Focus-mode row + the same-key write + the live hibana:focus-mode dispatch + the EN/FA STR pair), no-404 asset loop, S235 sprint.html embed (the strip ops + the desktop-owned chain + the cross-page link interceptor), node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }

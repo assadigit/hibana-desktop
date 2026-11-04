@@ -1548,3 +1548,115 @@ main.board-shell .db-frame .db-toolbar { padding: 0.25rem 0.2rem 0.85rem; }
 @media (prefers-reduced-motion: reduce) {
   .db-cols .pd-task-add, .db-cols .pd-empty-add, .db-cols .pd-task { transition: none; }
 }
+
+/* ---- S237 FOCUS MODE ---------------------------------------------------------
+   The board's focus layer (spec S237 §1.3): a per-lane blur-focus (the other
+   four lanes dim + go pointer-inert; the focused lane stays crisp and fully
+   interactive) and a per-lane enlarge sheet (a centered dialog over a dimmed
+   board with a sticky auto-focused quick-add). All logical properties — FA/RTL
+   mirrors for free. When the toggle is OFF none of these selectors ever match
+   (board-page.js emits no buttons, no classes, no attributes) — the board is
+   byte-identical to today's. The [ / ] cycling + Esc layering live in
+   board-page.js + focus-core.js. */
+
+/* The dim recipe — ONE class on the lane container, never per-card work, no
+   layout shift. The transition is declared unconditionally on the lane (it is
+   INERT while the toggle is off — filter/opacity never change anywhere else —
+   and it must already be in effect for the enter/move/exit beats to play). */
+.db-cols > .pd-col { transition: filter 150ms ease, opacity 150ms ease; }
+.db-cols[data-focus-active] .pd-col.db-dim {
+  filter: blur(3px) saturate(.5);
+  opacity: .4;
+  pointer-events: none;   /* dimmed lanes are inert to the pointer… */
+  user-select: none;      /* …and to selection — but NEVER to the keyboard:  */
+                          /* DOM order is untouched, Tab users pass through. */
+}
+
+/* The pressed focus button rides the ⋯ menu button's own active recipe. */
+.db-focus-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+/* A whisper of separation between the two focus controls + the ⋯ after them. */
+.db-focus-btn, .db-focus-enlarge { margin-inline-end: 1px; }
+
+/* The enlarge sheet — centered over a dimmed-board overlay. It sits BELOW the
+   task editor (z 90) so an editor opened from a sheet card stacks on top, and
+   below the confirm overlay (z 800) + toasts (z 600). */
+.db-focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgb(15 12 8 / 0.45);       /* the .db-modal backdrop recipe */
+  display: grid;
+  place-items: center;
+  padding: 4vh 4vw;
+}
+.db-focus-overlay[hidden] { display: none; }
+.db-focus-sheet {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 18px);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.28);
+  inline-size: min(34rem, 100%);         /* one lane's worth of reading measure */
+  max-block-size: 84vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;                       /* the head + quick-add stay pinned */
+}
+.db-focus-sheet-head {
+  flex: none;
+  padding: 0.85rem 1.1rem 0.55rem;
+  border-block-end: 1px solid var(--line);
+}
+.db-focus-sheet-head h3 { margin: 0; display: inline-flex; align-items: center; gap: 0.45rem; }
+.db-focus-sheet-lane { font-size: 0.9375rem; }
+/* The sticky quick-add — pinned under the head, above the scroll. */
+.db-focus-quick {
+  flex: none;
+  padding: 0.6rem 1.1rem;
+  border-block-end: 1px solid var(--line);
+  background: var(--statcard-bg);
+}
+.db-focus-quick-input {
+  inline-size: 100%;
+  min-block-size: 34px;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius-sm, 14px) - 5px);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+}
+.db-focus-quick-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -1px; }
+.db-focus-quick-input:disabled { opacity: 0.6; }
+/* The card list — the lane's mirror. It carries the .db-cols class so every
+   `.db-cols …` card rule applies VERBATIM (the markup is cloned from the lane);
+   only the lane GRID geometry is neutralized: one column, vertical, scrolling. */
+.db-focus-cards.db-cols {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  min-inline-size: 0;
+  gap: 0.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.7rem;
+  flex: 1 1 auto;
+  min-block-size: 8rem;
+}
+.db-focus-cards .pd-task-wrap { flex: none; }
+.db-focus-empty { margin: auto; padding: 1.2rem 0.75rem; }
+/* v1: the sheet is dragless — the markup is shared, the affordance is not. */
+.db-focus-sheet .pd-task { -webkit-user-drag: none; }
+
+/* <800px (spec §1.6): the two head buttons hide — the board is effectively
+   single-column there and the feature adds nothing. The settings toggle stays
+   visible on BOTH platforms; the F/[/] shortcuts no-op in board-page.js. */
+@media (max-width: 799px) {
+  .db-focus-btn, .db-focus-enlarge { display: none; }
+}
+
+/* prefers-reduced-motion: instant state changes — the dim/beat transitions
+   retire (the existing block above already kills the card/add transitions). */
+@media (prefers-reduced-motion: reduce) {
+  .db-cols > .pd-col { transition: none; }
+}

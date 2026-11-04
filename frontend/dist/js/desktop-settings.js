@@ -27,7 +27,7 @@
   // The sealed pin's package version (the sync script interpolates it at emit
   // time — the AppInfo binding carries version + webRef, and the island's own
   // package version rides the web-ref.json the script already knows).
-  var PIN_PACKAGE_VERSION = '0.4.1.41'
+  var PIN_PACKAGE_VERSION = '0.4.1.42'
 
   // The desktop-owned strings. The title rides the pin's own nav.settings key
   // and Sign out rides nav.signout (both in the markup via data-i18n); every
@@ -91,6 +91,11 @@
       themeLight: 'Light',
       themeDark: 'Dark',
       themeSystem: 'System',
+      // S237 (Focus Mode) — the Appearance section's focus row.
+      focusLabel: 'Focus mode',
+      focusOn: 'On',
+      focusOff: 'Off',
+      focusHint: 'Adds focus and enlarge controls to each board column. Off by default.',
       langUnreachable: "Couldn't reach hibana.ir — the language is unchanged.",
       langSession: 'Your session expired — sign in again.',
       done: 'Done'
@@ -145,6 +150,11 @@
       themeLight: 'روشن',
       themeDark: 'تیره',
       themeSystem: 'سیستم',
+      // S237 (حالت تمرکز) — ردیف تمرکش بخش ظاهر.
+      focusLabel: 'حالت تمرکز',
+      focusOn: 'روشن',
+      focusOff: 'خاموش',
+      focusHint: 'کنترل‌های تمرکز و بزرگ‌نمایی به هر ستون برد اضافه می‌کند. پیش‌فرض خاموش است.',
       langUnreachable: 'اتصال به hibana.ir برقرار نشد — زبان تغییر نکرد.',
       langSession: 'نشست شما منقضی شده — دوباره وارد شوید.',
       done: 'انجام شد'
@@ -223,7 +233,9 @@
       langFa: document.getElementById('db-settings-lang-fa'),
       themeLight: document.getElementById('db-settings-theme-light'),
       themeDark: document.getElementById('db-settings-theme-claude-dark'),
-      themeSystem: document.getElementById('db-settings-theme-system')
+      themeSystem: document.getElementById('db-settings-theme-system'),
+      focusOn: document.getElementById('db-settings-focus-on'),
+      focusOff: document.getElementById('db-settings-focus-off')
     }
 
     // The Go shell's last check verdict (display state — the Update-now
@@ -272,6 +284,10 @@
       if (els.themeLight) els.themeLight.textContent = t('themeLight')
       if (els.themeDark) els.themeDark.textContent = t('themeDark')
       if (els.themeSystem) els.themeSystem.textContent = t('themeSystem')
+      setText('db-settings-focus-label', t('focusLabel'))
+      setText('db-settings-focus-hint', t('focusHint'))
+      if (els.focusOn) els.focusOn.textContent = t('focusOn')
+      if (els.focusOff) els.focusOff.textContent = t('focusOff')
       setText('db-settings-done-label', t('done'))
       if (versionInfo) paintVersion()
       if (accountInfo) paintAccount()
@@ -697,6 +713,32 @@
     if (els.themeDark) els.themeDark.addEventListener('click', onThemePick)
     if (els.themeSystem) els.themeSystem.addEventListener('click', onThemePick)
 
+    // S237 (Focus Mode) — the board's focus toggle. PURE client pref (the SAME
+    // hibana-focus-mode key the web settings page writes): click writes the key +
+    // dispatches hibana:focus-mode on the document; the BOARD controller's own
+    // listener re-reads the key and re-renders the five lane heads LIVE (no Go
+    // binding, no reload). The segmented state mirrors localStorage at OPEN time
+    // and after every pick (the tray-radio aria-pressed grammar).
+    function currentFocusMode() {
+      try { return localStorage.getItem('hibana-focus-mode') === 'on' ? 'on' : 'off' } catch (e) { return 'off' }
+    }
+    function paintFocusSeg() {
+      var cur = currentFocusMode()
+      setSeg(els.focusOn, cur === 'on')
+      setSeg(els.focusOff, cur === 'off')
+    }
+    function onFocusPick(ev) {
+      var btn = ev.currentTarget
+      var next = btn.getAttribute('data-seg-focus')
+      if (next !== 'on' && next !== 'off') return
+      if (next === currentFocusMode()) return
+      try { localStorage.setItem('hibana-focus-mode', next) } catch (e) { /* private mode */ }
+      document.dispatchEvent(new CustomEvent('hibana:focus-mode', { detail: { on: next === 'on' } }))
+      paintFocusSeg()
+    }
+    if (els.focusOn) els.focusOn.addEventListener('click', onFocusPick)
+    if (els.focusOff) els.focusOff.addEventListener('click', onFocusPick)
+
     // ---- THE GO SHELL'S RELAYS (main.go's emit wiring): the tray and this
     //      sheet must agree on both segmented controls, and the update loop's
     //      verdict reaches the status line the same way the pill does. ----
@@ -728,6 +770,7 @@
       paintUpdateStatus()
       paintLangSeg()
       paintThemeSeg()
+      paintFocusSeg()
       resolveLive()
       dlg.showModal()
     }

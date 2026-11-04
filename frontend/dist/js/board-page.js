@@ -48,6 +48,240 @@
         let filterQuery = ''
         const filterSearchTimer = { t: null }
 
+        // ---- S237 (Focus Mode) ----------------------------------------------------
+        // The PURE decisions live in public/js/focus-core.js (window.HibanaFocusCore —
+        // parseToggle / cycleLane / escLayer / autoRestore / resolveFKey, covered by
+        // src/tests/focus-mode-s237.test.ts). This block owns the DOM half: the two
+        // per-lane head buttons (blur-focus + enlarge), the dim recipe re-applied at
+        // every render's tail (innerHTML rebuilds the lanes — the focus must survive
+        // task creates/edits/moves), the enlarge sheet (a centered RTL-native dialog
+        // over a dimmed-board overlay, sticky auto-focused quick-add, cards cloned
+        // from the board lane so the markup can NEVER drift), the F / [ / ] / Esc
+        // keyboard layer (capture phase — one Esc peels EXACTLY one layer and a
+        // consumed press never reaches zen-mode's own Esc listener), and the
+        // hibana:focus-mode listener (both settings surfaces — the web page + the
+        // desktop panel — write the SAME localStorage key and dispatch it, so the
+        // toggle is live). When the toggle is OFF the board renders byte-identical
+        // markup to today's: no buttons, no classes, no CSS effect.
+        const FC = () => window.HibanaFocusCore
+        const focus = { enabled: false, focusedStatus: null, sheetStatus: null }
+        const focusStorage = {
+          readToggle() { try { return localStorage.getItem(FC().TOGGLE_KEY) } catch { return null } },
+          readLast() { try { return localStorage.getItem(FC().LAST_KEY) } catch { return null } },
+          writeLast(st) { try { localStorage.setItem(FC().LAST_KEY, st) } catch { /* private mode */ } },
+        }
+        focus.enabled = FC() ? FC().parseToggle(focusStorage.readToggle()) : false
+        let hoverLane = null
+        // <800px (spec §1.6): the two head buttons hide via CSS and the F/[/]
+        // shortcuts go quiet. prefers-reduced-motion is handled ENTIRELY in CSS
+        // (the transition is declared in devboard.css + killed by the media query).
+        const narrowBoard = () => !!(window.matchMedia && window.matchMedia('(max-width: 799px)').matches)
+
+        // The two head-button glyphs (target + expand) — inline SVG, board style.
+        const I_TARGET = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>'
+        const I_EXPAND = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>'
+
+        // The dim recipe — ONE class per lane container (never per-card work, no
+        // layout shift). Called at render's tail + by the focus mutators (class-level
+        // only — a full re-render would rebuild the DOM and skip the ~150ms beat).
+        const syncFocusBtns = () => {
+          root.querySelectorAll('.db-focus-btn').forEach((btn) => {
+            const on = btn.getAttribute('data-db-focus') === focus.focusedStatus
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false')
+            btn.classList.toggle('is-active', on)
+            btn.setAttribute('title', on ? _t('db.focus.exit', 'Exit focus (Esc)') : _t('db.focus.toggle', 'Focus this column'))
+          })
+        }
+        const applyFocus = () => {
+          const colsEl = root.querySelector('.db-cols')
+          if (!colsEl) return
+          if (focus.enabled && focus.focusedStatus) colsEl.setAttribute('data-focus-active', '')
+          else colsEl.removeAttribute('data-focus-active')
+          root.querySelectorAll('.db-cols > .pd-col').forEach((col) => {
+            col.classList.toggle('db-dim', !!(focus.enabled && focus.focusedStatus && col.getAttribute('data-status') !== focus.focusedStatus))
+          })
+          syncFocusBtns()
+        }
+        const setFocus = (st) => {
+          if (!focus.enabled || !FC() || !FC().validStatus(st)) return
+          focus.focusedStatus = st
+          focusStorage.writeLast(st) // hibana-focus-last remembers the lane (spec §1.5)
+          applyFocus()
+        }
+        const clearFocus = () => {
+          if (!focus.focusedStatus) return
+          focus.focusedStatus = null // the LAST key stays — it remembers the lane
+          applyFocus()
+        }
+
+        // ---- the enlarge sheet (spec §1.3) ---------------------------------------
+        // A centered modal over a dimmed-board overlay: its own internal scroll, the
+        // S233 close grammar (title row + corner ✕ on the inline end — RTL mirrors),
+        // a sticky auto-focused quick-add whose Enter creates through the SAME
+        // devboard createTask call the editor uses (no duplicated POST logic; the
+        // desktop's S234 audio classifier sees the create cue), and the lane's cards
+        // CLONED from the board lane's .pd-tasks (byte-identical markup + the same
+        // filter view — the sheet is the lane's mirror, enlarged). Drag/drop is
+        // disabled inside it (v1 — reading/adding/editing; cross-lane moves happen
+        // on the board). One sheet at a time; opening another lane replaces it.
+        // Sheets are ALWAYS transient — never restored on load.
+        let sheetEl = null
+        let sheetReturnBtn = null
+        const laneTitleOf = (st) => {
+          const lane = root.querySelector('.db-cols > .pd-col[data-status="' + st + '"]')
+          const el = lane ? lane.querySelector('.pd-col-title') : null
+          return el ? el.textContent.trim() : B().statusLabel(st)
+        }
+        const laneCountOf = (st) => {
+          const lane = root.querySelector('.db-cols > .pd-col[data-status="' + st + '"]')
+          const el = lane ? lane.querySelector('.detail-tab-count') : null
+          const n = el ? parseInt(String(el.textContent).replace(/[^0-9]/g, ''), 10) : NaN
+          return Number.isFinite(n) ? n : B().state.tasks.filter((x) => x.status === st).length
+        }
+        const refreshSheet = () => {
+          if (!sheetEl || !focus.sheetStatus) return
+          const st = focus.sheetStatus
+          const lane = root.querySelector('.db-cols > .pd-col[data-status="' + st + '"]')
+          const laneBody = lane ? lane.querySelector('.pd-tasks') : null
+          const laneEl = sheetEl.querySelector('[data-sheet-lane]')
+          const countEl = sheetEl.querySelector('[data-sheet-count]')
+          if (laneEl) laneEl.textContent = laneTitleOf(st)
+          if (countEl) countEl.textContent = B().faDig(laneCountOf(st))
+          const dialog = sheetEl.querySelector('.db-focus-sheet')
+          if (dialog) {
+            dialog.setAttribute('aria-label', _t('db.focus.sheetTitle', '{lane} — {n} tasks')
+              .replace('{lane}', laneTitleOf(st)).replace('{n}', String(laneCountOf(st))))
+          }
+          const input = sheetEl.querySelector('[data-db-focus-quick]')
+          if (input) input.setAttribute('placeholder', _t('db.focus.sheetAdd', 'Add a task to this column…'))
+          const cardsEl = sheetEl.querySelector('[data-sheet-cards]')
+          if (cardsEl && laneBody) {
+            // The lane's exact inner markup — cards AND the empty-state group —
+            // cloned so the sheet can never drift from the board lane.
+            cardsEl.innerHTML = laneBody.innerHTML
+            // v1: no drag from the sheet — the markup is shared verbatim, so the
+            // switch happens post-render (plus the dragstart guard below).
+            cardsEl.querySelectorAll('.pd-task').forEach((el) => el.setAttribute('draggable', 'false'))
+            injectDbCardMenus()
+          }
+        }
+        const onSheetQuickAdd = async (e) => {
+          e.preventDefault()
+          if (!focus.sheetStatus) return
+          const input = e.currentTarget.querySelector('[data-db-focus-quick]')
+          const title = String(input.value || '').trim()
+          if (!title) { input.focus(); return }
+          input.disabled = true
+          try {
+            // The SAME creation call the board's editor path uses (devboard.js's
+            // createTask → POST /api/projects/:id/devtasks through the one api()
+            // choke point) — the quick-add never rolls its own POST.
+            await B().createTask({ title, status: focus.sheetStatus, priority: 'medium' })
+            window.hibana?.toast(_t('db.taskAdded', 'Task added'), 'ok')
+            input.value = '' // cleared + kept open for rapid entry (spec §1.3)
+            await reload() // reload → render → refreshSheet: count + cards update
+          } catch {
+            window.hibana?.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
+          }
+          input.disabled = false
+          const fresh = sheetEl ? sheetEl.querySelector('[data-db-focus-quick]') : null
+          if (fresh) fresh.focus()
+        }
+        const ensureSheet = () => {
+          if (sheetEl) return sheetEl
+          sheetEl = document.createElement('div')
+          sheetEl.id = 'db-focus-overlay'
+          sheetEl.className = 'db-focus-overlay'
+          sheetEl.hidden = true
+          sheetEl.innerHTML =
+            '<div class="db-focus-sheet" role="dialog" aria-modal="true" aria-labelledby="db-focus-sheet-title">' +
+              '<div class="row spread db-focus-sheet-head">' +
+                '<h3 id="db-focus-sheet-title"><span class="db-focus-sheet-lane" data-sheet-lane></span> <span class="detail-tab-count" data-sheet-count></span></h3>' +
+                '<button type="button" class="ghost" data-db-focus-sheet-x aria-label="' + B().esc(_t('common.close', 'Close')) + '" title="' + B().esc(_t('common.close', 'Close')) + '">✕</button>' +
+              '</div>' +
+              '<form class="db-focus-quick" autocomplete="off">' +
+                '<input type="text" class="db-focus-quick-input" data-db-focus-quick dir="auto" maxlength="150" aria-label="' + B().esc(_t('db.focus.sheetAdd', 'Add a task to this column…')) + '">' +
+              '</form>' +
+              '<div class="db-focus-cards db-cols" data-sheet-cards></div>' +
+            '</div>'
+          document.body.appendChild(sheetEl)
+          // Backdrop click closes (the delete-confirm's own grammar).
+          sheetEl.addEventListener('click', (e) => { if (e.target === sheetEl) closeSheet() })
+          sheetEl.querySelector('[data-db-focus-sheet-x]').addEventListener('click', closeSheet)
+          sheetEl.querySelector('form.db-focus-quick').addEventListener('submit', onSheetQuickAdd)
+          return sheetEl
+        }
+        const openSheet = (st) => {
+          if (!focus.enabled || !FC() || !FC().validStatus(st)) return
+          ensureSheet()
+          focus.sheetStatus = st // one sheet at a time — a second open replaces it
+          refreshSheet()
+          sheetReturnBtn = document.querySelector('.db-focus-enlarge[data-db-focus-sheet="' + st + '"]')
+          sheetEl.hidden = false
+          const input = sheetEl.querySelector('[data-db-focus-quick]')
+          if (input) input.focus() // sticky auto-focus: ready to type immediately
+        }
+        const closeSheet = () => {
+          if (!sheetEl || focus.sheetStatus == null) return
+          focus.sheetStatus = null
+          sheetEl.hidden = true
+          if (sheetReturnBtn && document.contains(sheetReturnBtn)) sheetReturnBtn.focus()
+          sheetReturnBtn = null
+        }
+
+        // ---- the keyboard layer (F / [ / ] / Esc — toggle-gated, spec §1.4) ------
+        // Esc registers on the CAPTURE phase + stopImmediatePropagation when
+        // consumed: one press peels EXACTLY one layer (sheet → focus) and never
+        // double-fires zen-mode's own (web-only) Esc listener in the same press.
+        // When no focus layer is ours the press is left alone — menus, dialogs and
+        // zen keep their own Esc contracts.
+        const isTyping = (e) => {
+          const t = e.target
+          if (!(t instanceof Element) || !t.closest) return false
+          return !!t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
+        }
+        ctx.on('keydown', (e) => {
+          if (!focus.enabled || !FC()) return
+          if (e.ctrlKey || e.metaKey || e.altKey) return
+          if (e.key === 'Escape') {
+            const layer = FC().escLayer(focus)
+            if (layer === 'sheet') { e.stopImmediatePropagation(); closeSheet() }
+            else if (layer === 'focus') { e.stopImmediatePropagation(); clearFocus() }
+            return
+          }
+          if (narrowBoard()) return // <800px the F/[/] shortcuts go quiet (spec §1.6)
+          if (isTyping(e)) return // never steal keys from a field
+          if (e.key === 'f' || e.key === 'F') {
+            const target = FC().resolveFKey(hoverLane, focusStorage.readLast())
+            if (!target) return // no hover, no last lane — F never guesses
+            e.preventDefault()
+            if (target === focus.focusedStatus) clearFocus() // natural toggle — the button's twin
+            else setFocus(target)
+            return
+          }
+          if ((e.key === '[' || e.key === ']') && focus.focusedStatus) {
+            e.preventDefault()
+            setFocus(FC().cycleLane(focus.focusedStatus, e.key === ']' ? 1 : -1))
+          }
+        }, true) // CAPTURE — see the block comment above
+        // The F target: the lane under the cursor (mouseover bubbles through the
+        // delegated layer; the last hovered lane sticks once the pointer leaves).
+        ctx.on('mouseover', (e) => {
+          const t = e.target instanceof Element ? e.target : null
+          const col = t && t.closest ? t.closest('.db-cols > .pd-col') : null
+          if (col) hoverLane = col.getAttribute('data-status')
+        })
+        // Both settings surfaces (the web settings page + the desktop panel) write
+        // the key then dispatch hibana:focus-mode — re-read + re-render so the
+        // toggle is LIVE (no reload; the desktop island ships this same controller).
+        ctx.on('hibana:focus-mode', () => {
+          const next = FC() ? FC().parseToggle(focusStorage.readToggle()) : false
+          if (next === focus.enabled) return
+          focus.enabled = next
+          if (!next) { clearFocus(); closeSheet() }
+          render()
+        })
+
         const render = () => {
           const S = B().state
           const titleEl = document.getElementById('db-title')
@@ -209,7 +443,16 @@
             }
             menuItems.push('<button type="button" role="menuitem" class="db-col-menu-item" data-db-copy="' + st + '">' + I_CLIPBOARD + '<span>' + B().esc(_t('pd.quickCopy', 'Quick copy')) + '</span></button>')
             menuItems.push('<button type="button" role="menuitem" class="db-col-menu-item" data-db-export="' + st + '">' + I_DOWNLOAD + '<span>' + B().esc(_t('pd.exportMd', 'Export Markdown')) + '</span></button>')
-            const colActionsHtml = '<span class="db-col-menu-wrap">' +
+            // S237 (Focus Mode): when the toggle is on, the two per-lane head buttons
+            // ride INSIDE the ⋯ wrap, BEFORE the ellipsis button — the wrap already
+            // owns the header's inline-end grouping + the menu anchor, so the
+            // existing grammar is untouched (ghost .db-col-menu-btn metrics). Off →
+            // the markup is byte-identical to today's board.
+            const focusHeadHtml = focus.enabled
+              ? '<button type="button" class="ghost small db-col-menu-btn db-focus-btn' + (focus.focusedStatus === st ? ' is-active' : '') + '" data-db-focus="' + st + '" aria-pressed="' + (focus.focusedStatus === st ? 'true' : 'false') + '" aria-label="' + B().esc(_t('db.focus.toggle', 'Focus this column')) + '" title="' + B().esc(focus.focusedStatus === st ? _t('db.focus.exit', 'Exit focus (Esc)') : _t('db.focus.toggle', 'Focus this column')) + '">' + I_TARGET + '</button>' +
+                '<button type="button" class="ghost small db-col-menu-btn db-focus-enlarge" data-db-focus-sheet="' + st + '" aria-label="' + B().esc(_t('db.focus.enlarge', 'Enlarge this column')) + '" title="' + B().esc(_t('db.focus.enlarge', 'Enlarge this column')) + '">' + I_EXPAND + '</button>'
+              : ''
+            const colActionsHtml = '<span class="db-col-menu-wrap">' + focusHeadHtml +
               '<button type="button" class="ghost small db-col-menu-btn" data-db-col-menu aria-haspopup="true" aria-expanded="false" aria-label="' + B().esc(colMenuLabel) + '" title="' + B().esc(colMenuLabel) + '">' + I_ELLIPSIS + '</button>' +
               '<div class="db-col-menu" role="menu" aria-label="' + B().esc(colMenuLabel) + '" hidden>' + menuItems.join('') + '</div>' +
             '</span>'
@@ -325,6 +568,11 @@
           // Inject the ⋯ menu content into each .db-card-menu (the cards re-render on
           // every load(), so we fill the menu placeholders + attach handlers here).
           injectDbCardMenus()
+          // S237: the focus tail — the dim recipe re-applies after every rebuild
+          // (the blur focus survives re-renders) and an open enlarge sheet
+          // refreshes its mirror (every mutation funnels through render()).
+          applyFocus()
+          refreshSheet()
         }
 
         const reload = async () => { await B().load(projectId); render() }
@@ -732,6 +980,21 @@
             })
             return
           }
+          // S237 (Focus Mode): the two per-lane head buttons (focus toggle + enlarge).
+          const focusBtn = e.target.closest('[data-db-focus]')
+          if (focusBtn) {
+            e.preventDefault()
+            const st = focusBtn.getAttribute('data-db-focus')
+            if (focus.focusedStatus === st) clearFocus() // same-lane press = exit (natural toggle)
+            else setFocus(st)
+            return
+          }
+          const enlargeBtn = e.target.closest('[data-db-focus-sheet]')
+          if (enlargeBtn) {
+            e.preventDefault()
+            openSheet(enlargeBtn.getAttribute('data-db-focus-sheet'))
+            return
+          }
           const add = e.target.closest('[data-add]')
           if (add) {
             B().openEditor(null, { defaults: { status: add.dataset.add }, onSaved: reload })
@@ -916,6 +1179,9 @@
         ctx.on('dragstart', (e) => {
           const card = e.target.closest('[data-task-card]')
           if (!card) return
+          // S237: the enlarge sheet is dragless (v1) — its cards render through the
+          // same markup but never start a board drag.
+          if (card.closest('.db-focus-sheet')) return
           drag = card
           e.dataTransfer.effectAllowed = 'move'
           e.dataTransfer.setData('text/plain', card.dataset.taskCard)
@@ -1054,6 +1320,7 @@
             if (!injected && waited >= 1200) {
               injected = true
               inject('/js/devboard.js?v=31') // keep in sync with the <head> tag + sw SHELL
+              if (!window.HibanaFocusCore) inject('/js/focus-core.js?v=1') // S237: the focus decision core — keep in sync with the <head> tag
               if (!window.HibanaChips) inject('/js/chip-render.js?v=13') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
               if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA
             }
@@ -1082,6 +1349,10 @@
         const boot = async () => {
           const ok = await ensureLib()
           if (!ok) return fail()
+          // S237: the probe surface — window.HibanaBoard.focusState() reports the live
+          // { enabled, focusedStatus, sheetStatus } triple (scripts/probe-focus.mjs
+          // reads it; the desktop island ships this same controller verbatim).
+          if (window.HibanaBoard) window.HibanaBoard.focusState = () => ({ enabled: focus.enabled, focusedStatus: focus.focusedStatus, sheetStatus: focus.sheetStatus })
           // S205 (spec §3.2): the entry point's default-project resolution — the
           // last-used board first (its load doubles as validation: a 404/deleted project
           // falls straight through), else the most-recent accessible project
@@ -1119,6 +1390,13 @@
             if (err && err.status === 404) return gone()
             return fail()
           }
+          // S237 (spec §1.5 auto-restore): toggle on + a valid remembered lane →
+          // re-enter that lane's blur focus immediately (fresh DOM — no animation).
+          // The enlarge sheet is ALWAYS transient — never restored.
+          {
+            const restore = FC() ? FC().autoRestore(focus.enabled, focusStorage.readLast()) : null
+            if (restore) { focus.focusedStatus = restore; applyFocus() }
+          }
           if (openTask && B().findTask(openTask)) B().openEditor(openTask, { onSaved: reload })
           else if (addStatus) B().openEditor(null, { defaults: { status: addStatus }, onSaved: reload })
         }
@@ -1132,6 +1410,12 @@
         // S205: the switcher popover is appended to <body> (positioning + stacking);
         // the page-lifecycle contract calls this on unmount so soft-navigations away
         // never leave a detached popover behind (nav.js applyDef → customUnmount).
-        return () => { if (switchPop) switchPop.remove() }
+        // S237: the sheet + the probe surface leave with the page (soft-nav away
+        // never leaks a detached overlay behind).
+        return () => {
+          if (switchPop) switchPop.remove()
+          if (sheetEl) { sheetEl.remove(); sheetEl = null }
+          if (window.HibanaBoard) delete window.HibanaBoard.focusState
+        }
       },
     })

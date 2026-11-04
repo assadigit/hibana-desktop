@@ -677,6 +677,13 @@ window.__hibanaDictFA = {
       'db.empty.inprog.title': 'چیزی در حال انجام نیست', 'db.empty.inprog.text': 'وقتی کاری را شروع کردی اینجا بیاور.',
       'db.empty.done.title': 'کاری انجام نشده است', 'db.empty.done.text': 'کارهای انجام‌شده اینجا نمایش داده می‌شوند.',
       'db.colMenu': 'عملیات ستون', 'db.helperHint': 'برای جلو بردن کارت، با افزودن یک کار شروع کن.',
+      // S237 (حالت تمرکز): کلیدهای سوئیچ تنظیمات + دو دکمهٔ سرستون هر لِین +
+      // رشته‌های پنجرهٔ بزرگ‌نمایی. همهٔ نقطه‌فراخوان‌ها fallback انگلیسی درج‌شده دارند.
+      'db.focus.mode': 'حالت تمرکز', 'db.focus.hint': 'کنترل‌های تمرکز و بزرگ‌نمایی به هر ستون برد اضافه می‌کند. پیش‌فرض خاموش است.',
+      'db.focus.toggle': 'تمرکز روی این ستون', 'db.focus.exit': 'خروج از تمرکز (Esc)',
+      'db.focus.enlarge': 'بزرگ‌نمایی این ستون',
+      'db.focus.sheetAdd': 'افزودن کار به این ستون…', 'db.focus.sheetTitle': '{lane} — {n} کار',
+      'db.focus.on': 'حالت تمرکز روشن شد', 'db.focus.off': 'حالت تمرکز خاموش شد',
       'db.pr.low': 'کم', 'db.pr.medium': 'متوسط', 'db.pr.high': 'زیاد', 'db.pr.urgent': 'فوری',
       'db.category': 'دسته‌بندی', 'db.uncategorized': 'دسته‌بندی‌نشده', 'db.newCategory': 'دسته‌بندی جدید…',
       'db.categoryName': 'نام دسته‌بندی (توسعهٔ قابلیت…)', 'db.renameCategory': 'تغییر نام دسته‌بندی',
