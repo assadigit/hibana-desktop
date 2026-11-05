@@ -84,3 +84,65 @@ go vet ./... ✓ · go test ./... ok (10 packages) · island checksums updated
 **Versions:** 0.1.32 → 0.1.34 everywhere (wails.json, main.go, versioninfo.json
 ×4, make-portable.ps1, desktop.yml's dev placeholder) — 0.1.33 reserved-lost
 for S236. Tag: v0.1.34-desktop.
+
+## Session S238 — the task view modal + the sheet polish, the island round (2026-11-05)
+
+**The round (the owner's five asks, delivered on the web first — commit 04218ca,
+web v0.4.1.43):** (1) the board's modal backdrops blur + drain to greyscale;
+(2) the enlarge sheet reads the FIXED ~800×600; (3) every sheet row gains a
+one-tap copy button + the cloned ⋯ menus come ALIVE (the data-ok strip — they
+were dead UI inside the sheet since S237); (4) the priority banner + detail
+pill read font-weight 400; (5) the card click opens the READ-ONLY task view —
+the editor stays behind the ⋯ menu's Edit / the view's Edit (the project
+page's S149 contract, brought to the board).
+
+**The desktop half is a PURE RE-PIN:** ZERO desktop-owned changes (no new
+settings row, no Go binding — the view is pure client, reads from the loaded
+state, adds ZERO fetch sites; the exactly-4 hibanaFetch seam count gate still
+holds). The island regenerated at pin 04218ca (web v0.4.1.43):
+- PIN_REF dac869f → 04218ca; PIN_PACKAGE_VERSION 0.4.1.42 → 0.4.1.43.
+- The manifest comments re-annotated (board-page.js v28, focus-core.js v2 +
+  escPeel, devboard.css v39, polish-batch.css v30, quicknotes.css v51,
+  i18n-en.js v105, i18n.js v158 with the lazy i18n-fa.js?v=99 injector,
+  i18n-fa.js v99). ZERO strip/insert anchors moved; the seam patch
+  find-strings byte-identical.
+- verifyDist grew the (1s8) S238 gate block: the board-page view-layer
+  markers + the card-click re-route (B().openEditor(card... must be GONE,
+  openTaskView(card... must be present), the devboard.css blur+greyscale
+  backdrop + the FIXED 800×600 + .db-view family + .db-sheet-copy, the
+  400-weight .prio-banner / .pd-detail-prio (read from DISK — the verbatim
+  copies ride `blobs`, not fileMap; the first run failed the gate reading
+  the empty map — fixed), focus-core.js escPeel, and the ?v=2/?v=28/?v=39
+  tag pins.
+- desktop.yml's WEB_REF/WEB_VERSION env moved to 04218ca / 0.4.1.43 (the
+  pinned-ref gate + the release notes source).
+
+**The 12th probe — scripts/probe-view.mjs (4 LEGs, 27 assertions, all green):**
+LEG 1 the island serves /kanban 200 + the chain + the S238 carriers
+(focus-core.js?v=2 with escPeel + the v39/v30/v51 CSS recipes read from the
+dist bytes). LEG 2 login → five lanes → THE CARD CLICK opens the READ-ONLY
+view (no editor modal, focusState().viewTaskId === 't1', the ✕ + Copy/Edit
+foot, the lane-named head, the FULL three-line definition, the banner at the
+REGULAR 400 weight, the Created meta) → Esc closes. LEG 3 the view's Copy
+wrote the RAW full definition (the stubbed clipboard), the view's Edit handed
+off to the REAL editor (prefilled), and the ⋯ menu's Edit opened it too.
+LEG 4 the sheet through the desktop panel toggle: the computed 800×600 box +
+the blur(4px) grayscale(1) backdrop + the one-tap .db-sheet-copy on every row +
+the ARMED cloned ⋯ → a sheet row click stacked the VIEW above the sheet
+(z 85 > 80) → the FIRST Esc peeled the view only, the second the sheet →
+disabling the toggle re-rendered the buttons away. ZERO page errors.
+
+**probe-labels re-pinned:** section (7) (the task editor's delete confirm)
+opened the editor by clicking the card — the S237-era contract. The S238
+re-pin: hover → the ⋯ menu → Edit (the owner's split), exactly like the web
+e2e re-pins. All 13 probes then PASS (login, logout, refresh, newproject,
+completefacts, labels, uiredesign, settings, soundfx, sprint, focus, update,
+view).
+
+**The ladder:** sync --ref 04218ca verified ✓ · sync --check byte-identical ✓
+(74 files) · ALL 13 probes PASS · Go checks not runnable in this sandbox (no
+Go toolchain) — the desktop.yml CI lane runs them on the Windows runner
+(go-version-file + wails build + both island gates).
+
+**Versions:** 0.1.34 → 0.1.35 everywhere (wails.json, main.go, versioninfo.json
+×4, make-portable.ps1, desktop.yml's dev placeholder). Tag: v0.1.35-desktop.

@@ -293,7 +293,11 @@ async function main() {
   // ---- (7) the task EDITOR's delete confirm (the pre-fix silent breakage) ----
   {
     const pg = await open()
-    await pg.locator('.pd-task').first().click()
+    // S238 re-pin: the card click opens the READ-ONLY view now — the editor
+    // opens from the ⋯ menu's Edit (the owner's split: menu = edit).
+    await pg.locator('.pd-task').first().hover()
+    await pg.locator('.db-card-menu [data-menu-open]').first().click()
+    await pg.locator('[data-db-edit-card]').first().click()
     const editor = pg.locator('.db-modal:not([hidden])')
     await editor.waitFor({ state: 'visible', timeout: 5000 })
     await editor.locator('[data-db-del]').click()

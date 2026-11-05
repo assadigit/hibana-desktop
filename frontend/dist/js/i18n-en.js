@@ -686,6 +686,10 @@ window.__hibanaDictEN = {
       'db.focus.enlarge': 'Enlarge this column',
       'db.focus.sheetAdd': 'Add a task to this column…', 'db.focus.sheetTitle': '{lane} — {n} tasks',
       'db.focus.on': 'Focus mode on', 'db.focus.off': 'Focus mode off',
+      // S238 (the task view modal + the sheet polish round)
+      'db.view.title': 'Task details', 'db.view.gone': 'This task no longer exists.',
+      'db.view.copyTask': 'Copy task', 'db.view.created': 'Created',
+      'db.view.updated': 'Updated', 'db.view.doneAt': 'Done',
       'db.pr.low': 'Low', 'db.pr.medium': 'Medium', 'db.pr.high': 'High', 'db.pr.urgent': 'Urgent',
       'db.category': 'Category', 'db.uncategorized': 'Uncategorized', 'db.newCategory': 'New category…',
       'db.categoryName': 'Category name (Feature Development…)', 'db.renameCategory': 'Rename category',

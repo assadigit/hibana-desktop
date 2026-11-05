@@ -1478,7 +1478,7 @@ mark.note-jump {
   flex-shrink: 0;
 }
 .pd-detail-prio {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  font-size: 10px; font-weight: 400; /* S238 (owner: the priority text reads REGULAR, not bold) — was 700, same call as the .prio-banner */ letter-spacing: 0.09em; text-transform: uppercase;
   line-height: 1.25; color: var(--prio-banner-ink); /* S154: was a hardcoded #fff — the badge family's base-ink token (white in light) */
   padding: 0.24rem 0.6rem; border-radius: 999px; white-space: nowrap;
 }

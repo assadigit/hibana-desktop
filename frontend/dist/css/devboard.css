@@ -1578,13 +1578,20 @@ main.board-shell .db-frame .db-toolbar { padding: 0.25rem 0.2rem 0.85rem; }
 .db-focus-btn, .db-focus-enlarge { margin-inline-end: 1px; }
 
 /* The enlarge sheet — centered over a dimmed-board overlay. It sits BELOW the
-   task editor (z 90) so an editor opened from a sheet card stacks on top, and
-   below the confirm overlay (z 800) + toasts (z 600). */
+   task view (z 85, S238) and the task editor (z 90) so an editor opened from a
+   sheet card / the view stacks on top, and below the confirm overlay (z 800) +
+   toasts (z 600).
+   S238 (the owner's round): the backdrop BLURS + drains to GREYSCALE (with the
+   tint) so the modal is the only thing the eye reads, and the sheet grows to
+   the ~800×600 reading rectangle (min(50rem, 100%) × min(37.5rem, 100%) — the
+   overlay's 4vh/4vw padding keeps it inside any viewport). */
 .db-focus-overlay {
   position: fixed;
   inset: 0;
   z-index: 80;
   background: rgb(15 12 8 / 0.45);       /* the .db-modal backdrop recipe */
+  -webkit-backdrop-filter: blur(4px) grayscale(1);  /* S238: focus stays on the modal */
+  backdrop-filter: blur(4px) grayscale(1);
   display: grid;
   place-items: center;
   padding: 4vh 4vw;
@@ -1595,8 +1602,8 @@ main.board-shell .db-frame .db-toolbar { padding: 0.25rem 0.2rem 0.85rem; }
   border: 1px solid var(--line);
   border-radius: var(--radius-md, 18px);
   box-shadow: 0 18px 50px rgb(0 0 0 / 0.28);
-  inline-size: min(34rem, 100%);         /* one lane's worth of reading measure */
-  max-block-size: 84vh;
+  inline-size: min(50rem, 100%);         /* S238: ~800px — the owner's ask */
+  block-size: min(37.5rem, 100%);        /* S238: ~600px — the FIXED rectangle (the owner's 800×600); the card list scrolls inside */
   display: flex;
   flex-direction: column;
   overflow: hidden;                       /* the head + quick-add stay pinned */
@@ -1659,4 +1666,124 @@ main.board-shell .db-frame .db-toolbar { padding: 0.25rem 0.2rem 0.85rem; }
    retire (the existing block above already kills the card/add transitions). */
 @media (prefers-reduced-motion: reduce) {
   .db-cols > .pd-col { transition: none; }
+}
+
+/* ---- S238 THE TASK VIEW MODAL + THE SHEET POLISH ------------------------------
+   The owner's round: (1) the board's modal backdrops blur + drain to greyscale
+   so the modal keeps the focus; (2) the enlarge sheet reads at ~800×600; (3)
+   every sheet row carries a one-tap COPY button; (4) the priority labels read
+   REGULAR weight (polish-batch.css / quicknotes.css — the banner + the detail
+   pill); (5) a card click opens the READ-ONLY task VIEW — the editor stays
+   behind the ⋯ menu's Edit. All logical properties — FA/RTL mirrors for free. */
+
+/* The read-only task view — same backdrop recipe as the sheet (blur + grey +
+   tint), one z-step ABOVE the sheet (a view opened from a sheet row stacks on
+   it) and one BELOW the task editor (z 90 — the view's Edit hands off to it
+   after closing, so they never stack). */
+.db-view-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  background: rgb(15 12 8 / 0.45);
+  -webkit-backdrop-filter: blur(4px) grayscale(1);
+  backdrop-filter: blur(4px) grayscale(1);
+  display: grid;
+  place-items: center;
+  padding: 4vh 4vw;
+}
+.db-view-overlay[hidden] { display: none; }
+.db-view-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 18px);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.28);
+  inline-size: min(40rem, 100%);         /* a single task's reading measure */
+  max-block-size: min(37.5rem, 100%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;                       /* the head + foot stay pinned */
+}
+.db-view-head {
+  flex: none;
+  padding: 0.85rem 1.1rem 0.55rem;
+  border-block-end: 1px solid var(--line);
+}
+.db-view-head h3 { margin: 0; font-size: 0.9375rem; }
+.db-view-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  flex: 1 1 auto;
+  min-block-size: 6rem;
+}
+/* the banner twin — read-only (no cycle cursor, no hover lift) */
+.db-view-card .db-view-prio { cursor: default; }
+.db-view-card .db-view-prio:hover { filter: none; }
+.db-view-task-title {
+  margin: 0.2rem 0 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.db-view-task-title .t-code { font-size: 0.92em; }
+.db-view-task-content {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  padding-block-start: 0.6rem;
+  border-block-start: 1px dashed var(--line);
+}
+.db-view-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  align-items: center;
+  margin-block-start: 0.5rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.db-view-meta .pd-tag { cursor: default; }  /* chips are inert in the view */
+.db-view-meta .pd-task-shots { margin-inline-start: auto; }
+.db-view-foot {
+  flex: none;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.7rem 1.1rem;
+  border-block-start: 1px solid var(--line);
+  background: var(--statcard-bg);
+}
+.db-view-foot .icon { inline-size: 1rem; block-size: 1rem; }
+
+/* The sheet's one-tap copy button — rides the ⋯ menu cluster (the card's
+   corner), always visible: the ⋯ reveals on hover, the copy never hides. */
+.db-focus-cards .db-card-menu { display: flex; align-items: center; gap: 0.2rem; }
+.db-sheet-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 30px;
+  block-size: 30px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--radius-sm, 14px);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.db-sheet-copy:hover { background: var(--bg-soft); color: var(--text); }
+.db-sheet-copy:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.db-sheet-copy .icon { inline-size: 1rem; block-size: 1rem; }
+
+/* the view's copy/edit foot buttons + the sheet's rows stay motion-quiet */
+@media (prefers-reduced-motion: reduce) {
+  .db-sheet-copy { transition: none; }
 }

@@ -684,6 +684,10 @@ window.__hibanaDictFA = {
       'db.focus.enlarge': 'بزرگ‌نمایی این ستون',
       'db.focus.sheetAdd': 'افزودن کار به این ستون…', 'db.focus.sheetTitle': '{lane} — {n} کار',
       'db.focus.on': 'حالت تمرکز روشن شد', 'db.focus.off': 'حالت تمرکز خاموش شد',
+      // S238 (the task view modal + the sheet polish round)
+      'db.view.title': 'جزئیات کار', 'db.view.gone': 'این کار دیگر وجود ندارد.',
+      'db.view.copyTask': 'کپی کار', 'db.view.created': 'ایجاد',
+      'db.view.updated': 'به‌روزرسانی', 'db.view.doneAt': 'انجام',
       'db.pr.low': 'کم', 'db.pr.medium': 'متوسط', 'db.pr.high': 'زیاد', 'db.pr.urgent': 'فوری',
       'db.category': 'دسته‌بندی', 'db.uncategorized': 'دسته‌بندی‌نشده', 'db.newCategory': 'دسته‌بندی جدید…',
       'db.categoryName': 'نام دسته‌بندی (توسعهٔ قابلیت…)', 'db.renameCategory': 'تغییر نام دسته‌بندی',

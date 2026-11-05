@@ -162,7 +162,16 @@
             // v1: no drag from the sheet — the markup is shared verbatim, so the
             // switch happens post-render (plus the dragstart guard below).
             cardsEl.querySelectorAll('.pd-task').forEach((el) => el.setAttribute('draggable', 'false'))
+            // S238: the cloned ⋯ menus arrive data-ok (copied off the ARMED board
+            // menus) — the marker makes injectDbCardMenus skip them, so the
+            // sheet's Copy/Edit/Delete were dead UI. Strip it: the injector
+            // re-arms the clones (fresh innerHTML + live handlers — the sheet's
+            // rows work exactly like the lane's own).
+            cardsEl.querySelectorAll('.db-card-menu[data-ok]').forEach((el) => el.removeAttribute('data-ok'))
             injectDbCardMenus()
+            // S238: the one-tap COPY button on every row (the owner's ask: copy a
+            // single task without opening the ⋯ menu).
+            injectSheetCopyRows(cardsEl)
           }
         }
         const onSheetQuickAdd = async (e) => {
@@ -229,26 +238,159 @@
           sheetReturnBtn = null
         }
 
+        // ---- S238: the task VIEW modal ----------------------------------------
+        // A card click (Enter/Space on a focused card, and a ?task= deep link)
+        // now OPENS THE TASK — a centered READ-ONLY dialog over the same blurred,
+        // color-drained backdrop the enlarge sheet wears — instead of the editor.
+        // The editor opens ONLY from the ⋯ menu's Edit (the board card's menu, the
+        // armed clone inside the sheet, or the view's own Edit button — the project
+        // page's S149 contract, brought to the board). It sits BETWEEN the sheet
+        // (z 80) and the task editor (z 90): a view opened from a sheet row stacks
+        // above it, and its Edit hands off to the real editor after closing. Esc
+        // peels it FIRST (view → sheet → focus — focus-core.js's escPeel); when a
+        // native <dialog> (the delete confirm / the shots viewer / the shot-note
+        // editor) or the task editor sits ABOVE it, the Esc is theirs, never ours.
+        // Data comes from the LOADED state (B().findTask — zero new fetch; the
+        // island's seam count stays exactly four).
+        let taskViewEl = null
+        let taskViewTask = null
+        let taskViewReturn = null
+        const viewIsOpen = () => !!(taskViewEl && !taskViewEl.hidden)
+        const VIEW_PIN_ICON = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v4M8.5 3.5h7l-.8 7.2 2.8 2.8v1.5H6.5v-1.5l2.8-2.8-.8-7.2Z"/></svg>'
+        const renderTaskView = (task) => {
+          const lang = window.hibanaI18n && window.hibanaI18n.lang ? window.hibanaI18n.lang() : 'en'
+          const chips = () => window.HibanaChips || null
+          const md = (raw) => (chips() && chips().renderTitle ? chips().renderTitle(String(raw == null ? '' : raw)) : B().esc(String(raw == null ? '' : raw)))
+          const metaDate = (iso, done) => (chips() && chips().metaDateHtml ? chips().metaDateHtml(iso, done, lang) : B().esc(String(iso || '')))
+          const prioLong = (p) => (chips() ? chips().prioLabel(p, lang) : B().prioLabel(p))
+          const prio = task.priority || 'medium'
+          const cat = task.category_id ? B().findCategory(task.category_id) : null
+          const sprint = task.sprint_id ? B().findSprint(task.sprint_id) : null
+          const tags = (task.tags || []).map((id) => B().tagById(id)).filter(Boolean)
+          // the banner twin — same classes, NO cycle button (the view is read-only)
+          const bannerHtml = '<span class="prio-banner prio-' + prio + ' db-view-prio"><span class="prio-banner-label">' + B().esc(prioLong(prio)) + '</span></span>'
+          const catHtml = cat ? '<span class="cat-chip" style="background:' + B().esc(cat.color_fill) + ';color:' + B().esc(cat.color_text) + '">' + B().esc(cat.name) + '</span>' : ''
+          // the FULL definition — first line = the heading, the rest = the body (the
+          // editor's own split), both through the SAME markdown-lite renderer
+          const s = String(task.title || '')
+          const nl = s.indexOf('\n')
+          const titlePart = nl >= 0 ? s.slice(0, nl) : s
+          const contentPart = nl >= 0 ? s.slice(nl + 1) : ''
+          // inert tag chips — no data-pd-tag-name: the view never toggles filters
+          const chipsHtml = (tags.length || sprint)
+            ? '<span class="pd-task-tags">' + tags.map((tg) => '<span dir="auto" class="pd-tag"><i class="pd-tag-dot" style="background:' + B().esc(tg.color) + '"></i>' + B().esc(tg.name) + '</span>').join('') +
+                (sprint ? '<span class="db-sprint-badge">◆ ' + B().esc(sprint.name) + '</span>' : '') + '</span>'
+            : ''
+          const shotsN = Number(task.shot_count || 0)
+          const shotsHtml = shotsN
+            ? '<button type="button" class="pd-task-shots" data-db-shots-dialog="' + B().esc(task.id) + '" title="' + B().esc(_t('db.taskShotsHint', 'Pinned pictures — note + proof stuck to this item')) + '" aria-label="' + B().esc(_t('db.taskShotsBadge', 'Pinned pictures ({n})').replace('{n}', String(shotsN))) + '">' + VIEW_PIN_ICON + ' ' + B().faDig(shotsN) + '</button>'
+            : ''
+          const metaHtml = '<div class="db-view-meta">' +
+              '<span>' + B().esc(_t('db.view.created', 'Created')) + ' ' + metaDate(task.created_at, task.status === 'done') + '</span>' +
+              (task.updated_at && task.updated_at !== task.created_at ? '<span>' + B().esc(_t('db.view.updated', 'Updated')) + ' ' + metaDate(task.updated_at, false) + '</span>' : '') +
+              (task.status === 'done' && task.done_at ? '<span>✓ ' + B().esc(_t('db.view.doneAt', 'Done')) + ' ' + metaDate(task.done_at, false) + '</span>' : '') +
+              (shotsHtml || '') +
+            '</div>'
+          const head = taskViewEl.querySelector('.db-view-head h3')
+          if (head) head.textContent = B().statusLabel(task.status) // the lane this task lives in
+          const body = taskViewEl.querySelector('.db-view-body')
+          if (body) {
+            body.innerHTML = bannerHtml + catHtml +
+              '<h4 class="db-view-task-title" dir="auto">' + md(titlePart) + '</h4>' +
+              (contentPart ? '<div class="db-view-task-content" dir="auto">' + md(contentPart) + '</div>' : '') +
+              chipsHtml + metaHtml
+          }
+        }
+        const ensureTaskView = () => {
+          if (taskViewEl) return taskViewEl
+          taskViewEl = document.createElement('div')
+          taskViewEl.id = 'db-view-overlay'
+          taskViewEl.className = 'db-view-overlay'
+          taskViewEl.hidden = true
+          taskViewEl.innerHTML =
+            '<div class="db-view-card" role="dialog" aria-modal="true" aria-label="' + B().esc(_t('db.view.title', 'Task details')) + '">' +
+              '<div class="row spread db-view-head">' +
+                '<h3></h3>' +
+                '<button type="button" class="ghost" data-db-view-x aria-label="' + B().esc(_t('common.close', 'Close')) + '" title="' + B().esc(_t('common.close', 'Close')) + '">✕</button>' +
+              '</div>' +
+              '<div class="db-view-body"></div>' +
+              '<div class="db-view-foot">' +
+                '<button type="button" class="ghost" data-db-view-copy aria-label="' + B().esc(_t('db.view.copyTask', 'Copy task')) + '" title="' + B().esc(_t('db.view.copyTask', 'Copy task')) + '">' + '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' + '<span>' + B().esc(_t('common.copy', 'Copy')) + '</span></button>' +
+                '<button type="button" class="btn" data-db-view-edit>' + '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' + '<span>' + B().esc(_t('common.edit', 'Edit')) + '</span></button>' +
+              '</div>' +
+            '</div>'
+          document.body.appendChild(taskViewEl)
+          // backdrop click closes (the sheet's own grammar)
+          taskViewEl.addEventListener('click', (e) => { if (e.target === taskViewEl) closeTaskView() })
+          taskViewEl.querySelector('[data-db-view-x]').addEventListener('click', closeTaskView)
+          // the one-tap copy — the RAW full definition (data-raw-title's twin)
+          taskViewEl.querySelector('[data-db-view-copy]').addEventListener('click', async () => {
+            const text = taskViewTask ? String(taskViewTask.title || '') : ''
+            try {
+              await navigator.clipboard.writeText(text)
+              window.hibana?.toast(_t('common.copied', 'Copied to clipboard'), 'ok')
+            } catch { window.hibana?.toast(_t('sparks.saveFailed', "Couldn't copy"), 'err') }
+          })
+          // Edit: the view closes, the REAL editor opens (the project detail's handoff)
+          taskViewEl.querySelector('[data-db-view-edit]').addEventListener('click', () => {
+            const id = taskViewTask ? taskViewTask.id : null
+            closeTaskView()
+            if (id) B().openEditor(id, { onSaved: reload })
+          })
+          return taskViewEl
+        }
+        const openTaskView = (taskId, returnEl) => {
+          const task = taskId ? B().findTask(taskId) : null
+          if (!task) { window.hibana?.toast(_t('db.view.gone', 'This task no longer exists.'), 'err'); return }
+          ensureTaskView()
+          taskViewTask = task
+          renderTaskView(task)
+          taskViewReturn = (returnEl instanceof Element && document.contains(returnEl)) ? returnEl : null
+          taskViewEl.hidden = false
+          const x = taskViewEl.querySelector('[data-db-view-x]')
+          if (x) x.focus() // the escape hatch is the tab root while the view is open
+        }
+        const closeTaskView = () => {
+          if (!taskViewEl || taskViewEl.hidden) return
+          taskViewEl.hidden = true
+          taskViewTask = null
+          if (taskViewReturn && document.contains(taskViewReturn)) taskViewReturn.focus()
+          taskViewReturn = null
+        }
+
         // ---- the keyboard layer (F / [ / ] / Esc — toggle-gated, spec §1.4) ------
         // Esc registers on the CAPTURE phase + stopImmediatePropagation when
-        // consumed: one press peels EXACTLY one layer (sheet → focus) and never
-        // double-fires zen-mode's own (web-only) Esc listener in the same press.
-        // When no focus layer is ours the press is left alone — menus, dialogs and
-        // zen keep their own Esc contracts.
+        // consumed: one press peels EXACTLY one layer (view → sheet → focus —
+        // S238 grew the stack inward) and never double-fires zen-mode's own
+        // (web-only) Esc listener in the same press. When no focus layer is ours
+        // the press is left alone — menus, dialogs and zen keep their own Esc
+        // contracts.
         const isTyping = (e) => {
           const t = e.target
           if (!(t instanceof Element) || !t.closest) return false
           return !!t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')
         }
         ctx.on('keydown', (e) => {
-          if (!focus.enabled || !FC()) return
           if (e.ctrlKey || e.metaKey || e.altKey) return
           if (e.key === 'Escape') {
+            // S238: the FULL peel — the task VIEW is the innermost layer, focus
+            // mode or not. When a native <dialog> (the delete confirm / the shots
+            // viewer / the shot-note editor) or the task editor sits ABOVE it,
+            // the Esc is theirs — the press falls through untouched.
+            const peel = FC() ? FC().escPeel({ viewOpen: viewIsOpen(), sheetStatus: focus.sheetStatus, focusedStatus: focus.focusedStatus }) : (viewIsOpen() ? 'view' : null)
+            if (peel === 'view') {
+              if (document.querySelector('dialog[open]') || document.querySelector('.db-modal:not([hidden])')) return
+              e.stopImmediatePropagation()
+              closeTaskView()
+              return
+            }
+            if (!focus.enabled || !FC()) return
             const layer = FC().escLayer(focus)
             if (layer === 'sheet') { e.stopImmediatePropagation(); closeSheet() }
             else if (layer === 'focus') { e.stopImmediatePropagation(); clearFocus() }
             return
           }
+          if (!focus.enabled || !FC()) return
           if (narrowBoard()) return // <800px the F/[/] shortcuts go quiet (spec §1.6)
           if (isTyping(e)) return // never steal keys from a field
           if (e.key === 'f' || e.key === 'F') {
@@ -852,6 +994,27 @@
             if (btn) btn.removeAttribute('data-open')
           })
         }
+        // S238: the sheet's one-tap COPY row button — rides the ⋯ menu cluster's
+        // inline start (the card's corner), always visible (the ⋯ itself reveals
+        // on hover — the owner wanted a copy affordance with NO menu). Clicked →
+        // the delegated [data-db-sheet-copy] branch copies the RAW title. Board
+        // cards keep their ⋯-only corner (the menu already carries Copy there).
+        function injectSheetCopyRows(scope) {
+          scope.querySelectorAll('.db-card-menu').forEach((menu) => {
+            if (menu.querySelector('.db-sheet-copy')) return
+            const wrap = menu.closest('.pd-task-wrap')
+            if (!wrap || !wrap.dataset.taskCard) return
+            const btn = document.createElement('button')
+            btn.type = 'button'
+            btn.className = 'db-sheet-copy'
+            btn.setAttribute('data-db-sheet-copy', wrap.dataset.taskCard)
+            const lbl = _t('db.view.copyTask', 'Copy task')
+            btn.setAttribute('aria-label', lbl)
+            btn.setAttribute('title', lbl)
+            btn.innerHTML = I_COPY
+            menu.insertBefore(btn, menu.firstChild)
+          })
+        }
         // UI-redesign: the column ellipsis (⋯) menu — open/close state. Mirrors the
         // card-menu discipline: one open menu at a time, Escape + outside-click close,
         // and every menu-item action closes it (the delegated handlers below call
@@ -1047,11 +1210,32 @@
             B().openTaskShots(badge.getAttribute('data-db-shots-dialog'), { onChanged: reload })
             return
           }
+          // S238: the sheet's one-tap per-row copy — the RAW full definition (the ⋯
+          // menu's Copy contract without opening the menu; data-raw-title first,
+          // the loaded task as the belt).
+          const sheetCopy = e.target.closest('[data-db-sheet-copy]')
+          if (sheetCopy) {
+            e.preventDefault()
+            const wrap = sheetCopy.closest('.pd-task-wrap')
+            const titleEl = wrap ? wrap.querySelector('.pd-task-title') : null
+            const raw = titleEl ? titleEl.getAttribute('data-raw-title') : null
+            const task = B().findTask(sheetCopy.getAttribute('data-db-sheet-copy'))
+            const text = raw || (task ? String(task.title || '') : '') || (titleEl ? titleEl.textContent : '')
+            try {
+              await navigator.clipboard.writeText(text)
+              window.hibana?.toast(_t('common.copied', 'Copied to clipboard'), 'ok')
+            } catch { window.hibana?.toast(_t('sparks.saveFailed', "Couldn't copy"), 'err') }
+            return
+          }
           const card = e.target.closest('[data-task-card]')
-          // S30 batch 2: never open the editor from the prio dot / label chips / the ⋯
-          // menu (they are actions of their own — cycling, filtering, edit/delete).
-          // S208: the pin badge joins the exclusion list (its own dialog, above).
-          if (card && !e.target.closest('[data-task-read-more]') && !e.target.closest('[data-db-cycle-prio]') && !e.target.closest('.pd-tag') && !e.target.closest('.db-card-menu') && !e.target.closest('[data-db-shots-dialog]')) B().openEditor(card.dataset.taskCard, { onSaved: reload })
+          // S238: a card click OPENS THE TASK — the read-only view modal. The
+          // editor opens only from the ⋯ menu's Edit / the view's Edit button
+          // (the project page's S149 contract, brought to the board). The
+          // exclusion list keeps its S30/S208 shape: the prio banner cycles, the
+          // label chips filter, the ⋯ menu (and the sheet's copy button inside
+          // it) own their actions, the pin badge opens its own dialog — none of
+          // them open the view either.
+          if (card && !e.target.closest('[data-task-read-more]') && !e.target.closest('[data-db-cycle-prio]') && !e.target.closest('.pd-tag') && !e.target.closest('.db-card-menu') && !e.target.closest('[data-db-shots-dialog]')) openTaskView(card.dataset.taskCard, card.querySelector('.pd-task'))
 
           // Item 8 + S30 batch 2: per-column Quick Copy + Export Markdown — the bullets
           // now carry priority + labels ("- [URGENT] Fix auth leak #UI/UX #Security") and
@@ -1287,15 +1471,15 @@
         })
 
         // S136: keyboard parity with the project page — the card is role="button" +
-        // tabindex=0 now, so Enter/Space open the editor (when the CARD itself is
-        // focused; inner buttons keep their own keys).
+        // tabindex=0 now, so Enter/Space open the task's VIEW (S238 — the click's
+        // twin; the editor stays behind the ⋯ menu's Edit / the view's Edit).
         ctx.on('keydown', (e) => {
           if (e.key !== 'Enter' && e.key !== ' ') return
           if (!(e.target instanceof Element) || !e.target.classList.contains('pd-task')) return
           const wrap = e.target.closest('[data-task-card]')
           if (!wrap) return
           e.preventDefault()
-          B().openEditor(wrap.dataset.taskCard, { onSaved: reload })
+          openTaskView(wrap.dataset.taskCard, e.target)
         })
 
         // ---- boot ----
@@ -1320,7 +1504,7 @@
             if (!injected && waited >= 1200) {
               injected = true
               inject('/js/devboard.js?v=31') // keep in sync with the <head> tag + sw SHELL
-              if (!window.HibanaFocusCore) inject('/js/focus-core.js?v=1') // S237: the focus decision core — keep in sync with the <head> tag
+              if (!window.HibanaFocusCore) inject('/js/focus-core.js?v=2') // S237/S238: the focus + view decision core — keep in sync with the <head> tag
               if (!window.HibanaChips) inject('/js/chip-render.js?v=13') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
               if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA
             }
@@ -1352,7 +1536,8 @@
           // S237: the probe surface — window.HibanaBoard.focusState() reports the live
           // { enabled, focusedStatus, sheetStatus } triple (scripts/probe-focus.mjs
           // reads it; the desktop island ships this same controller verbatim).
-          if (window.HibanaBoard) window.HibanaBoard.focusState = () => ({ enabled: focus.enabled, focusedStatus: focus.focusedStatus, sheetStatus: focus.sheetStatus })
+          // S238: viewTaskId joins the report (the view probe's contract).
+          if (window.HibanaBoard) window.HibanaBoard.focusState = () => ({ enabled: focus.enabled, focusedStatus: focus.focusedStatus, sheetStatus: focus.sheetStatus, viewTaskId: taskViewTask ? taskViewTask.id : null })
           // S205 (spec §3.2): the entry point's default-project resolution — the
           // last-used board first (its load doubles as validation: a 404/deleted project
           // falls straight through), else the most-recent accessible project
@@ -1397,7 +1582,7 @@
             const restore = FC() ? FC().autoRestore(focus.enabled, focusStorage.readLast()) : null
             if (restore) { focus.focusedStatus = restore; applyFocus() }
           }
-          if (openTask && B().findTask(openTask)) B().openEditor(openTask, { onSaved: reload })
+          if (openTask && B().findTask(openTask)) openTaskView(openTask) // S238: the deep link OPENS THE TASK (the view) — the editor stays behind ⋯ > Edit
           else if (addStatus) B().openEditor(null, { defaults: { status: addStatus }, onSaved: reload })
         }
         // S30 batch 5 (FA-guard find): `ready` is a PROMISE (always truthy) — the old
@@ -1411,10 +1596,11 @@
         // the page-lifecycle contract calls this on unmount so soft-navigations away
         // never leave a detached popover behind (nav.js applyDef → customUnmount).
         // S237: the sheet + the probe surface leave with the page (soft-nav away
-        // never leaks a detached overlay behind).
+        // never leaks a detached overlay behind). S238: the task view joins them.
         return () => {
           if (switchPop) switchPop.remove()
           if (sheetEl) { sheetEl.remove(); sheetEl = null }
+          if (taskViewEl) { taskViewEl.remove(); taskViewEl = null; taskViewTask = null; taskViewReturn = null }
           if (window.HibanaBoard) delete window.HibanaBoard.focusState
         }
       },

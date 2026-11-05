@@ -124,8 +124,24 @@ import { fileURLToPath } from 'node:url'
 // becomes the 11th probe. NOTE: S236 (sprint-page optimistic mutations) was lost with
 // its sandbox (never pushed, never deployed) — the desktop ladder RESERVES its 0.1.33
 // slot (this round ships 0.1.34) so the documented ladder stays truthful.
-const PIN_REF = 'dac869f'
-const PIN_PACKAGE_VERSION = '0.4.1.42'
+// S238 (the task view modal + the sheet polish — the owner's five-ask round): the pin
+// moved to the S238 web commit (web v0.4.1.43) — the board's card click opens the
+// READ-ONLY task view (blurred+greyscale backdrop, full definition, Copy/Edit foot;
+// the editor stays behind the ⋯ menu's Edit / the view's Edit), the enlarge sheet
+// reads the fixed ~800×600 over the SAME blurred+grey backdrop, every sheet row gains
+// a one-tap copy button + its cloned ⋯ menus come ALIVE (the data-ok strip), and the
+// priority banner + detail pill read font-weight 400. focus-core.js grows escPeel
+// (view → sheet → focus). The cache-bumped surfaces: board-page.js v28 /
+// focus-core.js v2 (its tag + the ensureLib self-heal literal) / devboard.css v39 /
+// polish-batch.css v30 / quicknotes.css v51 / i18n-en.js v105 / i18n.js v158 (its
+// lazy i18n-fa.js?v=99 injector literal) / i18n-fa.js v99. ZERO strip/insert anchors
+// moved (the strip list is untouched) and the seam patch find-strings are byte-
+// identical (the view block reads from the LOADED state — zero new fetch; the
+// exactly-4 hibanaFetch count gate still holds). ZERO desktop-owned changes this
+// round (no new settings row, no Go binding — the island is a pure re-pin) and
+// probe-view.mjs becomes the 12th probe. The version ladder: 0.1.34 → 0.1.35.
+const PIN_REF = '04218ca'
+const PIN_PACKAGE_VERSION = '0.4.1.43'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -146,14 +162,14 @@ const CSS_SHEETS = [
   'css/dashboard-todo.css', // ?v=25
   'css/components.css',     // ?v=9  — owns the .toast recipe's styles (:252-319)
   'css/canvas.css',         // ?v=11
-  'css/quicknotes.css',     // ?v=50
+  'css/quicknotes.css',     // ?v=51 — the .pd-detail slide-over + the S238 .pd-detail-prio weight drop (400)
   'css/to-do-list.css',     // ?v=13
   'css/polish-ui.css',      // ?v=39 — toast animations/positioning (:325, :582)
   'css/calendar.css',       // ?v=10
   'css/notifications.css',  // ?v=12
-  'css/polish-batch.css',   // ?v=29 — .toast-msg unicode-bidi (:644)
+  'css/polish-batch.css',   // ?v=30 — .toast-msg unicode-bidi (:644) + the S238 .prio-banner weight drop (400)
   'css/project-header.css', // ?v=50 — the .pd-col column anatomy
-  'css/devboard.css',       // ?v=37 — the .db-frame mother container (S207) + the redesign (S230) + the polish pass (S231)
+  'css/devboard.css',       // ?v=39 — the .db-frame mother container (S207) + the redesign (S230) + the polish pass (S231) + the focus mode (S237) + the view/sheet polish (S238: blur+greyscale backdrops, the 800×600 sheet, .db-view-*)
   'css/misc.css',           // ?v=24
   'css/themes.css',         // ?v=9  — the explicit LIGHT token block
   'css/claude-dark-theme.css', // ?v=31 — html[data-theme='claude-dark']
@@ -194,12 +210,12 @@ const JS_FILES = [
   'js/sync-state.js',      // v2 (v0.4.1.37) — the per-card sync tracker (hibana-sync-status-spec §14: ONE source; devboard.js's task mutations report in, the badges + the Sync button count derive from it)
   'js/devboard.js',        // v29 (v0.4.1.37) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked()
   'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
-  'js/board-page.js',      // v24 (v0.4.1.38) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion (inline EN fallbacks, solid ⋯ dots) + the S237 focus block (the two per-lane head buttons, the enlarge sheet, the F/[/]/Esc capture layer — adds ZERO fetch: the quick-add rides devboard's createTask through the patched api() choke point)
-  'js/focus-core.js',      // v1 (v0.4.1.42, S237 NEW) — the focus decision core (parseToggle/cycleLane/escLayer/autoRestore/resolveFKey — pure, zero DOM). board.html @ the pin carries its own <script> tag between sync-state.js and devboard.js (kept verbatim); board-page.js's ensureLib self-heals it at the same ?v=1.
+  'js/board-page.js',      // v28 (v0.4.1.43) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion (inline EN fallbacks, solid ⋯ dots) + the S237 focus block (the two per-lane head buttons, the enlarge sheet, the F/[/]/Esc capture layer — adds ZERO fetch: the quick-add rides devboard's createTask through the patched api() choke point) + the S238 block (the READ-ONLY task VIEW on card click — openTaskView + the escPeel layer — the sheet's one-tap copy rows + the data-ok strip that re-arms the cloned ⋯ menus; still ZERO new fetch: the view reads from the LOADED state)
+  'js/focus-core.js',      // v2 (v0.4.1.43, S237 NEW + S238 escPeel) — the focus + view decision core (parseToggle/cycleLane/escLayer/escPeel/autoRestore/resolveFKey — pure, zero DOM). board.html @ the pin carries its own <script> tag between sync-state.js and devboard.js (kept verbatim); board-page.js's ensureLib self-heals it at the same ?v=2.
   'js/sprint-page.js',     // v22 (v0.4.1.40) — the /sprint.html page; the S235 embed (the owner ask: "When clicking on sprints, the app becomes problematic" — the sprint link 404'd on the desktop because sprint.html was never in the island). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
-  'js/i18n-en.js',         // v102 (v0.4.1.38) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign empty-state / menu / helper keys
-  'js/i18n.js',            // v155 (v0.4.1.37) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below)
-  'js/i18n-fa.js',         // v96 (v0.4.1.38) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA empty-state / menu / helper keys
+  'js/i18n-en.js',         // v105 (v0.4.1.43) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign empty-state / menu / helper keys + db.view.* (S238)
+  'js/i18n.js',            // v158 (v0.4.1.43) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below — its lazy injector literal now reads /js/i18n-fa.js?v=99)
+  'js/i18n-fa.js',         // v99 (v0.4.1.43) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA empty-state / menu / helper keys + db.view.* FA (S238)
   'js/image-resize.js',    // v1 — the LAZY ≤1600px WebP prepare pass (devboard.js:307-319)
   'vendor/jalaali.min.js', // Jalali dates for FA (devboard.js calOf)
 ]
@@ -6290,6 +6306,50 @@ function verifyDist(outDir, fileMap) {
   if (!settingsJs.includes('focusLabel') || !settingsJs.includes('حالت تمرکز')) problems.push('js/desktop-settings.js: the focus row STR pair is missing (EN + FA labels)')
   if (!fs.existsSync(path.join(outDir, 'js/desktop-settings.js'))) problems.push('js/desktop-settings.js: missing from dist')
 
+  // (1s8) THE S238 TASK-VIEW ROUND (the owner's five asks): the copied
+  // board-page.js carries the view layer (openTaskView + the escPeel layer +
+  // the sheet's one-tap copy rows + the data-ok strip that re-arms the cloned
+  // ⋯ menus — ZERO new fetch sites, the exactly-4 gate above still holds), the
+  // copied devboard.css carries the blurred+greyscale backdrops + the FIXED
+  // 800×600 sheet + the .db-view-* family + the .db-sheet-copy button, and the
+  // copied polish-batch.css / quicknotes.css read the priority labels at
+  // font-weight 400 (the owner: "regular not bold"). focus-core.js carries the
+  // escPeel export (view → sheet → focus). NO desktop-owned changes this
+  // round — the island is a pure re-pin (probe-view.mjs is the round's probe).
+  {
+    // Read the verbatim copies from DISK (they ride `blobs`, not fileMap — only
+    // the patched trio enters the map; the manifest files are all on disk by
+    // the time verifyDist runs).
+    const readDist = (rel) => fs.existsSync(path.join(outDir, rel)) ? fs.readFileSync(path.join(outDir, rel), 'utf8') : ''
+    const polishCss = readDist('css/polish-batch.css')
+    const quickCss = readDist('css/quicknotes.css')
+    const focusCore = readDist('js/focus-core.js')
+    if (!polishCss) problems.push('css/polish-batch.css: missing from dist (the S238 weight gate cannot run)')
+    if (!quickCss) problems.push('css/quicknotes.css: missing from dist (the S238 weight gate cannot run)')
+    if (!focusCore) problems.push('js/focus-core.js: missing from dist (the S238 escPeel gate cannot run)')
+    for (const kept of ['openTaskView', 'db-view-overlay', 'data-db-view-x', 'data-db-view-edit', 'data-db-view-copy', 'data-db-sheet-copy', 'escPeel', 'viewIsOpen', 'injectSheetCopyRows', "querySelectorAll('.db-card-menu[data-ok]')"]) {
+      if (!boardPage.includes(kept)) problems.push('js/board-page.js: the S238 view layer is missing "' + kept + '"')
+    }
+    // the card click opens the VIEW, never the editor directly (the owner's split)
+    if (boardPage.includes('B().openEditor(card.dataset.taskCard')) problems.push('js/board-page.js: the card click must open the VIEW, not the editor (S238)')
+    if (!boardPage.includes('openTaskView(card.dataset.taskCard')) problems.push('js/board-page.js: the card click must route through openTaskView (S238)')
+    for (const kept of ['.db-view-overlay', '.db-view-card', '.db-view-foot', '.db-sheet-copy', 'backdrop-filter: blur(4px) grayscale(1)', 'inline-size: min(50rem, 100%)', 'block-size: min(37.5rem, 100%)']) {
+      if (!devboardCss.includes(kept)) problems.push('css/devboard.css: the S238 view/sheet recipe is missing "' + kept + '"')
+    }
+    {
+      const banner = polishCss.match(/\.prio-banner \{[^}]+\}/)
+      if (!banner) problems.push('css/polish-batch.css: the .prio-banner rule is missing')
+      else if (!banner[0].includes('font-weight: 400')) problems.push('css/polish-batch.css: the .prio-banner must read font-weight: 400 (the S238 owner ask)')
+      const pill = quickCss.match(/\.pd-detail-prio \{[^}]+\}/)
+      if (!pill) problems.push('css/quicknotes.css: the .pd-detail-prio rule is missing')
+      else if (!pill[0].includes('font-weight: 400')) problems.push('css/quicknotes.css: the .pd-detail-prio must read font-weight: 400 (the S238 owner ask)')
+    }
+    if (!focusCore.includes('escPeel')) problems.push('js/focus-core.js: the S238 escPeel decision is missing')
+    if (!indexHtml.includes('/js/focus-core.js?v=2')) problems.push('index.html: the focus-core.js tag must read ?v=2 (the S238 bump)')
+    if (!indexHtml.includes('/js/board-page.js?v=28')) problems.push('index.html: the board-page.js tag must read ?v=28 (the S238 bump)')
+    if (!indexHtml.includes('/css/devboard.css?v=39')) problems.push('index.html: the devboard.css tag must read ?v=39 (the S238 bump)')
+  }
+
   // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the
   // persisted mirror-meta pref is Go-side; the island never forks it). The bare WORD
   // may appear in comments (desktop-theme.js's header says "NO localStorage:"), so
@@ -6521,7 +6581,7 @@ function main() {
   for (const line of sprintAdapted.log) process.stdout.write('  ' + line + '\n')
   for (const line of patchLog) process.stdout.write('  ' + line + '\n')
   process.stdout.write('  copied   : ' + COPY_MANIFEST.length + ' manifest files (verbatim) + index.html + sprint.html (S235) + js/desktop-shim.js + js/desktop-audio.js + js/desktop-login.js + css/desktop-login.css + js/desktop-theme.js + js/desktop-sync.js + css/desktop-sync.css + js/desktop-logout.js + css/desktop-logout.css + js/desktop-newproject.js + css/desktop-newproject.css + js/desktop-refresh.js + css/desktop-refresh.css + js/desktop-update.js + css/desktop-update.css + js/desktop-settings.js + css/desktop-settings.css + icon.svg + web-ref.json\n')
-  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the seven synthesized cues + the seam observer (S234: archive + create cues + the collection-path classifier — archive-done, create-task/sprint/category, restore-archived-task, delete-archived-task, delete-category, restore-project), the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines) + the v0.1.19 test-connection button (TestGithubConnection, the typed/saved/anonymous verdict lines, the private-repo signal) + the apply-failure release-page note (#db-update-fallback, the pageOpened flag, both language pairs), no-storage (the S237 line-precise hibana-focus-mode exception)), the S237 focus-mode round (focus-core.js in the manifest + its tag + load order before devboard.js, the board-page focus layer markers, the devboard.css dim/sheet recipe, the settings panel Focus-mode row + the same-key write + the live hibana:focus-mode dispatch + the EN/FA STR pair), no-404 asset loop, S235 sprint.html embed (the strip ops + the desktop-owned chain + the cross-page link interceptor), node --check\n')
+  process.stdout.write('  verified : seam counts, CSS manifest order (rtl.css last), theme → shim → audio → login → sync → logout → newproject → refresh → update → settings → devboard → board-page, the login gate markup + hooks, the theme + sync + sign-out + new-project + refresh + sound + update + settings rounds (both toggle surfaces, the modal ids, click-time SetTheme/SyncNow/Logout/ApplyUpdate/SetLanguage/CheckForUpdates/SetGithubToken, the step relay, the will-not-vanish copy, the login-card reload, the planning-status create through the shim seam, the deep-link boot, the MutationObserver row, the dead-link interception, the Refresh pill + its reload, the pulled-boards reflex on the sync modal, the hero stage wiring + the seven synthesized cues + the seam observer (S234: archive + create cues + the collection-path classifier — archive-done, create-task/sprint/category, restore-archived-task, delete-archived-task, delete-category, restore-project), the hidden Update pill + its two event relays + the live bar + the restarting panel, the settings gear in the account zone + the owner\'s four-section order + the three delegation flows + the segmented controls + the live flip + the reload reflex + the three event relays + the v0.1.18 GitHub-access row (password field, Save/Remove/Enter-to-save, the connect-now re-check, both honesty lines) + the v0.1.19 test-connection button (TestGithubConnection, the typed/saved/anonymous verdict lines, the private-repo signal) + the apply-failure release-page note (#db-update-fallback, the pageOpened flag, both language pairs), no-storage (the S237 line-precise hibana-focus-mode exception)), the S237 focus-mode round (focus-core.js in the manifest + its tag + load order before devboard.js, the board-page focus layer markers, the devboard.css dim/sheet recipe, the settings panel Focus-mode row + the same-key write + the live hibana:focus-mode dispatch + the EN/FA STR pair), no-404 asset loop, S235 sprint.html embed (the strip ops + the desktop-owned chain + the cross-page link interceptor), the S238 task-view round (the board-page view layer + the card-click re-route + the sheet copy rows + the data-ok strip, the devboard.css blur+greyscale backdrops + the fixed 800×600 sheet + the .db-view family + .db-sheet-copy, the 400-weight priority labels in polish-batch/quicknotes, focus-core.js escPeel + the ?v=2/?v=28/?v=39 tag pins), node --check\n')
   process.stdout.write('  checksums: ' + Object.keys(hashes).length + ' files -> ' + path.relative(REPO_ROOT, checksPath) + '\n')
   process.stdout.write('[sync-island] DONE. Island pinned at ' + PIN_REF + ' @ v' + PIN_PACKAGE_VERSION + '.\n')
 }

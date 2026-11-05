@@ -799,7 +799,7 @@ input.qe-name,
   inline-size: 100%; border: none; cursor: pointer;
   padding: 0.28rem 0.6rem;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  font-family: inherit; font-size: 10px; font-weight: 700;
+  font-family: inherit; font-size: 10px; font-weight: 400; /* S238 (owner: "the Medium/High priority etc text must be regular not bold") — was 700 */
   letter-spacing: 0.09em; text-transform: uppercase; line-height: 1.25;
   color: var(--prio-banner-ink); background: var(--prio-banner-medium);
   transition: filter 0.12s ease;

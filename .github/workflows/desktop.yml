@@ -21,8 +21,8 @@ on:
   workflow_dispatch: {}
 
 env:
-  WEB_REF: dac869f          # the island pin (must match scripts/sync-island.mjs) — the S237 focus-mode ref (v0.4.1.42)
-  WEB_VERSION: "0.4.1.42"   # the pin's package version (Release notes carry BOTH)
+  WEB_REF: 04218ca          # the island pin (must match scripts/sync-island.mjs) — the S238 task-view ref (v0.4.1.43)
+  WEB_VERSION: "0.4.1.43"   # the pin's package version (Release notes carry BOTH)
 
 jobs:
   build:
@@ -127,7 +127,7 @@ jobs:
           if ($env:GITHUB_REF -like 'refs/tags/v*') {
             $v = ($env:GITHUB_REF -replace '^refs/tags/v', '') -replace '-desktop$', ''
           } else {
-            $v = '0.1.34-dev'
+            $v = '0.1.35-dev'
           }
           Add-Content $env:GITHUB_ENV "BUILD_VERSION=$v"
           Write-Host "BUILD_VERSION=$v"

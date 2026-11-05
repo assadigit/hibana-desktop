@@ -2,9 +2,9 @@
 //
 // The board controller (board-page.js) owns the DOM half; every DECISION this
 // feature makes is extracted here so it is testable without a browser
-// (src/tests/focus-mode-s237.test.ts evaluates THIS file byte-for-byte — the
-// sync-state.js harness doctrine). Zero DOM, zero fetch, zero i18n: functions
-// in, decisions out.
+// (src/tests/focus-mode-s237.test.ts + task-view-s238.test.ts evaluate THIS
+// file byte-for-byte — the sync-state.js harness doctrine). Zero DOM, zero
+// fetch, zero i18n: functions in, decisions out.
 //
 // The contract (spec S237 §1):
 //   - parseToggle:  localStorage 'hibana-focus-mode' is 'on' | 'off' — 'on' is
@@ -22,6 +22,12 @@
 //                   the remembered lane is a valid status key.
 //   - resolveFKey:  the F target — the hovered lane wins, else the last
 //                   focused lane, else null (F never guesses a lane).
+//
+// S238 (the task view modal): escPeel extends the SAME inside-out law with
+// the read-only task VIEW as the innermost layer — it peels before the sheet
+// and the focus, focus mode ON or OFF (a card click opens the view with the
+// toggle off too). escLayer keeps the S237 shape untouched (its suite still
+// pins it byte-for-byte).
 //
 // Loaded by board.html only (defer, before devboard.js) — the sprint page and
 // the project page's embedded board are out of S237 scope. board-page.js's
@@ -63,6 +69,20 @@ window.HibanaFocusCore = (() => {
     return null
   }
 
+  // S238: the FULL board peel — the task VIEW modal (focus-independent: a card
+  // click opens it with the mode on OR off) is the innermost layer, then the
+  // enlarge sheet, then the blur focus. state is the live
+  // { viewOpen, sheetStatus, focusedStatus } triple. null = this Esc is not
+  // ours. (The native <dialog> / task-editor cases stay DOM-side guards in
+  // board-page.js — environment, not decision.)
+  const escPeel = (state) => {
+    if (!state) return null
+    if (state.viewOpen) return 'view'
+    if (state.sheetStatus) return 'sheet'
+    if (state.focusedStatus) return 'focus'
+    return null
+  }
+
   // Board-load auto-restore: only (toggle ON) × (a valid remembered lane).
   const autoRestore = (enabled, last) => (enabled && validStatus(last) ? last : null)
 
@@ -73,5 +93,5 @@ window.HibanaFocusCore = (() => {
     return null
   }
 
-  return { STATUSES, TOGGLE_KEY, LAST_KEY, validStatus, parseToggle, cycleLane, escLayer, autoRestore, resolveFKey }
+  return { STATUSES, TOGGLE_KEY, LAST_KEY, validStatus, parseToggle, cycleLane, escLayer, escPeel, autoRestore, resolveFKey }
 })()
