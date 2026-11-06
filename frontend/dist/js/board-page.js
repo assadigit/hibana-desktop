@@ -46,6 +46,12 @@
         const filterPrios = new Set()
         const filterTags = new Set()
         let filterQuery = ''
+        // S242 (spec pack §7.5/Screen A): the fourth filter dimension — the SPRINT
+        // view filter. '' = All tasks (the default — today's board behavior);
+        // '__none' = No sprint; any other value = a sprint id (ANY lifecycle state
+        // — a VIEW filter: a completed sprint's unfinished tasks stay findable).
+        // Composes AND with priority × label × search; never mutates assignments.
+        let filterSprint = ''
         const filterSearchTimer = { t: null }
 
         // ---- S237 (Focus Mode) ----------------------------------------------------
@@ -276,10 +282,12 @@
           const nl = s.indexOf('\n')
           const titlePart = nl >= 0 ? s.slice(0, nl) : s
           const contentPart = nl >= 0 ? s.slice(nl + 1) : ''
-          // inert tag chips — no data-pd-tag-name: the view never toggles filters
+          // inert tag chips — no data-pd-tag-name: the view never toggles filters.
+          // S242: the sprint chip wears the sprint's emoji (else the default ◆) —
+          // every sprint-identity surface reads the same glyph (spec §4.2).
           const chipsHtml = (tags.length || sprint)
             ? '<span class="pd-task-tags">' + tags.map((tg) => '<span dir="auto" class="pd-tag"><i class="pd-tag-dot" style="background:' + B().esc(tg.color) + '"></i>' + B().esc(tg.name) + '</span>').join('') +
-                (sprint ? '<span class="db-sprint-badge">◆ ' + B().esc(sprint.name) + '</span>' : '') + '</span>'
+                (sprint ? '<span class="db-sprint-badge">' + B().esc((sprint.emoji ? sprint.emoji + ' ' : '◆ ') + sprint.name) + '</span>' : '') + '</span>'
             : ''
           const shotsN = Number(task.shot_count || 0)
           const shotsHtml = shotsN
@@ -289,6 +297,15 @@
               '<span>' + B().esc(_t('db.view.created', 'Created')) + ' ' + metaDate(task.created_at, task.status === 'done') + '</span>' +
               (task.updated_at && task.updated_at !== task.created_at ? '<span>' + B().esc(_t('db.view.updated', 'Updated')) + ' ' + metaDate(task.updated_at, false) + '</span>' : '') +
               (task.status === 'done' && task.done_at ? '<span>✓ ' + B().esc(_t('db.view.doneAt', 'Done')) + ' ' + metaDate(task.done_at, false) + '</span>' : '') +
+              // S244 (spec §12.3/§12.4): the read-only view's meta rows join the
+              // deadline display — the same row grammar (icon + the threshold
+              // word; a done task reads neutral with the Done indication).
+              (B().deadlineViewHtml ? B().deadlineViewHtml(task, lang) : '') +
+              // S246 (spec §16): the view is the DETAILS surface — the dep rows
+              // join the meta stack through the row-only twin, which carries the
+              // blocker NAMES ("detailed blocker names belong in task details or
+              // the Edit Task modal, not in long card text").
+              (B().depViewHtml ? B().depViewHtml(task, null, null, lang) : '') +
               (shotsHtml || '') +
             '</div>'
           const head = taskViewEl.querySelector('.db-view-head h3')
@@ -466,15 +483,28 @@
             if (filterQuery) {
               if (!String(task.title || '').toLowerCase().includes(filterQuery)) return false
             }
+            // S242: the sprint view filter — '__none' shows unassigned tasks only.
+            if (filterSprint) {
+              if (filterSprint === '__none' ? !!task.sprint_id : task.sprint_id !== filterSprint) return false
+            }
             return true
           }
           const shownCount = S.tasks.filter(taskMatches).length
-          const anyFilter = filterPrios.size > 0 || filterTags.size > 0 || filterQuery !== ''
+          const anyFilter = filterPrios.size > 0 || filterTags.size > 0 || filterQuery !== '' || filterSprint !== ''
           const filterBarHtml = S.tasks.length ? '<div class="db-filter" data-db-filter role="toolbar" aria-label="' + B().esc(_t('db.filterAria', 'Filter tasks')) + '">' +
             // S136: the search input FIRST — the exact structure + classes of the
             // project page's bar (project-page.js pdFilterBuild; .db-filter-search
             // styles ship in devboard.css and were already shared).
             '<input type="search" class="db-filter-search" data-db-filter-q placeholder="' + B().esc(_t('db.filterSearchPh', 'Search tasks…')) + '" aria-label="' + B().esc(_t('db.filterSearchPh', 'Search tasks…')) + '" autocomplete="off" spellcheck="false" dir="auto" value="' + B().esc(filterQuery) + '">' +
+            // S242 (spec §7.5/Screen A): the compact SPRINT filter — default
+            // "All tasks"; every project sprint (any lifecycle state) with its
+            // emoji-or-default glyph + name, plus "No sprint". The is-on tint
+            // marks an active (non-All) filter (devboard.css).
+            '<select class="db-filter-sprint' + (filterSprint ? ' is-on' : '') + '" data-db-filter-sprint aria-label="' + B().esc(_t('db.filterSprint', 'Sprint filter')) + '" title="' + B().esc(_t('db.filterSprint', 'Sprint filter')) + '">' +
+              '<option value="">' + B().esc(_t('db.filterSprintAll', 'All tasks')) + '</option>' +
+              '<option value="__none"' + (filterSprint === '__none' ? ' selected' : '') + '>' + B().esc(_t('db.noSprint', 'No sprint')) + '</option>' +
+              S.sprints.map((s) => '<option value="' + B().esc(s.id) + '"' + (filterSprint === s.id ? ' selected' : '') + '>' + B().esc((s.emoji ? s.emoji + ' ' : '◆ ') + s.name) + '</option>').join('') +
+            '</select>' +
             '<span class="db-filter-label muted small">' + B().esc(_t('db.filterPrio', 'Priority')) + '</span>' +
             B().PRIORITIES.slice().reverse().map((p) =>
               '<button type="button" class="chip db-filter-prio prio-' + p + '" data-fp="' + p + '" aria-pressed="' + (filterPrios.has(p) ? 'true' : 'false') + '" title="' + B().esc(_t('db.filterPrioHint', 'Show only {p} tasks').replace('{p}', B().prioLabel(p))) + '"><span class="prio-dot prio-' + p + '"></span>' + B().esc(B().prioLabel(p)) + '</button>'
@@ -494,6 +524,61 @@
             '<p class="empty-state-text">' + B().esc(_t('db.filterEmptyText', 'Try another word, or clear the filters to see every task.')) + '</p>' +
             '<button type="button" class="empty-state-cta btn ghost" data-db-filter-empty-clear>' + B().esc(_t('db.filterClear', 'Clear filter')) + '</button>' +
           '</div>' : ''
+          // S243 (spec §7.4 + Screen G — the compact sprint overview): selecting a
+          // NAMED sprint in the view filter mounts its overview panel under the bar —
+          // identity + lifecycle state, the five lane counts + total (the §12.5
+          // CLIENT fold over the loaded payload — ZERO new fetches), and the
+          // lifecycle actions the state permits (Start/Resume, Pause, Finish) +
+          // Settings (deep-links the Sprints page's detail panel). No percentages,
+          // no analytics — the restrained distribution the spec pins.
+          let sprintOvHtml = ''
+          const ovSprint = filterSprint && filterSprint !== '__none' ? B().findSprint(filterSprint) : null
+          if (ovSprint) {
+            const ovSt = B().sprintStatusOf(ovSprint)
+            const fold = B().sprintLaneCounts(ovSprint.id)
+            const badgeMap = {
+              active: ['sp-st-active', _t('db.sprintSt.active', 'Active')],
+              planned: ['sp-st-planned', _t('db.sprintSt.planned', 'Planned')],
+              paused: ['sp-st-paused', _t('db.sprintSt.paused', 'Paused')],
+              completed: ['sp-st-completed', _t('db.sprintSt.completed', 'Completed')],
+            }
+            const bm = badgeMap[ovSt] || badgeMap.planned
+            const dueTxt = ovSprint.due_at
+              ? '<span class="db-sprint-ov-due muted small">' + B().esc(_t('db.ov.due', 'Due {d}').replace('{d}', new Date(ovSprint.due_at).toLocaleDateString(document.documentElement.lang === 'fa' ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }))) + '</span>'
+              : ''
+            const acts = []
+            if (ovSt === 'planned') acts.push('<button type="button" class="btn small" data-db-ov-start>▸ ' + B().esc(_t('db.startSprint', 'Start sprint')) + '</button>')
+            if (ovSt === 'paused') acts.push('<button type="button" class="btn small" data-db-ov-resume>▸ ' + B().esc(_t('db.resumeSprint', 'Resume')) + '</button>')
+            if (ovSt === 'active') {
+              acts.push('<button type="button" class="btn ghost small" data-db-ov-pause>⏸ ' + B().esc(_t('db.pauseSprint', 'Pause sprint')) + '</button>')
+              acts.push('<button type="button" class="btn ghost small" data-db-ov-finish>⏹ ' + B().esc(_t('db.finishSprint', 'Finish sprint')) + '</button>')
+            }
+            // S245 (spec pack Phase 6 — §13.2 + Screen J1): the overview's Extend
+            // affordance — any NON-COMPLETED sprint carrying a deadline (a
+            // completed sprint's deadline is historical, §10.3 — no extension).
+            // Opens the shared J1 dialog (identity + current deadline + the four
+            // choices + the BEFORE-confirmation impact counts).
+            if (ovSt !== 'completed' && ovSprint.due_at) {
+              acts.push('<button type="button" class="btn ghost small" data-db-ov-extend>⏱ ' + B().esc(_t('db.extendSprint', 'Extend')) + '</button>')
+            }
+            acts.push('<a class="btn ghost small" data-db-ov-settings href="/sprint.html?project=' + encodeURIComponent(projectId) + '&sprint=' + encodeURIComponent(ovSprint.id) + '">⚙ ' + B().esc(_t('db.ov.settings', 'Settings')) + '</a>')
+            sprintOvHtml =
+              '<div class="db-sprint-ov" data-db-sprint-ov data-sprint-id="' + B().esc(ovSprint.id) + '">' +
+                '<div class="row db-sprint-ov-head">' +
+                  '<span class="db-sprint-ov-glyph" aria-hidden="true">' + B().esc(B().sprintGlyph(ovSprint)) + '</span>' +
+                  '<span class="db-sprint-ov-name" dir="auto">' + B().esc(ovSprint.name || '') + '</span>' +
+                  '<span class="sp-list-badge ' + bm[0] + '">' + B().esc(bm[1]) + '</span>' +
+                  dueTxt +
+                  '<span class="db-flex-gap"></span>' +
+                  '<div class="row db-sprint-ov-actions">' + acts.join('') + '</div>' +
+                '</div>' +
+                '<div class="db-sprint-ov-counts" role="table" aria-label="' + B().esc(_t('db.ov.counts', 'Task counts by Kanban column')) + '">' +
+                  B().STATUSES.map((st) =>
+                    '<span class="db-sprint-ov-count" role="row"><span class="db-sprint-ov-lane" role="cell">' + B().esc(B().statusLabel(st)) + '</span><b role="cell">' + B().faDig(fold.counts[st] || 0) + '</b></span>').join('') +
+                  '<span class="db-sprint-ov-count db-sprint-ov-total" role="row"><span class="db-sprint-ov-lane" role="cell">' + B().esc(_t('db.ov.total', 'Total')) + '</span><b role="cell">' + B().faDig(fold.total) + '</b></span>' +
+                '</div>' +
+              '</div>'
+          }
           // Session 22 (user request): unlimited task titles clamp at 150 CHARS — same
           // recipe as the project page's progress boxes: first 150 chars visible, the
           // rest in a hidden .pd-title-rest span INSIDE the title element (so
@@ -569,7 +654,7 @@
           // data-task-card (drag/drop + editor), the ⋯ menu (anchored to the wrap,
           // the quicknotes.css project recipe), Archive/Clear/Copy/Export in
           // .pd-col-actions, and .db-cat-chip / .db-sprint-badge (no pd counterpart).
-          root.innerHTML = filterBarHtml + filterEmptyHtml + '<div class="db-cols">' + B().STATUSES.map((st) => {
+          root.innerHTML = filterBarHtml + filterEmptyHtml + sprintOvHtml + '<div class="db-cols">' + B().STATUSES.map((st) => {
             const items = S.tasks.filter((x) => x.status === st && taskMatches(x))
             const isDone = st === 'done'
             // UI-redesign (spec §4): ONE ellipsis menu per lane replaces the always-
@@ -639,13 +724,42 @@
                   // S152 (block 6): the category chip moved ABOVE the title row (the
                   // owner's placement spec) and wears the curated fill+ink pair.
                   const catChipHtml = cat ? '<span class="cat-chip" style="background:' + B().esc(cat.color_fill) + ';color:' + B().esc(cat.color_text) + '">' + B().esc(cat.name) + '</span>' : ''
-                  const chipsHtml = (tags.length || sprint
+                  // S242 (spec pack §3.2/Screen A — card sprint identity): the
+                  // sprint's OWN compact row — its emoji (or the default ◆ glyph)
+                  // + name — directly under the description/preview, BEFORE the
+                  // label chips and the timestamp area (the Phase 5 deadline row
+                  // slots in right after this seam). Identical markup renders on
+                  // the embedded board (detail-helpers.ts sprintBadgeHtml) — the
+                  // S209 1:1 parity contract.
+                  const sprintRowHtml = sprint
+                    ? '<span class="db-sprint-badge">' + B().esc((sprint.emoji ? sprint.emoji + ' ' : '◆ ') + sprint.name) + '</span>'
+                    : ''
+                  // S244 (spec pack §12 + Screen A — the deadline row + the thin
+                  // progress bar): the Phase 3 seam — directly under the sprint
+                  // row, above the tags/meta area. The shared devboard.js render
+                  // stack (B().deadlineRowHtml) consumes the payload's
+                  // server-computed effective_* triple (S241): the §12.3 threshold
+                  // WORD carries the meaning (never color alone) and the bar's fill
+                  // is the §12.2 ELAPSED-time ratio from effective_due_origin_at —
+                  // never completion, never a client re-derivation. Renders '' when
+                  // the triple is null (no row, no bar).
+                  const deadlineHtml = B().deadlineRowHtml ? B().deadlineRowHtml(task, lang) : ''
+                  // S246 (spec pack §16 + Screen L/M-6/7 — the compact dep
+                  // badges): their OWN row in the Phase 3 seam family — right
+                  // after the deadline row (+bar), before the tags — rendered by
+                  // the SHARED devboard.js fold (B().depBadgeHtml) over the
+                  // payload's task_deps edges. Blocked (optionally · N) /
+                  // Blocks N / Ready render ONLY when the relationships exist;
+                  // fully independent of the priority ribbon AND the deadline
+                  // display (§16: "keep dependency status separate"; §23: the
+                  // ribbon stays unchanged). SOFT indicators — never a gate.
+                  const depHtml = B().depBadgeHtml ? B().depBadgeHtml(task, null, null, lang) : ''
+                  const chipsHtml = (tags.length
                     ? '<span class="pd-task-tags">' +
                       // S30 batch 2: label chips are FILTER toggles (GitHub behavior) —
                       // S136: rendered as the project page's .pd-tag spans (data-pd-tag-name
                       // carries the match key; the colored .pd-tag-dot replaces the ● text).
                       tags.map((tg) => '<span dir="auto" class="pd-tag" data-pd-tag-name="' + B().esc(tg.name.toLowerCase()) + '" title="' + B().esc(_t('db.filterTagHint', 'Click to filter by this label')) + '"><i class="pd-tag-dot" style="background:' + B().esc(tg.color) + '"></i>' + B().esc(tg.name) + '</span>').join('') +
-                      (sprint ? '<span class="db-sprint-badge">◆ ' + B().esc(sprint.name) + '</span>' : '') +
                     '</span>'
                     : '')
                   // S110 (v0.3.43.0): the meta line mirrors the project page's progress
@@ -681,6 +795,9 @@
                         '</span>' +
                         previewHtml(task.title) +
                         readMoreBtn(task.title) +
+                        sprintRowHtml +
+                        deadlineHtml +
+                        depHtml +
                         chipsHtml +
                         metaHtml +
                       '</span>' +
@@ -861,7 +978,7 @@
           closeSwitch()
           closeAllDbMenus()
           // per-board filter state resets with the board (predictable switching)
-          filterPrios.clear(); filterTags.clear(); filterQuery = ''
+          filterPrios.clear(); filterTags.clear(); filterQuery = ''; filterSprint = ''
           projectId = id
           // URL: SAME pathname (works on /kanban and /board.html alike), the new project,
           // the old board's deep-link params dropped; pushState so Back returns to the
@@ -1108,7 +1225,7 @@
             return
           }
           if (e.target.closest('[data-db-filter-clear]') || e.target.closest('[data-db-filter-empty-clear]')) {
-            filterPrios.clear(); filterTags.clear(); filterQuery = ''
+            filterPrios.clear(); filterTags.clear(); filterQuery = ''; filterSprint = ''
             render()
             return
           }
@@ -1210,6 +1327,20 @@
             B().openTaskShots(badge.getAttribute('data-db-shots-dialog'), { onChanged: reload })
             return
           }
+          // S245 (spec pack Phase 6 — §13 + Screens J2/J3): the deadline row's Extend
+          // affordance — the shared stack's ROUTER owns the scope decision (a
+          // personal deadline → J2's picker; a sprint-sourced row → J3's CHOICE
+          // modal — never a silent sprint change); no effective deadline → nothing.
+          // Runs BEFORE the card-click→view branch below (the button lives INSIDE
+          // [data-task-card]; ctx.on handlers are separate document-level listeners
+          // — an early return is the only shield, the moreBtn badge precedent).
+          const extBtn = e.target.closest('[data-db-extend]')
+          if (extBtn) {
+            e.preventDefault(); e.stopPropagation()
+            const task = B().findTask(extBtn.getAttribute('data-db-extend'))
+            if (task && B().openTaskDeadlineExtend) B().openTaskDeadlineExtend(task, { onDone: reload })
+            return
+          }
           // S238: the sheet's one-tap per-row copy — the RAW full definition (the ⋯
           // menu's Copy contract without opening the menu; data-raw-title first,
           // the loaded task as the belt).
@@ -1231,11 +1362,12 @@
           // S238: a card click OPENS THE TASK — the read-only view modal. The
           // editor opens only from the ⋯ menu's Edit / the view's Edit button
           // (the project page's S149 contract, brought to the board). The
-          // exclusion list keeps its S30/S208 shape: the prio banner cycles, the
-          // label chips filter, the ⋯ menu (and the sheet's copy button inside
-          // it) own their actions, the pin badge opens its own dialog — none of
-          // them open the view either.
-          if (card && !e.target.closest('[data-task-read-more]') && !e.target.closest('[data-db-cycle-prio]') && !e.target.closest('.pd-tag') && !e.target.closest('.db-card-menu') && !e.target.closest('[data-db-shots-dialog]')) openTaskView(card.dataset.taskCard, card.querySelector('.pd-task'))
+          // exclusion list keeps its S30/S208/S245 shape: the prio banner cycles,
+          // the label chips filter, the ⋯ menu (and the sheet's copy button inside
+          // it) own their actions, the pin badge opens its own dialog, the
+          // deadline row's Extend affordance routes its own flow — none of them
+          // open the view either.
+          if (card && !e.target.closest('[data-task-read-more]') && !e.target.closest('[data-db-cycle-prio]') && !e.target.closest('.pd-tag') && !e.target.closest('.db-card-menu') && !e.target.closest('[data-db-shots-dialog]') && !e.target.closest('[data-db-extend]')) openTaskView(card.dataset.taskCard, card.querySelector('.pd-task'))
 
           // Item 8 + S30 batch 2: per-column Quick Copy + Export Markdown — the bullets
           // now carry priority + labels ("- [URGENT] Fix auth leak #UI/UX #Security") and
@@ -1470,6 +1602,37 @@
           }, 150)
         })
 
+        // S242 (spec §7.5): the SPRINT FILTER select — one change re-renders with
+        // the new view filter (the render carries the selected option + the is-on
+        // tint across the rebuild). A select needs no focus/caret restore.
+        ctx.on('change', (e) => {
+          const sel = e.target.closest ? e.target.closest('[data-db-filter-sprint]') : null
+          if (!sel) return
+          filterSprint = sel.value
+          render()
+        })
+
+        // S243 (Screen G): the compact overview's lifecycle actions — the shared
+        // devboard.js stack (the H2 finish confirmation, the H3 pause confirm, the
+        // H1-aware start/resume). onDone = the page's own reload() — the board
+        // re-pulls + re-renders (the panel + the counts follow the fresh state).
+        ctx.on('click', (e) => {
+          const ov = e.target.closest('[data-db-sprint-ov]')
+          if (!ov) return
+          const id = ov.dataset.sprintId
+          const s = id ? B().findSprint(id) : null
+          if (!s) return
+          if (e.target.closest('[data-db-ov-start]')) { B().startSprintWithConflict(s.id, { onDone: reload }); return }
+          if (e.target.closest('[data-db-ov-resume]')) { B().startSprintWithConflict(s.id, { onDone: reload }); return }
+          if (e.target.closest('[data-db-ov-pause]')) { B().confirmSprintPause(s, { onDone: reload }); return }
+          if (e.target.closest('[data-db-ov-finish]')) { B().openSprintFinish(s, { onDone: reload }); return }
+          // S245 (Screen J1): the overview's Extend action — the shared J1 dialog
+          // (the /kanban twin folds state.tasks for the impact preview; the
+          // reload re-pulls so the moved deadline + the inheritors re-render).
+          if (e.target.closest('[data-db-ov-extend]')) { if (B().openSprintDeadlineExtend) B().openSprintDeadlineExtend(s, { onDone: reload }); return }
+          // data-db-ov-settings is an <a href> — the browser navigates; no handler.
+        })
+
         // S136: keyboard parity with the project page — the card is role="button" +
         // tabindex=0 now, so Enter/Space open the task's VIEW (S238 — the click's
         // twin; the editor stays behind the ⋯ menu's Edit / the view's Edit).
@@ -1503,7 +1666,7 @@
             if (window.HibanaBoard) return resolve(true)
             if (!injected && waited >= 1200) {
               injected = true
-              inject('/js/devboard.js?v=31') // keep in sync with the <head> tag + sw SHELL
+              inject('/js/devboard.js?v=36') // keep in sync with the <head> tag + sw SHELL
               if (!window.HibanaFocusCore) inject('/js/focus-core.js?v=2') // S237/S238: the focus + view decision core — keep in sync with the <head> tag
               if (!window.HibanaChips) inject('/js/chip-render.js?v=13') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
               if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA

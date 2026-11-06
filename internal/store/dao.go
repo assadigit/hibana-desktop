@@ -40,6 +40,10 @@ type Project struct {
 }
 
 // Task mirrors one dev_tasks row — a Kanban card (DATA-MODEL.md §2.2, DDL §6).
+// S248 (Phase 9 / 0065 mirror): the personal deadline pair (due_at/due_origin_at)
+// plus the payload's SERVER-COMPUTED effective-deadline triple, stored verbatim
+// (contract §12.2 — the desktop ships zero deadline-resolution logic; the values
+// arrive resolved on every board pull and are simply mirrored).
 type Task struct {
 	ID         string  // id
 	ProjectID  string  // project_id
@@ -55,9 +59,26 @@ type Task struct {
 	EndAt      *string // end_at (nullable)
 	SearchTags string  // search_tags (server-maintained denormalization)
 	UpdatedAt  *string // updated_at (nullable)
+
+	// S248: 0065's personal deadline pair (raw columns, mirrored verbatim).
+	DueAt     *string // due_at (nullable — ISO-8601 instant)
+	DueOrigin *string // due_origin_at (nullable — the progress START stamp, §12.2)
+
+	// S248: the payload's computed triple (mirror-only columns — the cloud
+	// computes at read time and never stores them; spec §18 forbids forking the
+	// resolution, so the resolved values ride every pull and land here verbatim).
+	EffectiveDueAt     *string // effective_due_at (nullable)
+	EffectiveDueSource *string // effective_due_source: 'task' | 'sprint' | NULL
+	EffectiveDueOrigin *string // effective_due_origin_at (nullable)
 }
 
-// Sprint mirrors one sprints row (DATA-MODEL.md §2.3, DDL §6).
+// Sprint mirrors one sprints row (DATA-MODEL.md §2.3, DDL §6). S248 (Phase 9 /
+// 0065 mirror): the explicit lifecycle columns — status (planned|active|paused|
+// completed, NULL on a lagging pre-0065 payload row — the mirror never derives,
+// it stores what the payload carries), emoji (optional identity), due_at +
+// due_origin_at (the sprint-level deadline pair, origin rules live server-side),
+// and updated_at (the D8 sync field). The legacy is_draft/ended_at pair stays
+// the timeline's band-edge representation, kept in lock-step cloud-side.
 type Sprint struct {
 	ID          string  // id
 	ProjectID   string  // project_id
@@ -68,6 +89,13 @@ type Sprint struct {
 	IsDraft     int64   // is_draft (0/1)
 	Version     *string // version (nullable)
 	Description *string // description (nullable)
+
+	// S248: 0065's explicit-lifecycle + deadline columns (mirrored verbatim).
+	Status    *string // status: planned|active|paused|completed (nullable — lagging-D1 belt)
+	Emoji     *string // emoji (nullable — one picker token, §4.2)
+	DueAt     *string // due_at (nullable — ISO-8601 instant)
+	DueOrigin *string // due_origin_at (nullable — the progress START stamp)
+	UpdatedAt *string // updated_at (nullable — stamped on every cloud write, D8)
 }
 
 // Category mirrors one categories row — task categories (DATA-MODEL.md §2.4).
@@ -103,9 +131,21 @@ type CategoryRef struct {
 	CategoryID string // category_id
 }
 
+// TaskDep is one dev_task_deps edge row — "blocker_task_id blocks
+// blocked_task_id" (0065 / contract §12.3): the payload's flat task_deps join,
+// stored verbatim. Project-wide within one project (a write-time invariant
+// cloud-side — same-project on both ends, so scoping through EITHER end finds
+// the project's edges); the reverse Blocks view is derived, never stored.
+type TaskDep struct {
+	BlockerTaskID string // blocker_task_id
+	BlockedTaskID string // blocked_task_id
+}
+
 // Archive mirrors one project_archives row — a done-task snapshot (DATA-MODEL.md
 // §2.6). Archived ≠ deleted: rows stay restorable; Tags is the label snapshot
-// JSON ("[]").
+// JSON ("[]"). S248 (Phase 9 / 0065 mirror): SprintNameSnapshot carries the D3
+// historical sprint label — a deleted sprint's rows read "<name> (deleted)"
+// instead of dangling (the archives payload's additive sprint_name_snapshot).
 type Archive struct {
 	ID                string  // id
 	ProjectID         string  // project_id
@@ -118,6 +158,7 @@ type Archive struct {
 	OriginalCreatedAt string  // original_created_at
 	ArchivedAt        string  // archived_at
 	Tags              string  // tags (JSON array snapshot)
+	SprintName        *string // sprint_name_snapshot (nullable — S248, D3)
 }
 
 // Shot mirrors one screenshots row — METADATA ONLY; the object bytes stay in the
@@ -212,18 +253,23 @@ ON CONFLICT(id) DO UPDATE SET
 const sqlInsertTask = `
 INSERT INTO dev_tasks (
   id, project_id, title, status, priority, category_id, sprint_id, sort_order,
-  created_at, done_at, start_at, end_at, search_tags, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  created_at, done_at, start_at, end_at, search_tags, updated_at,
+  due_at, due_origin_at, effective_due_at, effective_due_source, effective_due_origin_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 const sqlUpsertSprint = `
 INSERT INTO sprints (
-  id, project_id, name, started_at, ended_at, created_at, is_draft, version, description
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  id, project_id, name, started_at, ended_at, created_at, is_draft, version, description,
+  status, emoji, due_at, due_origin_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
   project_id = excluded.project_id, name = excluded.name,
   started_at = excluded.started_at, ended_at = excluded.ended_at,
   created_at = excluded.created_at, is_draft = excluded.is_draft,
-  version = excluded.version, description = excluded.description`
+  version = excluded.version, description = excluded.description,
+  status = excluded.status, emoji = excluded.emoji,
+  due_at = excluded.due_at, due_origin_at = excluded.due_origin_at,
+  updated_at = excluded.updated_at`
 
 const sqlUpsertCategory = `
 INSERT INTO categories (
@@ -252,11 +298,25 @@ ON CONFLICT(user_id, name) DO UPDATE SET
 const sqlInsertTaskTag = `
 INSERT OR IGNORE INTO dev_task_tags (task_id, tag_id) VALUES (?, ?)`
 
+// S248: one dep edge insert — plain INSERT (the delete pass emptied the
+// project's edges and the payload's (blocker, blocked) pair is PK-clean
+// upstream; a duplicate here means payload drift and must fail loudly).
+const sqlInsertTaskDep = `
+INSERT INTO dev_task_deps (blocker_task_id, blocked_task_id, created_at) VALUES (?, ?, ?)`
+
 const sqlInsertProjectCategory = `
 INSERT OR IGNORE INTO project_categories (project_id, category_id) VALUES (?, ?)`
 
 const sqlDeleteBoardTaskTags = `
 DELETE FROM dev_task_tags WHERE task_id IN (SELECT id FROM dev_tasks WHERE project_id = ?)`
+
+// S248: the project's dep edges die with the board swap. Scoped through the
+// BLOCKED end — the payload's own rule (taskDepsForProject joins through the
+// blocked task's project; same-project both ends is a cloud-side write
+// invariant, so either end would find the same rows). The dev_tasks FKs also
+// CASCADE, so this explicit pass is the ordered head + the cascade is the belt.
+const sqlDeleteBoardTaskDeps = `
+DELETE FROM dev_task_deps WHERE blocked_task_id IN (SELECT id FROM dev_tasks WHERE project_id = ?)`
 
 const sqlDeleteBoardTasks = `DELETE FROM dev_tasks WHERE project_id = ?`
 
@@ -281,8 +341,8 @@ const sqlGracePurge = `DELETE FROM local_grace_tasks WHERE seen_missing_at < ?`
 const sqlInsertArchive = `
 INSERT INTO project_archives (
   id, project_id, title, status, priority, category_id, sprint_id, done_at,
-  original_created_at, archived_at, tags
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  original_created_at, archived_at, tags, sprint_name_snapshot
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 const sqlUpsertScreenshot = `
 INSERT INTO screenshots (
@@ -312,7 +372,8 @@ const prioOrderSQL = `CASE t.priority
 
 const sqlGetBoard = `
 SELECT id, project_id, title, status, priority, category_id, sprint_id, sort_order,
-  created_at, done_at, start_at, end_at, search_tags, updated_at
+  created_at, done_at, start_at, end_at, search_tags, updated_at,
+  due_at, due_origin_at, effective_due_at, effective_due_source, effective_due_origin_at
 FROM dev_tasks t
 WHERE t.project_id = ?
 ORDER BY ` + prioOrderSQL
@@ -320,6 +381,7 @@ ORDER BY ` + prioOrderSQL
 const sqlBoardCards = `
 SELECT t.id, t.project_id, t.title, t.status, t.priority, t.category_id, t.sprint_id,
   t.sort_order, t.created_at, t.done_at, t.start_at, t.end_at, t.search_tags, t.updated_at,
+  t.due_at, t.due_origin_at, t.effective_due_at, t.effective_due_source, t.effective_due_origin_at,
   COALESCE(g.id, ''), COALESCE(g.name, ''), COALESCE(g.color, ''),
   COALESCE(sc.shot_count, 0)
 FROM dev_tasks t
@@ -346,7 +408,9 @@ func scanProject(sc scanner, p *Project) error {
 func scanTask(sc scanner, t *Task) error {
 	return sc.Scan(&t.ID, &t.ProjectID, &t.Title, &t.Status, &t.Priority,
 		&t.CategoryID, &t.SprintID, &t.SortOrder, &t.CreatedAt, &t.DoneAt,
-		&t.StartAt, &t.EndAt, &t.SearchTags, &t.UpdatedAt)
+		&t.StartAt, &t.EndAt, &t.SearchTags, &t.UpdatedAt,
+		&t.DueAt, &t.DueOrigin, &t.EffectiveDueAt, &t.EffectiveDueSource,
+		&t.EffectiveDueOrigin)
 }
 
 func upsertProject(ctx context.Context, ex execer, p Project) error {
@@ -393,11 +457,11 @@ func (s *Store) MarkProjectGone(ctx context.Context, id, at string) error {
 
 // ReplaceBoard swaps in one project's freshly-pulled board atomically. One
 // transaction: upsert the project; delete + reinsert that project's dev_tasks /
-// dev_task_tags / project_categories; upsert sprints / categories / tags (tags
-// are user-scoped: upsert by id, never delete user tags here); then the
-// disappearance pass (GO-DESKTOP-PORT-PLAN.md §5, "disappeared from pull =
-// deleted, 7-day local grace copy"; DATA-MODEL.md §6 "Deletion shadow
-// (pre-tombstone)"):
+// dev_task_tags / dev_task_deps / project_categories; upsert sprints /
+// categories / tags (tags are user-scoped: upsert by id, never delete user tags
+// here); then the disappearance pass (GO-DESKTOP-PORT-PLAN.md §5, "disappeared
+// from pull = deleted, 7-day local grace copy"; DATA-MODEL.md §6 "Deletion
+// shadow (pre-tombstone)"):
 //
 //   - every previously-mirrored task of this project that is NOT in the fresh
 //     set moves to local_grace_tasks (INSERT OR REPLACE, seen_missing_at = now)
@@ -410,7 +474,7 @@ func (s *Store) MarkProjectGone(ctx context.Context, id, at string) error {
 // projectID, p and tasks must agree (loud checks below): the board payload is
 // project-scoped and complete (API-AND-SYNC-CONTRACT.md §3.2), so anything
 // absent from the fresh set was deleted upstream.
-func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, tasks []Task, sprints []Sprint, categories []Category, tags []Tag, taskTags []TaskTag, projCategories []CategoryRef) error {
+func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, tasks []Task, sprints []Sprint, categories []Category, tags []Tag, taskTags []TaskTag, projCategories []CategoryRef, taskDeps []TaskDep) error {
 	if p.ID != projectID {
 		return fmt.Errorf("store: ReplaceBoard: project id %q does not match board id %q", p.ID, projectID)
 	}
@@ -488,7 +552,13 @@ func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, t
 
 	// 3. Clear the project's previous board rows. The join rows go first (they
 	//    key on task ids), then the tasks, then the project↔category joins.
+	//    S248: the dep edges die with the task set too — BEFORE the tasks
+	//    themselves (the FK CASCADE would also catch them; the explicit pass
+	//    keeps the ordering readable and deterministic).
 	if _, err := tx.ExecContext(ctx, sqlDeleteBoardTaskTags, projectID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, sqlDeleteBoardTaskDeps, projectID); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, sqlDeleteBoardTasks, projectID); err != nil {
@@ -498,7 +568,9 @@ func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, t
 		return err
 	}
 
-	// 4. Fresh task set.
+	// 4. Fresh task set (the 0065 mirror: the deadline pair + the payload's
+	//    computed effective triple ride every row — verbatim, zero local
+	//    resolution).
 	insertTask, err := tx.PrepareContext(ctx, sqlInsertTask)
 	if err != nil {
 		return err
@@ -506,7 +578,9 @@ func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, t
 	for _, t := range tasks {
 		if _, err := insertTask.ExecContext(ctx, t.ID, t.ProjectID, t.Title, t.Status,
 			t.Priority, t.CategoryID, t.SprintID, t.SortOrder, t.CreatedAt, t.DoneAt,
-			t.StartAt, t.EndAt, t.SearchTags, t.UpdatedAt); err != nil {
+			t.StartAt, t.EndAt, t.SearchTags, t.UpdatedAt,
+			t.DueAt, t.DueOrigin, t.EffectiveDueAt, t.EffectiveDueSource,
+			t.EffectiveDueOrigin); err != nil {
 			return err
 		}
 	}
@@ -523,6 +597,32 @@ func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, t
 			continue
 		}
 		if _, err := insertTaskTag.ExecContext(ctx, j.TaskID, j.TagID); err != nil {
+			return err
+		}
+	}
+
+	// 5b. S248: the fresh dep edge set (the payload's task_deps join, stored
+	//     verbatim). Filtered to BOTH ends inside the fresh task set: the
+	//     payload is project-scoped and cascade-clean upstream, so a filtered
+	//     edge would mean its task vanished upstream this pull — writing it
+	//     would violate the FK and fail the whole replace; skipping it is the
+	//     faithful mirror of the server's own cascade. created_at is a NOT NULL
+	//     cloud column the flat payload does not carry — the mirror stamps its
+	//     own pull time (it never orders by it; the payload's deterministic
+	//     edge order is preserved by the insert sequence).
+	insertTaskDep, err := tx.PrepareContext(ctx, sqlInsertTaskDep)
+	if err != nil {
+		return err
+	}
+	now := nowISO()
+	for _, d := range taskDeps {
+		if _, ok := fresh[d.BlockerTaskID]; !ok {
+			continue
+		}
+		if _, ok := fresh[d.BlockedTaskID]; !ok {
+			continue
+		}
+		if _, err := insertTaskDep.ExecContext(ctx, d.BlockerTaskID, d.BlockedTaskID, now); err != nil {
 			return err
 		}
 	}
@@ -547,7 +647,8 @@ func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, t
 	for _, sp := range sprints {
 		if _, err := upsertSprint.ExecContext(ctx, sp.ID, sp.ProjectID, sp.Name,
 			sp.StartedAt, sp.EndedAt, sp.CreatedAt, sp.IsDraft, sp.Version,
-			sp.Description); err != nil {
+			sp.Description, sp.Status, sp.Emoji, sp.DueAt, sp.DueOrigin,
+			sp.UpdatedAt); err != nil {
 			return err
 		}
 	}
@@ -631,7 +732,7 @@ func (s *Store) UpsertArchives(ctx context.Context, projectID string, arcs []Arc
 	for _, a := range arcs {
 		if _, err := insertArchive.ExecContext(ctx, a.ID, a.ProjectID, a.Title,
 			a.Status, a.Priority, a.CategoryID, a.SprintID, a.DoneAt,
-			a.OriginalCreatedAt, a.ArchivedAt, a.Tags); err != nil {
+			a.OriginalCreatedAt, a.ArchivedAt, a.Tags, a.SprintName); err != nil {
 			return err
 		}
 	}
@@ -912,6 +1013,8 @@ func (s *Store) BoardTasksWithTags(ctx context.Context, projectID string) ([]Tas
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.Title, &t.Status, &t.Priority,
 			&t.CategoryID, &t.SprintID, &t.SortOrder, &t.CreatedAt, &t.DoneAt,
 			&t.StartAt, &t.EndAt, &t.SearchTags, &t.UpdatedAt,
+			&t.DueAt, &t.DueOrigin, &t.EffectiveDueAt, &t.EffectiveDueSource,
+			&t.EffectiveDueOrigin,
 			&chip.ID, &chip.Name, &chip.Color, &shot); err != nil {
 			return nil, fmt.Errorf("store: scan task card: %w", err)
 		}

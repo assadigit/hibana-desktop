@@ -142,6 +142,101 @@ func TestPullMirrorsBoardAndEtagSkip(t *testing.T) {
 	}
 }
 
+// testBoardV3 is the S248 (Phase 9 / 0065) board payload: the legacy six keys
+// with the feature's additive surface riding on top — the sprint's explicit
+// lifecycle columns, the tasks' deadline pair + the server-computed effective
+// triple, and the flat task_deps edge join (contract §12). A pre-0065 payload
+// (testBoard above) simply omits every new key — the decoder's nil defaults
+// keep that path byte-compatible.
+const testBoardV3 = `{
+ "project":{"id":"p1","title":"T","status":"operational","type":"personal"},
+ "tasks":[
+  {"id":"t1","project_id":"p1","title":"hello","status":"idea","priority":"high","category_id":null,"sprint_id":"sp1","sort_order":0,"created_at":"2026-01-01T00:00:00.000Z","done_at":null,"start_at":null,"end_at":null,"search_tags":"","updated_at":"2026-01-02T00:00:00.000Z","tags":[],"shot_count":0,
+   "due_at":"2026-01-10T20:59:59.999Z","due_origin_at":"2026-01-02T00:00:00.000Z",
+   "effective_due_at":"2026-01-10T20:59:59.999Z","effective_due_source":"task","effective_due_origin_at":"2026-01-02T00:00:00.000Z"},
+  {"id":"t2","project_id":"p1","title":"world","status":"planned","priority":"medium","category_id":null,"sprint_id":"sp1","sort_order":1,"created_at":"2026-01-01T00:00:00.000Z","done_at":null,"start_at":null,"end_at":null,"search_tags":"","updated_at":"2026-01-02T00:00:00.000Z","tags":[],"shot_count":0,
+   "due_at":null,"due_origin_at":null,
+   "effective_due_at":"2026-01-15T20:59:59.999Z","effective_due_source":"sprint","effective_due_origin_at":"2026-01-01T00:00:00.000Z"}
+ ],
+ "categories":[],
+ "sprints":[{"id":"sp1","project_id":"p1","name":"Sprint 1","started_at":"2026-01-01T00:00:00.000Z","ended_at":null,"created_at":"2026-01-01T00:00:00.000Z","is_draft":0,"version":null,"description":null,
+  "status":"active","emoji":"🚀","due_at":"2026-01-15T20:59:59.999Z","due_origin_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-03T00:00:00.000Z"}],
+ "tags":[],
+ "task_tags":[],
+ "task_deps":[{"blocker_task_id":"t1","blocked_task_id":"t2"}]
+}`
+
+// TestPullMirrorsSprintDeadlineDeps pins the S248 mirror path end-to-end: the
+// payload's additive 0065 surface decodes verbatim and lands in the mirror's
+// v3 columns — the tasks' raw deadline pair + the server-computed effective
+// triple readable straight back through GetBoard (the sprint columns, dep
+// edges, CHECK/one-active constraints, and the archives snapshot are pinned
+// at the store layer in store_test.go's TestMirrorV3SprintDeadlineDeps, where
+// the raw SQL is reachable). A second pull without the edge then proves the
+// full-replace semantics (D8: no deltas needed) never errors on the new keys.
+func TestPullMirrorsSprintDeadlineDeps(t *testing.T) {
+	f := newSyncFake()
+	f.bodies["/api/projects/p1/devboard"] = testBoardV3
+	eng, st, done := newEngine(t, f)
+	defer done()
+	ctx := context.Background()
+
+	if _, err := eng.Pull(ctx, "p1"); err != nil {
+		t.Fatalf("pull: %v", err)
+	}
+
+	// Task rows: the raw pair + the computed triple, verbatim.
+	board, err := st.GetBoard(ctx, "p1")
+	if err != nil || len(board) != 2 {
+		t.Fatalf("board after pull: %v %+v", err, board)
+	}
+	var t1, t2 store.Task
+	for _, tk := range board {
+		if tk.ID == "t1" {
+			t1 = tk
+		}
+		if tk.ID == "t2" {
+			t2 = tk
+		}
+	}
+	if t1.DueAt == nil || *t1.DueAt != "2026-01-10T20:59:59.999Z" ||
+		t1.DueOrigin == nil || *t1.DueOrigin != "2026-01-02T00:00:00.000Z" ||
+		t1.EffectiveDueAt == nil || *t1.EffectiveDueAt != "2026-01-10T20:59:59.999Z" ||
+		t1.EffectiveDueSource == nil || *t1.EffectiveDueSource != "task" ||
+		t1.EffectiveDueOrigin == nil || *t1.EffectiveDueOrigin != "2026-01-02T00:00:00.000Z" {
+		t.Fatalf("t1 deadline fields not mirrored verbatim: %+v", t1)
+	}
+	if t2.DueAt != nil || t2.DueOrigin != nil {
+		t.Fatalf("t2 raw pair should be null: %+v", t2)
+	}
+	if t2.EffectiveDueAt == nil || *t2.EffectiveDueAt != "2026-01-15T20:59:59.999Z" ||
+		t2.EffectiveDueSource == nil || *t2.EffectiveDueSource != "sprint" ||
+		t2.EffectiveDueOrigin == nil || *t2.EffectiveDueOrigin != "2026-01-01T00:00:00.000Z" {
+		t.Fatalf("t2 inherited triple not mirrored verbatim: %+v", t2)
+	}
+	if t1.SprintID == nil || *t1.SprintID != "sp1" {
+		t.Fatalf("t1 sprint link not mirrored: %+v", t1)
+	}
+
+	// The edge-less repull: full-replace never errors on the new keys and
+	// the task rows keep their mirrored fields (the edge set's swap is
+	// pinned at the store layer).
+	f.bodies["/api/projects/p1/devboard"] = strings.Replace(testBoardV3,
+		`"task_deps":[{"blocker_task_id":"t1","blocked_task_id":"t2"}]`, `"task_deps":[]`, 1)
+	if _, err := eng.Pull(ctx, "p1"); err != nil {
+		t.Fatalf("second pull (edge-less): %v", err)
+	}
+	board, err = st.GetBoard(ctx, "p1")
+	if err != nil || len(board) != 2 {
+		t.Fatalf("board after repull: %v %+v", err, board)
+	}
+	for _, tk := range board {
+		if tk.ID == "t1" && (tk.EffectiveDueAt == nil || *tk.EffectiveDueAt != "2026-01-10T20:59:59.999Z") {
+			t.Fatalf("t1 lost its mirrored triple on the repull: %+v", tk)
+		}
+	}
+}
+
 func TestPullGone(t *testing.T) {
 	f := newSyncFake()
 	f.statuses["/api/projects/p1/devboard"] = http.StatusNotFound
@@ -485,7 +580,7 @@ func TestBoardPayloadDecodesRealShape(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &bp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	p, tasks, _, _, _, joins, _ := boardToStore(&bp, "")
+	p, tasks, _, _, _, joins, _, _ := boardToStore(&bp, "")
 	if p.ID != "p1" || tasks[0].CategoryID == nil || *tasks[0].CategoryID != "c9" {
 		t.Fatalf("converter lost fields: %+v %+v", p, tasks[0])
 	}

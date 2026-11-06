@@ -80,6 +80,71 @@ CREATE TABLE screenshots (
 );
 `
 
+// mirrorSchemaV3 is the S248 (Phase 9) mirror of the web's migration
+// 0065_sprint_deadline_deps.sql — the Sprint/Deadline/Dependency feature pack
+// (API-AND-SYNC-CONTRACT.md §12, the contract this mirror consumes). Semantics
+// are IDENTICAL to 0065 where the columns exist cloud-side:
+//
+//   - sprints gain the explicit lifecycle (status TEXT — the service layer +
+//     the partial unique index idx_sprints_one_active enforce one-active, never
+//     a NOT NULL column: SQLite cannot ADD COLUMN with a non-constant default),
+//     emoji, due_at + due_origin_at (the §12.2 origin rules live SERVER-side),
+//     and updated_at (the D8 sync field, stamped on every cloud write).
+//   - dev_tasks gain the personal deadline pair due_at + due_origin_at.
+//   - dev_task_deps links blocker→blocked with both FKs ON DELETE CASCADE, the
+//     table-level CHECK blocker<>blocked, and both FK indexes (cycles are a
+//     service-layer CTE cloud-side; the mirror only ever full-replaces from the
+//     payload, so it inherits the cloud's already-clean edge set).
+//   - project_archives gains sprint_name_snapshot (D3: a deleted sprint's
+//     history survives as "Sprint: <name> (deleted)").
+//
+// NO backfill runs here — unlike the cloud's 0065 (which normalized legacy
+// is_draft/ended_at data), the mirror never migrates legacy sprint rows: it is
+// offline-local and every ReplaceBoard full-replaces the project's rows from
+// the live payload, so a fresh column set + the server-computed values simply
+// arrive on the next pull (D8: no deltas needed).
+//
+// MIRROR-ONLY additions beyond 0065 (documented divergence, NOT schema drift —
+// the cloud computes these at read time and never stores them): dev_tasks also
+// carries the payload's server-computed effective-deadline triple
+// effective_due_at / effective_due_source / effective_due_origin_at VERBATIM
+// (contract §12.2: spec §18 forbids forking deadline resolution between
+// platforms — the desktop stores the computed values and ships ZERO
+// deadline-resolution logic of its own).
+const mirrorSchemaV3 = `
+-- ---- sprints: the explicit lifecycle (0065 / D1) ---------------------------
+ALTER TABLE sprints ADD COLUMN status TEXT;
+ALTER TABLE sprints ADD COLUMN emoji TEXT;
+ALTER TABLE sprints ADD COLUMN due_at TEXT;
+ALTER TABLE sprints ADD COLUMN due_origin_at TEXT;
+ALTER TABLE sprints ADD COLUMN updated_at TEXT;
+-- The one-active invariant at the persistence layer, verbatim from 0065: the
+-- payload can never carry two active sprints (the cloud enforces the same
+-- index), so this is the fail-loudly belt against a drifted payload.
+CREATE UNIQUE INDEX idx_sprints_one_active ON sprints(project_id) WHERE status = 'active';
+
+-- ---- dev_tasks: personal deadlines (0065 / D7) + the payload's computed triple
+ALTER TABLE dev_tasks ADD COLUMN due_at TEXT;
+ALTER TABLE dev_tasks ADD COLUMN due_origin_at TEXT;
+ALTER TABLE dev_tasks ADD COLUMN effective_due_at TEXT;
+ALTER TABLE dev_tasks ADD COLUMN effective_due_source TEXT CHECK (effective_due_source IS NULL OR effective_due_source IN ('task','sprint'));
+ALTER TABLE dev_tasks ADD COLUMN effective_due_origin_at TEXT;
+
+-- ---- dev_task_deps: task dependencies (0065 / D7) ---------------------------
+CREATE TABLE dev_task_deps (
+  blocker_task_id TEXT NOT NULL REFERENCES dev_tasks(id) ON DELETE CASCADE,
+  blocked_task_id TEXT NOT NULL REFERENCES dev_tasks(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (blocker_task_id, blocked_task_id),
+  CHECK (blocker_task_id <> blocked_task_id)
+);
+CREATE INDEX idx_dev_task_deps_blocker ON dev_task_deps(blocker_task_id);
+CREATE INDEX idx_dev_task_deps_blocked ON dev_task_deps(blocked_task_id);
+
+-- ---- project_archives: the historical sprint label (0065 / D3) ---------------
+ALTER TABLE project_archives ADD COLUMN sprint_name_snapshot TEXT;
+`
+
 // localSchemaV2 holds the LOCAL-ONLY additions. None of it is ever pushed to the
 // cloud; none of it diverges from the §6 column shapes.
 const localSchemaV2 = `

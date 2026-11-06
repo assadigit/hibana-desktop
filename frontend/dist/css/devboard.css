@@ -143,6 +143,246 @@ main.board-shell .db-frame { min-block-size: calc(100dvh - 1.5rem); }
   padding: 0.05rem 0.45rem;
   white-space: nowrap;
 }
+/* S242 (spec pack §3.2/Screen A — card sprint identity): the badge renders as its
+   OWN compact row directly under the description/preview (before the tags chips
+   and the timestamp area — the Phase 5 deadline row slots in right after it).
+   .pd-task-body is a grid, so a direct badge child gets its own row for free;
+   justify-self keeps it at the reading edge in BOTH directions (RTL mirrors). */
+.pd-task-body > .db-sprint-badge { justify-self: start; margin-block: 0.1rem 0; }
+
+/* --- S244 (spec pack §12 — the card deadline row + the thin progress bar) -----
+   Screen A's order: description → sprint row → DEADLINE ROW → BAR → tags → meta.
+   The row: the calendar-clock icon + the §12.3 threshold WORD (the word carries
+   the meaning — never color alone) in the four restrained state colors +
+   neutral gray for the §12.4 done state. The bar: 4-6px thin, rounded ends,
+   subtle neutral track, no border/shadow, the ELAPSED-time fill (§12.2 — never
+   completion), no percentage. §17 EXCEPTION: the bar is direction-locked LTR —
+   time progression stays left-to-right even inside an RTL card. */
+.db-due-row {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--fs-xs);
+  line-height: 1.25;
+  max-inline-size: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-due-row .db-due-ic { inline-size: 0.85rem; block-size: 0.85rem; flex: none; }
+.db-due-txt { overflow: hidden; text-overflow: ellipsis; }
+/* S247 (Phase 8 a11y): the text pair darkened to clear WCAG AA 4.5:1 on the
+   white card — comfortable #5a7d5a→#4d6b4d (5.96:1), approaching
+   #9a6f2f→#8a6428 (5.34:1); still the §12.3 "restrained sage/green" and
+   "restrained amber" character. The FILLS below stay decorative (the bar is
+   aria-hidden — the WORD always carries the meaning, never color alone). */
+.db-due-row.st-comfortable { color: #4d6b4d; }
+.db-due-row.st-approaching { color: #8a6428; }
+.db-due-row.st-urgent { color: #b03f3f; }
+.db-due-row.st-overdue { color: #a02c2c; font-weight: 600; }
+.db-due-row.st-done { color: var(--muted, #8a8f98); }
+.db-due-bar {
+  justify-self: stretch;
+  display: block;
+  block-size: 5px; /* the 4-6px thin spec band */
+  margin-block: 0.1rem 0.05rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line, #e4e2dd) 65%, transparent);
+  overflow: hidden;
+  direction: ltr; /* §17: the elapsed-time fill always progresses left-to-right */
+}
+.db-due-fill { display: block; block-size: 100%; border-radius: inherit; }
+.db-due-fill.st-comfortable { background: #8fb58f; }
+.db-due-fill.st-approaching { background: #d9a45b; }
+.db-due-fill.st-urgent { background: #d37070; }
+.db-due-fill.st-overdue { background: #c94f4f; }
+.db-due-fill.st-done { background: var(--muted, #b6babf); }
+/* the read-only task view's meta row carries the row-only variant inline */
+.db-view-meta .db-due-view { font-size: var(--fs-xs); }
+
+/* --- S244 (D6 — the shared Gregorian/Jalali date control) ---------------------
+   The Screen C grammar: the segmented calendar selector (the .db-seg recipe),
+   ONE editable date field (native <input type="date"> for Gregorian; the
+   numeric Jalali text input stays dir=ltr so 1405/08/12 reads as numbers in
+   both directions), the six preset chips, the Add time toggle + HH:MM input,
+   and the §11.2 helper text. RTL-safe via logical properties. */
+.db-due-ctl { display: grid; gap: 0.5rem; }
+.db-due-ctl .db-due-cal { max-inline-size: max-content; }
+.db-due-date-row { display: grid; gap: 0.25rem; }
+.db-due-date, .db-due-time {
+  font: inherit; font-size: var(--fs-sm);
+  color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 0.4em 0.6em; min-block-size: 26px;
+}
+.db-due-j.is-invalid { border-color: var(--err, #c94f4f); }
+.db-due-err { margin: 0; font-size: var(--fs-sm); color: var(--err, #c94f4f); }
+.db-due-presets { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.db-due-presets button {
+  font: inherit; font-size: var(--fs-xs);
+  color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 0.15rem 0.55rem; cursor: pointer;
+}
+.db-due-presets button:hover { border-color: var(--brand); color: var(--brand); }
+.db-due-hint { margin: 0; }
+/* the task modal's inherited read-only line (§10.1) */
+.db-due-inherited { margin: 0.15rem 0 0; }
+.db-due-field .db-due-mount { margin-block: 0.35rem 0.1rem; }
+/* the sprint settings panel's control mount */
+.db-sd-due-mount { margin-block: 0.35rem 0.1rem; }
+/* S245 (spec pack Phase 6 — §13 + Screen J): the deadline row's compact Extend
+   affordance — a hover-revealed ghost glyph at the row's inline end (the row
+   stays one line; keyboard users reach it through focus-visible). Logical
+   properties keep it mirroring in RTL. */
+.db-due-ext {
+  margin-inline-start: auto;
+  display: inline-flex; align-items: center;
+  padding: 0.1rem; border: 0; background: none;
+  color: var(--muted); cursor: pointer; flex: none;
+  opacity: 0; transition: opacity 0.12s ease;
+}
+.db-due-ext .icon { block-size: 13px; inline-size: 13px; }
+.db-due-ext:hover { color: var(--brand); }
+.db-due-ext:focus-visible { opacity: 1; outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.pd-task:hover .db-due-ext, .db-view-body:hover .db-due-ext { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .db-due-ext { transition: none; } }
+/* the task modal's due-field Extend… link (J2/J3's modal anchor) */
+.db-due-ext-link {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  margin-block: 0.25rem 0; font-size: var(--fs-xs);
+  color: var(--brand); padding: 0;
+}
+.db-due-ext-link .icon { block-size: 13px; inline-size: 13px; }
+.db-due-ext-link:hover { text-decoration: underline; }
+/* S245 — the extension dialogs (Screens J1/J2/J3): the four-choice chips (the
+   .db-due-presets recipe), the Custom arm's control mount, the live preview
+   line, and the J3 choice arms' sub-lines. */
+.db-ext-choices { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.db-ext-choice {
+  font: inherit; font-size: var(--fs-xs);
+  color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 0.15rem 0.55rem; cursor: pointer;
+}
+.db-ext-choice:hover { border-color: var(--brand); color: var(--brand); }
+.db-ext-choice.is-on { border-color: var(--brand); color: var(--brand); background: color-mix(in srgb, var(--brand) 8%, transparent); }
+.db-ext-custom { margin-block: 0.35rem 0; }
+.db-ext-preview { margin: 0; min-block-size: 1.1em; }
+.db-sm-taskline { font-weight: 600; overflow-wrap: anywhere; }
+.db-sm-action-sub { display: block; flex: 1 1 100%; text-align: start; font-size: var(--fs-xs); }
+.db-sm-action { flex-wrap: wrap; }
+
+/* --- S246 (spec pack Phase 7 — §16 + Screens K/L): the dependency badges + the
+   Dependencies section -------------------------------------------------------
+   Screen L: the compact card badges — their OWN row in the Phase 3 seam family
+   (after the sprint + deadline rows, before the tags). The WORD carries the
+   meaning (never color alone): a warm held amber for Blocked, the muted green
+   check for Ready (§16.1's resolution), the neutral gray arrow for the derived
+   Blocks N. Fully independent of the priority ribbon AND the deadline colors.
+   Soft indicators only — decorative weight, no alerts. */
+.db-dep-row {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-block: 0.1rem 0;
+  max-inline-size: 100%;
+}
+.db-dep-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: var(--fs-xs);
+  line-height: 1.25;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  max-inline-size: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.db-dep-badge .db-dep-ic { inline-size: 0.85rem; block-size: 0.85rem; flex: none; }
+.db-dep-badge-txt { overflow: hidden; text-overflow: ellipsis; }
+.db-dep-badge.st-blocked { color: #8a6428; background: color-mix(in srgb, #d9a45b 16%, transparent); } /* S247 a11y: 4.73:1 on the tint */
+.db-dep-badge.st-ready { color: #4d6b4d; background: color-mix(in srgb, #8fb58f 18%, transparent); } /* S247 a11y: 5.23:1 on the tint */
+.db-dep-badge.st-blocks { color: var(--muted, #8a8f98); background: color-mix(in srgb, var(--line, #e4e2dd) 55%, transparent); }
+/* the read-only task view's meta rows carry the row-only variant inline (the
+   details surface — blocker names ride here per §16) */
+.db-view-meta .db-dep-view { font-size: var(--fs-xs); }
+.db-view-meta .db-dep-badge { white-space: normal; }
+
+/* Screen K: the Dependencies section in Add/Edit Task — COLLAPSED by default
+   (the S244 due-toggle's grammar: a compact section header, hidden controls
+   while collapsed, no large empty area when collapsed — the visual guide's
+   checklist). The header is a disclosure button: chevron + label + the current
+   blocker count; expanded reveals the Blocked-by label, the search input, the
+   capped scrollable option list (the long-list rule), the derived-reverse note
+   and the inline 400/409 error surface. */
+.db-deps-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: inherit; font-size: var(--fs-sm);
+  color: var(--text); background: none;
+  border: 0; padding: 0.15rem 0;
+  cursor: pointer;
+}
+.db-deps-toggle:hover { color: var(--brand); }
+.db-deps-toggle .db-deps-chev {
+  inline-size: 0.95rem; block-size: 0.95rem; flex: none;
+  transition: transform 0.12s ease;
+}
+.db-deps-toggle[aria-expanded="true"] .db-deps-chev { transform: rotate(180deg); }
+.db-deps-count {
+  font-size: var(--fs-xs);
+  color: #9a6f2f;
+  background: color-mix(in srgb, #d9a45b 16%, transparent);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+}
+.db-deps-mount { display: grid; gap: 0.35rem; margin-block: 0.35rem 0.1rem; }
+.db-deps-label { font-size: var(--fs-sm); }
+.db-deps-q {
+  font: inherit; font-size: var(--fs-sm);
+  color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 0.4em 0.6em; min-block-size: 26px;
+}
+.db-deps-list {
+  display: grid; gap: 0.2rem;
+  max-block-size: 15rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem;
+  scrollbar-width: thin; /* the long-list rule: capped + scrollable, slim bar */
+}
+.db-deps-opt {
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  font: inherit; font-size: var(--fs-sm);
+  color: var(--text); background: var(--card);
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  padding: 0.3rem 0.4rem;
+  cursor: pointer; text-align: start;
+}
+.db-deps-opt:hover { border-color: var(--line); background: color-mix(in srgb, var(--line, #e4e2dd) 30%, var(--card)); }
+.db-deps-opt:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.db-deps-opt .db-deps-check {
+  inline-size: 1rem; flex: none;
+  color: var(--brand); font-weight: 600;
+  text-align: center;
+}
+.db-deps-opt-body { display: grid; gap: 0.05rem; min-inline-size: 0; }
+.db-deps-opt-title { overflow-wrap: anywhere; }
+.db-deps-opt-meta { font-size: var(--fs-xs); }
+.db-deps-opt.is-on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 7%, var(--card)); }
+.db-deps-empty { margin: 0.3rem 0.4rem; }
+.db-deps-note { margin: 0; }
+.db-deps-blocksline { margin: 0; }
+.db-deps-err { margin: 0; font-size: var(--fs-sm); color: var(--err, #c94f4f); }
+@media (prefers-reduced-motion: reduce) { .db-deps-toggle .db-deps-chev { transition: none; } }
 
 /* --- task editor modal ----------------------------------------------------- */
 .db-modal {
@@ -917,6 +1157,70 @@ main.shell.sp-shell .sp-wrap { min-block-size: min(64vh, 30rem); }
    forces [hidden] to win for the filter-clear chip (only shows when a filter is on). */
 .db-filter-clear[hidden] { display: none !important; }
 .db-filter-shown { flex: none; margin-inline-start: auto; }
+/* S242 (spec pack §7.5/Screen A — the toolbar SPRINT FILTER): a compact select
+   at the S32 chip scale (26px, fs-xs — the search input's twin), defaulting to
+   "All tasks". Every project sprint rides along (ANY lifecycle state — it's a
+   VIEW filter: a completed sprint's unfinished tasks must stay findable) plus a
+   "No sprint" option; it composes with the search + priority + label filters and
+   never mutates assignments. The active (non-All) state tints like a pressed
+   chip so the filtered board explains itself at a glance. */
+.db-filter-sprint {
+  flex: none;
+  min-block-size: 26px;
+  max-inline-size: 13rem;
+  padding: 0.16em 0.5em;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.db-filter-sprint:hover { border-color: var(--line-strong); }
+.db-filter-sprint:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 15%, transparent);
+}
+.db-filter-sprint.is-on {
+  border-color: var(--brand);
+  background: var(--brand-soft, rgb(42 132 96 / 0.12));
+}
+@media (prefers-contrast: more) {
+  .db-filter-sprint { border-color: var(--line-strong); }
+  .db-filter-sprint:focus-visible { outline: 2px solid var(--accent, currentColor); }
+}
+
+/* --- S242: the sprint quick-create dialog (spec pack §7.1/Screen D) -----------
+   A SMALL dialog layered ABOVE the open task modal (z 95 > the editor's 90) —
+   required name, optional emoji (the shared full-library picker), Add description
+   + Set due date toggles OFF by default (spec §4.2). RTL-safe throughout via
+   logical properties; the card's dir follows the UI locale like the task modal. */
+.db-sprintq { z-index: 95; }
+.db-sprintq-card { inline-size: min(26rem, 100%); }
+.db-sprintq-body { display: grid; gap: 0.75rem; }
+.db-sq-emoji-row { gap: 0.4rem; }
+.db-sq-emoji-cur { font-size: 1.05rem; line-height: 1; }
+.db-sq-emoji-btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+/* The OFF-by-default toggles (spec §4.2) — plain checkbox rows reading at the
+   field-label scale; the revealed inputs sit directly beneath their toggle. */
+.db-sq-toggle {
+  display: flex; align-items: center; gap: 0.45rem;
+  font-size: var(--fs-sm); color: var(--text);
+  cursor: pointer; user-select: none;
+}
+.db-sq-toggle input { accent-color: var(--brand); inline-size: 0.95rem; block-size: 0.95rem; margin: 0; cursor: pointer; }
+.db-sq-desc, .db-sq-due {
+  font: inherit; font-size: var(--fs-sm);
+  color: var(--text); background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 0.4em 0.6em; min-block-size: 26px;
+}
+.db-sq-desc { min-block-size: 4.2rem; resize: vertical; }
+.db-sq-error { margin: 0; font-size: var(--fs-sm); color: var(--err); }
 @media (max-width: 640px) {
   .db-filter-shown { margin-inline-start: 0; }
 }
@@ -1786,4 +2090,162 @@ main.board-shell .db-frame .db-toolbar { padding: 0.25rem 0.2rem 0.85rem; }
 /* the view's copy/edit foot buttons + the sheet's rows stay motion-quiet */
 @media (prefers-reduced-motion: reduce) {
   .db-sheet-copy { transition: none; }
+}
+
+/* ===========================================================================
+   S243 (spec pack Phase 4 — Screens E/F/G/H/I): the sprint lifecycle UI. Shared
+   grammar across every surface (/kanban, the Sprints page, the embedded board):
+   the compact overview panel, the lifecycle-grouped list, the Settings/Tasks
+   detail panel, the H1 conflict + H2 finish + Screen-I delete confirmations,
+   and the distinct PAUSED timeline render (spec §5.5). Logical properties
+   throughout — RTL mirrors with dir, never a mirrored rule (spec §17).
+   ========================================================================= */
+
+/* --- Screen G: the compact sprint overview (both board surfaces) --------------
+   A restrained panel under the filter bar: identity + lifecycle badge + due date,
+   then the five lane counts + total (§12.5's client fold — counts only, never
+   percentages). Its counts row reads as one quiet table strip. */
+.db-sprint-ov {
+  margin-block-start: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--statcard-bg, var(--card));
+  display: grid;
+  gap: 0.5rem;
+}
+.db-sprint-ov-head { align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.db-sprint-ov-glyph { font-size: 1.05rem; line-height: 1; }
+.db-sprint-ov-name { font-weight: 600; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 22rem; }
+.db-sprint-ov-actions { gap: 0.4rem; flex-wrap: wrap; }
+.db-sprint-ov-counts {
+  display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem;
+  padding-block-start: 0.45rem;
+  border-block-start: 1px dashed var(--line);
+}
+.db-sprint-ov-count { display: inline-flex; align-items: baseline; gap: 0.35rem; font-size: var(--fs-xs); }
+.db-sprint-ov-lane { color: var(--muted); }
+.db-sprint-ov-count b { font-weight: 600; }
+.db-sprint-ov-total { margin-inline-start: auto; }
+.db-sprint-ov-total .db-sprint-ov-lane { color: var(--text); font-weight: 600; }
+
+/* --- the lifecycle badges (the list rows, the detail panel, the overview) ----- */
+.sp-list-badge.sp-st-active { background: var(--accent-soft); color: var(--accent-ink); }
+.sp-list-badge.sp-st-planned { background: color-mix(in srgb, var(--muted) 12%, transparent); color: var(--muted); }
+.sp-list-badge.sp-st-paused { background: color-mix(in srgb, #b98a2e 16%, transparent); color: #8a6a26; }
+.sp-list-badge.sp-st-completed { background: color-mix(in srgb, var(--success, #4a9fa3) 15%, transparent); color: var(--success, #4a9fa3); }
+
+/* --- Screen E: the lifecycle-grouped list on the Sprints page ---------------- */
+.sp-list-group { display: grid; gap: 0.3rem; margin-block-start: 0.6rem; }
+.sp-list-group-title {
+  display: flex; align-items: center; gap: 0.45rem;
+  margin: 0; font-size: var(--fs-xs); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding-inline: 0.15rem;
+}
+.sp-list-group-title .detail-tab-count { font-size: 0.7rem; }
+.sp-list-ident { font-size: 0.95rem; line-height: 1; flex: none; }
+.sp-list-more { flex: none; opacity: 0.55; }
+.sp-list-row:hover .sp-list-more { opacity: 1; }
+.sp-list-due { white-space: nowrap; }
+
+/* --- spec §5.5: the DISTINCT paused timeline render ---------------------------
+   A paused sprint keeps its open window (assumption 7) but reads differently:
+   a muted + hatched band + dashed boundary rails + the ⏸ chip mark. */
+.sp-band.is-paused-band {
+  background-image: repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--muted) 14%, transparent) 6px 12px);
+  opacity: 0.75;
+}
+.sp-sprint.is-paused .sp-sprint-chip { border-style: dashed; opacity: 0.85; }
+.sp-bound.is-paused-bound { border-style: dashed; opacity: 0.75; }
+
+/* --- Screens H1/H2/I: the lifecycle confirmation dialogs ----------------------
+   The .db-modal grammar (the S242 quick-create precedent), z-96 — above the
+   sprint popovers AND the z-95 detail panel (dialog-on-dialog). */
+.db-sprintmod { z-index: 96; }
+.db-sprintmod-card { inline-size: min(28rem, 100%); }
+.db-sprintmod-body { display: grid; gap: 0.55rem; }
+.db-sm-identity {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin: 0; font-size: var(--fs-sm);
+  padding: 0.45rem 0.6rem;
+  background: var(--bg-soft, color-mix(in srgb, var(--muted) 8%, transparent));
+  border-radius: var(--radius-sm);
+}
+.db-sm-identity b { min-inline-size: 0; overflow-wrap: anywhere; }
+.db-sm-glyph { font-size: 1.05rem; line-height: 1; flex: none; }
+.db-sm-role { margin-inline-start: auto; flex: none; }
+.db-sm-role-lab { margin: 0.15rem 0 0; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.68rem; }
+.db-sm-line { margin: 0; font-size: var(--fs-sm); color: var(--text); }
+.db-sm-safe { color: var(--muted); }
+/* the H1 conflict's two explicit arms — full-width quiet action rows */
+.db-sm-action {
+  display: flex; align-items: center; gap: 0.55rem;
+  inline-size: 100%;
+  padding: 0.55rem 0.7rem;
+  font: inherit; font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: start;
+  transition: border-color 0.14s ease, background-color 0.14s ease;
+}
+.db-sm-action:hover { border-color: var(--line-strong); background: var(--bg-soft, color-mix(in srgb, var(--muted) 6%, transparent)); }
+.db-sm-action:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.db-sm-action[disabled] { opacity: 0.6; cursor: default; }
+
+/* --- Screen F: the sprint DETAIL panel (Settings + Tasks) ---------------------
+   The z-95 layer (under the confirmations, over the page chrome). */
+.db-sprintdetail { z-index: 95; }
+.db-sprintdetail-card { inline-size: min(34rem, 100%); }
+.sp-detail-title { display: flex; align-items: center; gap: 0.45rem; margin: 0; min-inline-size: 0; }
+.sp-detail-title > span { min-inline-size: 0; overflow-wrap: anywhere; }
+.sp-detail-glyph { font-size: 1.1rem; line-height: 1; flex: none; }
+.sp-detail-tabs { gap: 0.35rem; }
+.sp-detail-tab {
+  padding: 0.35rem 0.8rem;
+  font: inherit; font-size: var(--fs-sm);
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.sp-detail-tab:hover { color: var(--text); }
+.sp-detail-tab.is-on { color: var(--text); border-color: var(--line); background: var(--statcard-bg, var(--card)); font-weight: 600; }
+.sp-detail-tab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.sp-detail-err { margin: 0; font-size: var(--fs-sm); color: var(--err, #b42318); }
+.sp-detail-due { margin: 0.1rem 0 0; }
+.sp-detail-plan-note { margin: 0.15rem 0 0; }
+/* the Tasks tab: the five-lane fold + total, then each lane's rows */
+.sp-detail-lanes { display: grid; gap: 0.55rem; }
+.sp-detail-total {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: var(--fs-sm); font-weight: 600;
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: var(--statcard-bg, var(--card));
+}
+.sp-detail-total .detail-tab-count { margin-inline-start: auto; }
+.sp-detail-lane { display: grid; gap: 0.25rem; }
+.sp-detail-lane-head { display: flex; align-items: center; gap: 0.5rem; font-size: var(--fs-xs); color: var(--muted); }
+.sp-detail-lane-head .detail-tab-count { margin-inline-start: auto; }
+.sp-detail-tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
+.sp-detail-task {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  font-size: var(--fs-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.sp-detail-task[role='button']:hover { background: var(--bg-soft, color-mix(in srgb, var(--muted) 8%, transparent)); }
+.sp-detail-task-title { min-inline-size: 0; overflow-wrap: anywhere; }
+.sp-detail-archived { display: grid; gap: 0.3rem; margin-block-start: 0.7rem; padding-block-start: 0.6rem; border-block-start: 1px dashed var(--line); }
+.sp-detail-archived-title { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: var(--fs-xs); }
+.sp-detail-archived-title .detail-tab-count { margin-inline-start: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .db-sm-action { transition: none; }
 }

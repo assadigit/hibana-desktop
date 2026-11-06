@@ -16,7 +16,11 @@ import (
 )
 
 // boardToStore converts one full board payload into the mirror's row shapes.
-func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []store.Task, []store.Sprint, []store.Category, []store.Tag, []store.TaskTag, []store.CategoryRef) {
+// S248 (Phase 9 / 0065 mirror): carries the payload's additive fields VERBATIM —
+// the tasks' deadline pair + the server-computed effective triple, the sprints'
+// lifecycle columns, and the flat task_deps edge set. Zero local resolution:
+// whatever the server computed is what lands in the mirror (spec §18).
+func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []store.Task, []store.Sprint, []store.Category, []store.Tag, []store.TaskTag, []store.CategoryRef, []store.TaskDep) {
 	p := store.Project{
 		ID:     bp.Project.ID,
 		Title:  bp.Project.Title,
@@ -30,20 +34,25 @@ func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []stor
 	tasks := make([]store.Task, 0, len(bp.Tasks))
 	for _, t := range bp.Tasks {
 		tasks = append(tasks, store.Task{
-			ID:         t.ID,
-			ProjectID:  t.ProjectID,
-			Title:      t.Title,
-			Status:     t.Status,
-			Priority:   t.Priority,
-			CategoryID: t.CategoryID,
-			SprintID:   t.SprintID,
-			SortOrder:  t.SortOrder,
-			CreatedAt:  t.CreatedAt,
-			DoneAt:     t.DoneAt,
-			StartAt:    t.StartAt,
-			EndAt:      t.EndAt,
-			SearchTags: t.SearchTags,
-			UpdatedAt:  t.UpdatedAt,
+			ID:                 t.ID,
+			ProjectID:          t.ProjectID,
+			Title:              t.Title,
+			Status:             t.Status,
+			Priority:           t.Priority,
+			CategoryID:         t.CategoryID,
+			SprintID:           t.SprintID,
+			SortOrder:          t.SortOrder,
+			CreatedAt:          t.CreatedAt,
+			DoneAt:             t.DoneAt,
+			StartAt:            t.StartAt,
+			EndAt:              t.EndAt,
+			SearchTags:         t.SearchTags,
+			UpdatedAt:          t.UpdatedAt,
+			DueAt:              t.DueAt,
+			DueOrigin:          t.DueOrigin,
+			EffectiveDueAt:     t.EffectiveDueAt,
+			EffectiveDueSource: t.EffectiveDueSource,
+			EffectiveDueOrigin: t.EffectiveDueOrigin,
 		})
 	}
 
@@ -59,6 +68,11 @@ func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []stor
 			IsDraft:     s.IsDraft,
 			Version:     s.Version,
 			Description: s.Description,
+			Status:      s.Status,
+			Emoji:       s.Emoji,
+			DueAt:       s.DueAt,
+			DueOrigin:   s.DueOrigin,
+			UpdatedAt:   s.UpdatedAt,
 		})
 	}
 
@@ -98,7 +112,15 @@ func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []stor
 		joins = append(joins, store.TaskTag{TaskID: j.TaskID, TagID: j.ID})
 	}
 
-	return p, tasks, sprints, cats, tags, joins, projCats
+	// S248: the 7th payload key — the flat dep edge join, mirrored verbatim
+	// (taskDepsForProject scopes through the blocked task's project; the
+	// mirror's ReplaceBoard filters both ends to the fresh task set).
+	deps := make([]store.TaskDep, 0, len(bp.TaskDeps))
+	for _, d := range bp.TaskDeps {
+		deps = append(deps, store.TaskDep{BlockerTaskID: d.BlockerTaskID, BlockedTaskID: d.BlockedTaskID})
+	}
+
+	return p, tasks, sprints, cats, tags, joins, projCats, deps
 }
 
 // projectListToStore converts one projects-list row into the mirror shape.

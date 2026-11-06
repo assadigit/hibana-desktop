@@ -114,7 +114,7 @@ func TestPragmas(t *testing.T) {
 	}
 }
 
-func boardFixture(projectID string) (Project, []Task, []Sprint, []Category, []Tag, []TaskTag, []CategoryRef) {
+func boardFixture(projectID string) (Project, []Task, []Sprint, []Category, []Tag, []TaskTag, []CategoryRef, []TaskDep) {
 	p := Project{
 		ID: projectID, UserID: "u1", Title: "Hibana", Description: "", Type: "personal",
 		Status: "developing", SortOrder: 0, LatestNote: "",
@@ -131,9 +131,23 @@ func boardFixture(projectID string) (Project, []Task, []Sprint, []Category, []Ta
 		task("t-b", "urgent", 5, "2026-10-20T02:00:00.000Z"),
 		task("t-c", "medium", 0, "2026-10-20T03:00:00.000Z"),
 	}
+	// S248 (0065 mirror): the fixture carries the feature's additive fields on
+	// every surface — t-a owns a personal deadline (the raw pair + the computed
+	// triple with source 'task'), t-c inherits nothing (the null triple), and the
+	// sprint is an ACTIVE sprint with emoji + due pair + updated_at.
+	tasks[0].DueAt = ptr("2026-11-01T20:59:59.999Z")
+	tasks[0].DueOrigin = ptr("2026-10-25T00:00:00.000Z")
+	tasks[0].EffectiveDueAt = ptr("2026-11-01T20:59:59.999Z")
+	tasks[0].EffectiveDueSource = ptr("task")
+	tasks[0].EffectiveDueOrigin = ptr("2026-10-25T00:00:00.000Z")
 	sprints := []Sprint{{
 		ID: "sp-1", ProjectID: projectID, Name: "Sprint 1",
 		StartedAt: "2026-10-20T00:00:00.000Z", CreatedAt: "2026-10-20T00:00:00.000Z", IsDraft: 0,
+		Status:    ptr("active"),
+		Emoji:     ptr("🚀"),
+		DueAt:     ptr("2026-11-05T20:59:59.999Z"),
+		DueOrigin: ptr("2026-10-20T00:00:00.000Z"),
+		UpdatedAt: ptr("2026-10-21T00:00:00.000Z"),
 	}}
 	cats := []Category{{
 		ID: "cat-1", UserID: "u1", Name: "Bug", ColorFill: "#333333", ColorText: "#ffffff",
@@ -145,7 +159,11 @@ func boardFixture(projectID string) (Project, []Task, []Sprint, []Category, []Ta
 	}}
 	taskTags := []TaskTag{{TaskID: "t-b", TagID: "tag-1"}}
 	projCats := []CategoryRef{{ProjectID: projectID, CategoryID: "cat-1"}}
-	return p, tasks, sprints, cats, tags, taskTags, projCats
+	// S248: one dep edge — t-a blocks t-c (both ends survive every full-board
+	// pull in the fixtures below; the vanish tests drop t-b, which no edge
+	// references, so the edge set stays stable across the shrink pulls).
+	deps := []TaskDep{{BlockerTaskID: "t-a", BlockedTaskID: "t-c"}}
+	return p, tasks, sprints, cats, tags, taskTags, projCats, deps
 }
 
 // 3. ReplaceBoard round-trip: full replace, disappearance → 7-day grace,
@@ -155,10 +173,10 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 	const pid = "p1"
-	p, tasks, sprints, cats, tags, taskTags, projCats := boardFixture(pid)
+	p, tasks, sprints, cats, tags, taskTags, projCats, deps := boardFixture(pid)
 
 	// Full board: three tasks mirrored, board order is PRIO_ORDER (b, c, a).
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
 		t.Fatalf("ReplaceBoard full: %v", err)
 	}
 	board, err := s.GetBoard(ctx, pid)
@@ -182,7 +200,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 	// dev_task_tags rows are gone too.
 	rest := []Task{tasks[0], tasks[2]}
 	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags,
-		[]TaskTag{{TaskID: "t-a", TagID: "tag-1"}}, projCats); err != nil {
+		[]TaskTag{{TaskID: "t-a", TagID: "tag-1"}}, projCats, nil); err != nil {
 		t.Fatalf("ReplaceBoard smaller: %v", err)
 	}
 	board, err = s.GetBoard(ctx, pid)
@@ -208,7 +226,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 	}
 
 	// t-b re-appears within 7 days → restored onto the board, shadow dropped.
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
 		t.Fatalf("ReplaceBoard restore: %v", err)
 	}
 	if board, err = s.GetBoard(ctx, pid); err != nil {
@@ -223,7 +241,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 
 	// Vanish again, then age the shadow past 7 days (injected directly) and
 	// pull once more: the shadow is purged for good.
-	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, nil); err != nil {
 		t.Fatalf("ReplaceBoard vanish again: %v", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM local_grace_tasks WHERE id = 't-b'`); n != 1 {
@@ -234,7 +252,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 		`UPDATE local_grace_tasks SET seen_missing_at = ? WHERE id = 't-b'`, stale); err != nil {
 		t.Fatalf("inject stale seen_missing_at: %v", err)
 	}
-	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, nil); err != nil {
 		t.Fatalf("ReplaceBoard purge pull: %v", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM local_grace_tasks WHERE id = 't-b'`); n != 0 {
@@ -438,14 +456,14 @@ func TestTagsUniqueUpsert(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 	const pid = "p1"
-	p, tasks, sprints, cats, tags, taskTags, projCats := boardFixture(pid)
+	p, tasks, sprints, cats, tags, taskTags, projCats, deps := boardFixture(pid)
 
 	// Same tag delivered by two consecutive pulls: the id conflict is handled
 	// quietly, exactly one row exists.
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
 		t.Fatalf("first pull: %v", err)
 	}
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
 		t.Fatalf("second pull with identical tags: %v (UNIQUE(user_id,name) must not fire on identical upserts)", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM tags WHERE user_id = 'u1' AND name = 'urgent'`); n != 1 {
@@ -459,7 +477,7 @@ func TestTagsUniqueUpsert(t *testing.T) {
 		CreatedAt: "2026-10-21T00:00:00.000Z",
 	}}
 	rejoin := []TaskTag{{TaskID: "t-b", TagID: "tag-9"}}
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, retarget, rejoin, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, retarget, rejoin, projCats, deps); err != nil {
 		t.Fatalf("pull with retargeted tag id: %v", err)
 	}
 	var id, color string
@@ -479,7 +497,7 @@ func TestTagsUniqueUpsert(t *testing.T) {
 		ID: "tag-10", UserID: "u1", Name: "later", Color: "#f6d365", UsageCount: 0,
 		CreatedAt: "2026-10-21T00:00:00.000Z",
 	})
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, mixed, rejoin, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, mixed, rejoin, projCats, deps); err != nil {
 		t.Fatalf("pull with a new tag name: %v", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM tags WHERE user_id = 'u1'`); n != 2 {
@@ -517,7 +535,7 @@ func TestBoardTasksWithTags(t *testing.T) {
 		{TaskID: "t-b", TagID: "tag-2nd"},
 		{TaskID: "t-m1", TagID: "tag-md"},
 	}
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, nil, nil, tags, taskTags, nil); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, nil, nil, tags, taskTags, nil, nil); err != nil {
 		t.Fatalf("ReplaceBoard: %v", err)
 	}
 
@@ -791,12 +809,12 @@ func TestResetAccount(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 	const pid = "p1"
-	p, tasks, sprints, cats, tags, taskTags, projCats := boardFixture(pid)
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats); err != nil {
+	p, tasks, sprints, cats, tags, taskTags, projCats, deps := boardFixture(pid)
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
 		t.Fatalf("ReplaceBoard full: %v", err)
 	}
 	// Vanish one task so a deletion shadow exists (account data too).
-	if err := s.ReplaceBoard(ctx, pid, p, tasks[1:2], sprints, cats, tags, nil, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks[1:2], sprints, cats, tags, nil, projCats, nil); err != nil {
 		t.Fatalf("ReplaceBoard shrink: %v", err)
 	}
 	if err := s.Enqueue(ctx, "create", "task", "t-z", `{"title":"Z"}`, ""); err != nil {
@@ -866,7 +884,7 @@ func TestResetAccount(t *testing.T) {
 	}
 
 	// The next account's first pull refills the mirror through the same path.
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
 		t.Fatalf("ReplaceBoard after the wipe: %v", err)
 	}
 	board, err := s.GetBoard(ctx, pid)
@@ -886,5 +904,169 @@ func TestResetAccount(t *testing.T) {
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM meta`); n != 0 {
 		t.Fatalf("meta after the keep-less ResetAccount = %d, want 0", n)
+	}
+}
+
+// 13. TestMirrorV3SprintDeadlineDeps — the S248 (Phase 9) mirror of the web's
+// migration 0065: the v3 columns exist on every touched table, the ReplaceBoard
+// path writes the sprint lifecycle columns + dep edges verbatim and swaps the
+// edge set on repull (full-replace), the 0065 constraints fire loudly (the
+// blocker<>blocked CHECK, the one-active partial unique index, the effective_
+// due_source CHECK, and both FKs), and the archives snapshot column round-trips.
+func TestMirrorV3SprintDeadlineDeps(t *testing.T) {
+	ctx := context.Background()
+	s := openTestStore(t)
+	const pid = "p1"
+	p, tasks, sprints, cats, tags, taskTags, projCats, deps := boardFixture(pid)
+
+	// (a) The v3 columns exist (a stale schema would fail every later step,
+	// but the PRAGMA read gives the failure a name).
+	cols := func(table string) map[string]bool {
+		out := map[string]bool{}
+		rows, err := s.db.QueryContext(ctx, `SELECT name FROM pragma_table_info('`+table+`')`)
+		if err != nil {
+			t.Fatalf("pragma_table_info(%s): %v", table, err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var c string
+			if err := rows.Scan(&c); err != nil {
+				t.Fatalf("pragma scan: %v", err)
+			}
+			out[c] = true
+		}
+		return out
+	}
+	for _, c := range []string{"status", "emoji", "due_at", "due_origin_at", "updated_at"} {
+		if !cols("sprints")[c] {
+			t.Fatalf("sprints.%s missing (mirror schema v3 not applied)", c)
+		}
+	}
+	taskCols := cols("dev_tasks")
+	for _, c := range []string{"due_at", "due_origin_at", "effective_due_at", "effective_due_source", "effective_due_origin_at"} {
+		if !taskCols[c] {
+			t.Fatalf("dev_tasks.%s missing (mirror schema v3 not applied)", c)
+		}
+	}
+	if !cols("project_archives")["sprint_name_snapshot"] {
+		t.Fatalf("project_archives.sprint_name_snapshot missing (mirror schema v3 not applied)")
+	}
+
+	// (b) The full board lands the sprint lifecycle columns + the dep edge.
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
+		t.Fatalf("ReplaceBoard full: %v", err)
+	}
+	var status, emoji, dueAt, dueOrigin, sprintUpdated string
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT status, emoji, due_at, due_origin_at, updated_at FROM sprints WHERE id = 'sp-1'`).
+		Scan(&status, &emoji, &dueAt, &dueOrigin, &sprintUpdated); err != nil {
+		t.Fatalf("sprint v3 columns: %v", err)
+	}
+	if status != "active" || emoji != "🚀" || dueAt != "2026-11-05T20:59:59.999Z" ||
+		dueOrigin != "2026-10-20T00:00:00.000Z" || sprintUpdated != "2026-10-21T00:00:00.000Z" {
+		t.Fatalf("sprint v3 columns wrong: %q %q %q %q %q", status, emoji, dueAt, dueOrigin, sprintUpdated)
+	}
+	if n := count(t, s, `SELECT COUNT(*) FROM dev_task_deps WHERE blocker_task_id = 't-a' AND blocked_task_id = 't-c'`); n != 1 {
+		t.Fatalf("dep edge count = %d, want 1", n)
+	}
+
+	// (c) The task's deadline pair + computed triple round-trip through
+	// GetBoard (the nullables on the other tasks stay null).
+	board, err := s.GetBoard(ctx, pid)
+	if err != nil {
+		t.Fatalf("GetBoard: %v", err)
+	}
+	for _, tk := range board {
+		if tk.ID == "t-a" {
+			if tk.DueAt == nil || *tk.DueAt != "2026-11-01T20:59:59.999Z" ||
+				tk.EffectiveDueSource == nil || *tk.EffectiveDueSource != "task" {
+				t.Fatalf("t-a deadline fields not round-tripped: %+v", tk)
+			}
+		} else if tk.DueAt != nil || tk.EffectiveDueAt != nil || tk.EffectiveDueSource != nil {
+			t.Fatalf("%s should carry the null triple: %+v", tk.ID, tk)
+		}
+	}
+
+	// (d) A repull with a DIFFERENT edge set swaps it (full-replace — D8:
+	// no deltas needed) and an edge referencing a vanished task is skipped,
+	// never an FK error.
+	swapped := []TaskDep{
+		{BlockerTaskID: "t-b", BlockedTaskID: "t-c"},
+		{BlockerTaskID: "t-a", BlockedTaskID: "t-b"}, // t-a vanished below — filtered
+	}
+	rest := []Task{tasks[1], tasks[2]} // t-b, t-c — t-a disappears
+	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, swapped); err != nil {
+		t.Fatalf("ReplaceBoard swap: %v", err)
+	}
+	if n := count(t, s, `SELECT COUNT(*) FROM dev_task_deps WHERE blocker_task_id = 't-b' AND blocked_task_id = 't-c'`); n != 1 {
+		t.Fatalf("swapped edge count = %d, want 1", n)
+	}
+	if n := count(t, s, `SELECT COUNT(*) FROM dev_task_deps WHERE blocker_task_id = 't-a'`); n != 0 {
+		t.Fatalf("edge referencing the vanished t-a survived, want 0 (fresh-set filter)")
+	}
+	if n := count(t, s, `SELECT COUNT(*) FROM local_grace_tasks WHERE id = 't-a'`); n != 1 {
+		t.Fatalf("t-a grace row = %d, want 1 (disappearance pass intact under v3)", n)
+	}
+
+	// (e) The 0065 constraints fire loudly on direct writes.
+	// Self edge → the table CHECK.
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO dev_task_deps (blocker_task_id, blocked_task_id, created_at) VALUES ('t-b', 't-b', '2026-11-06T00:00:00.000Z')`); err == nil || !strings.Contains(strings.ToLower(err.Error()), "check") {
+		t.Fatalf("self dep edge: want CHECK constraint error, got %v", err)
+	}
+	// Bogus effective_due_source → the mirror-only CHECK.
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE dev_tasks SET effective_due_source = 'whenever' WHERE id = 't-b'`); err == nil || !strings.Contains(strings.ToLower(err.Error()), "check") {
+		t.Fatalf("bogus effective_due_source: want CHECK constraint error, got %v", err)
+	}
+	// Two active sprints in one project → the 0065 partial unique index.
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO sprints (id, project_id, name, started_at, created_at, is_draft, status)
+                 VALUES ('sp-2', ?, 'Sprint 2', '2026-10-22T00:00:00.000Z', '2026-10-22T00:00:00.000Z', 0, 'active')`, pid); err == nil || !strings.Contains(strings.ToLower(err.Error()), "unique") {
+		t.Fatalf("second active sprint: want UNIQUE constraint error, got %v", err)
+	}
+	// A second ACTIVE sprint in ANOTHER project is fine (the index is per-project).
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO sprints (id, project_id, name, started_at, created_at, is_draft, status)
+                 VALUES ('sp-9', 'p-other', 'Elsewhere', '2026-10-22T00:00:00.000Z', '2026-10-22T00:00:00.000Z', 0, 'active')`); err != nil {
+		t.Fatalf("active sprint in another project should insert: %v", err)
+	}
+	// A dep edge referencing a task that does not exist → the FK (foreign_keys=ON).
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO dev_task_deps (blocker_task_id, blocked_task_id, created_at) VALUES ('t-zz', 't-c', '2026-11-06T00:00:00.000Z')`); err == nil || !strings.Contains(strings.ToLower(err.Error()), "foreign") {
+		t.Fatalf("dangling dep edge: want FOREIGN KEY constraint error, got %v", err)
+	}
+
+	// (f) The archives snapshot column round-trips (the D3 historical label).
+	snap := "Sprint 1 (deleted)"
+	if err := s.UpsertArchives(ctx, pid, []Archive{{
+		ID: "ar1", ProjectID: pid, Title: "Done thing", Status: "done", Priority: "medium",
+		OriginalCreatedAt: "2026-10-01T00:00:00.000Z", ArchivedAt: "2026-10-30T00:00:00.000Z",
+		Tags: "[]", SprintName: &snap,
+	}}); err != nil {
+		t.Fatalf("UpsertArchives: %v", err)
+	}
+	var gotSnap *string
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT sprint_name_snapshot FROM project_archives WHERE id = 'ar1'`).Scan(&gotSnap); err != nil {
+		t.Fatalf("archive snapshot read: %v", err)
+	}
+	if gotSnap == nil || *gotSnap != snap {
+		t.Fatalf("archive snapshot = %v, want %q", gotSnap, snap)
+	}
+
+	// (g) Migration idempotence over v3: reopen the same file — v3 already
+	// applied, data intact (TestMigrationsIdempotent covers the general
+	// case; this pins that v3 specifically re-opens clean).
+	path := filepath.Join(t.TempDir(), "mirror.db")
+	s2, err := Open(path)
+	if err != nil {
+		t.Fatalf("fresh Open for v3 idempotence: %v", err)
+	}
+	if n := count(t, s2, `SELECT COUNT(*) FROM desktop_meta_migrations WHERE version = 3`); n != 1 {
+		t.Fatalf("v3 migration row = %d, want 1", n)
+	}
+	if err := s2.Close(); err != nil {
+		t.Fatalf("close s2: %v", err)
 	}
 }

@@ -22,9 +22,15 @@ type migration struct {
 //
 //	v1 — the DATA-MODEL.md §6 cloud-subset mirror, verbatim.
 //	v2 — local-only machinery: outbox + meta + local_grace_tasks + local indexes.
+//	v3 — S248 (Phase 9): the 0065 mirror — sprints' explicit lifecycle columns
+//	     (status/emoji/due_at/due_origin_at/updated_at + the one-active partial
+//	     unique index), dev_tasks' deadline pair + the payload's computed
+//	     effective-deadline triple, the dev_task_deps edge table, and
+//	     project_archives.sprint_name_snapshot (schema.go's mirrorSchemaV3).
 var migrations = []migration{
 	{version: 1, sql: mirrorSchemaV1},
 	{version: 2, sql: localSchemaV2},
+	{version: 3, sql: mirrorSchemaV3},
 }
 
 // migrationsTableDDL is the local bookkeeping table (see migrations above).

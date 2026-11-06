@@ -21,7 +21,7 @@ on:
   workflow_dispatch: {}
 
 env:
-  WEB_REF: 04218ca          # the island pin (must match scripts/sync-island.mjs) — the S238 task-view ref (v0.4.1.43)
+  WEB_REF: 7f314e9          # the island pin (must match scripts/sync-island.mjs) — the S248 Sprint/Deadline/Dependency feature ref (S247b reconciliation @ v0.4.1.43)
   WEB_VERSION: "0.4.1.43"   # the pin's package version (Release notes carry BOTH)
 
 jobs:
@@ -127,7 +127,7 @@ jobs:
           if ($env:GITHUB_REF -like 'refs/tags/v*') {
             $v = ($env:GITHUB_REF -replace '^refs/tags/v', '') -replace '-desktop$', ''
           } else {
-            $v = '0.1.35-dev'
+            $v = '0.1.36-dev'
           }
           Add-Content $env:GITHUB_ENV "BUILD_VERSION=$v"
           Write-Host "BUILD_VERSION=$v"

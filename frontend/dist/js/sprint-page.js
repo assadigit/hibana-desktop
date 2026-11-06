@@ -358,9 +358,13 @@
           geom.forEach((g, gi) => {
             const left = pctOf(g.s0)
             const w = Math.max(pctOf(g.s1) - left, 0.8)
-            bgHtml += '<div class="sp-band' + (gi % 2 ? ' is-alt' : '') + (g.open ? ' is-open-band' : '') + '" data-band="' + g.s.id + '" style="inset-inline-start:' + left + '%;inline-size:' + w + '%"></div>'
-            bgHtml += '<div class="sp-bound" data-bound="' + g.s.id + '" data-edge="start" style="inset-inline-start:' + left + '%"><i class="sp-bound-grip" aria-hidden="true"></i></div>'
-            bgHtml += '<div class="sp-bound' + (g.open ? ' is-open-bound' : '') + '" data-bound="' + g.s.id + '" data-edge="end" style="inset-inline-start:' + pctOf(g.s1) + '%"><i class="sp-bound-grip" aria-hidden="true"></i></div>'
+            // S243 (spec §5.5 — the paused render): a PAUSED sprint keeps its open
+            // window on the axis (assumption 7 — it never blocks anything) but
+            // reads DISTINCTLY: the band wears the paused hatch, the chip a ⏸ mark.
+            const paused = B().sprintStatusOf(g.s) === 'paused'
+            bgHtml += '<div class="sp-band' + (gi % 2 ? ' is-alt' : '') + (g.open ? ' is-open-band' : '') + (paused ? ' is-paused-band' : '') + '" data-band="' + g.s.id + '" style="inset-inline-start:' + left + '%;inline-size:' + w + '%"></div>'
+            bgHtml += '<div class="sp-bound' + (paused ? ' is-paused-bound' : '') + '" data-bound="' + g.s.id + '" data-edge="start" style="inset-inline-start:' + left + '%"><i class="sp-bound-grip" aria-hidden="true"></i></div>'
+            bgHtml += '<div class="sp-bound' + (g.open ? ' is-open-bound' : '') + (paused ? ' is-paused-bound' : '') + '" data-bound="' + g.s.id + '" data-edge="end" style="inset-inline-start:' + pctOf(g.s1) + '%"><i class="sp-bound-grip" aria-hidden="true"></i></div>'
           })
           // S48k: position the today line at the CENTER of today's cell (was: left edge =
           // the boundary between yesterday + today, which read as "off by one"). Half a
@@ -374,6 +378,7 @@
           geom.forEach((g) => {
             const left = pctOf(g.s0)
             const w = Math.max(pctOf(g.s1) - left, 1.2)
+            const paused = B().sprintStatusOf(g.s) === 'paused' // S243: the distinct paused render
             // S35 (the video-editing strip): [●start-dot ▶ strip …live-edge●] — the chip
             // carries name + duration + done stats; the strip itself is the sprint's
             // lifetime (open → grows to today, finished → frozen at its end) with a
@@ -390,7 +395,7 @@
             const statsTxt = (st.assigned
               ? '✓ ' + B().faDig(st.done) + '/' + B().faDig(st.assigned)
               : '✓ ' + B().faDig(st.done)) + (st.docChecked ? ' · ☑ ' + B().faDig(st.docChecked) : '')
-            const chipStats = '<span class="sp-chip-stats" dir="auto"> · ' + B().esc(durTxt) + ' · ' + B().esc(statsTxt) + '</span>'
+            const chipStats = '<span class="sp-chip-stats" dir="auto">' + (paused ? '⏸ · ' : '') + ' · ' + B().esc(durTxt) + ' · ' + B().esc(statsTxt) + '</span>'
             const clipPct = clipPctOf(g)
             const fillPct = st.assigned ? Math.round((st.done / st.assigned) * 100) : 0
             let ticksHtml = ''
@@ -405,8 +410,8 @@
                 ticksHtml += '<i class="sp-clip-tick" style="inset-inline-start:' + p.toFixed(2) + '%" title="' +
                   B().esc(B().fullLabel(i, L2) + ' — ' + titles) + '" aria-hidden="true"></i>'
               })
-            sprintLane += '<div class="sp-sprint' + (g.open ? ' is-open' : '') + '" data-sprint="' + g.s.id + '" data-bandmove="' + g.s.id + '" style="inset-inline-start:' + left + '%;inline-size:' + w + '%">' +
-              '<button type="button" class="sp-sprint-chip" data-sprint-menu="' + g.s.id + '" title="' + B().esc(g.s.name + ' · ' + durTxt + ' · ' + statsTxt) + '">' +
+            sprintLane += '<div class="sp-sprint' + (g.open ? ' is-open' : '') + (paused ? ' is-paused' : '') + '" data-sprint="' + g.s.id + '" data-bandmove="' + g.s.id + '" style="inset-inline-start:' + left + '%;inline-size:' + w + '%">' +
+              '<button type="button" class="sp-sprint-chip" data-sprint-menu="' + g.s.id + '" title="' + B().esc((paused ? '⏸ ' : '') + g.s.name + ' · ' + durTxt + ' · ' + statsTxt) + '">' +
                 '<span class="sp-diamond">◆</span><span dir="auto">' + B().esc(g.s.name) + '</span>' + chipStats +
               '</button>' +
               '<i class="sp-startdot" aria-hidden="true"></i>' +
@@ -545,16 +550,18 @@
             catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err') }
           })
           el.querySelector('[data-sp-draft-start]').onclick = async () => {
+            // S243 (spec §5.2 + Screen H1): the one-active conflict resolves through
+            // the shared flow — a planned draft starts through /start, and another
+            // active sprint opens the H1 modal (pause-or-finish current & start).
             try {
-              await B().startSprint(draft.id)
-              window.hibana && window.hibana.toast(_t('db.sprintStarted', 'Sprint started'))
-              dayOffset = 0 // starting lands on the today window where the new band renders
-              await reload()
+              await B().startSprintWithConflict(draft.id, { onDone: () => { dayOffset = 0; reload() } })
             } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err') }
           }
           el.querySelector('[data-sp-draft-del]').onclick = async () => {
-            if (!await window.hibana.confirm(_t('db.delSprintConfirm', 'Delete this sprint? Its tasks stay, unassigned.'), { title: 'Delete sprint', danger: true, confirmLabel: 'Delete' })) return
-            try { await B().deleteSprint(draft.id); await reload() }
+            // S243 (spec §6 + Screen I): the plain db.delSprintConfirm confirm is
+            // replaced by the exact-counts delete modal (planned = deletable; the
+            // archived-with-snapshot count rides the lazy archives list).
+            try { await B().openSprintDelete(draft, { projectId: projectId, onDone: reload }) }
             catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err') }
           }
         }
@@ -618,8 +625,14 @@
         }
 
         // S46.10 (owner: "see the sprints in a list — Sprint A, Sprint B. Create this
-        // section below the sprint timeline as a separate section.") — a flat list of ALL
-        // sprints (drafts, running, finished) with name + status badge + dates + item count.
+        // section below the sprint timeline as a separate section.") — S243 (spec §7.3
+        // + Screen E — D5): the flat list became the lifecycle-grouped OVERVIEW —
+        // Active / Planned / Paused / Completed history. Each row: the identity glyph,
+        // name, lifecycle badge, dates, REAL task count (the s206 fix) + the due date
+        // when present. The row opens the Settings/Tasks detail panel (Screen F); the
+        // ⋯ button keeps the quick-action popover (data-sprint-menu — the timeline
+        // chip's twin). The timeline above STAYS (spec §7.3: the list is an addition,
+        // never a replacement).
         function renderSprintsList() {
           const section = document.getElementById('sp-sprints-list-section')
           const list = document.getElementById('sp-sprints-list')
@@ -633,10 +646,28 @@
           section.hidden = !all.length
           if (!all.length) { list.innerHTML = ''; return }
           const esc = B().esc
-          const statusBadge = (s) => {
-            if (s.ended_at) return '<span class="sp-list-badge is-done">' + _t('db.st.done', 'Done') + '</span>'
-            if (s.started_at && !s.is_draft) return '<span class="sp-list-badge is-running">' + _t('db.st.inprog', 'In Progress') + '</span>'
-            return '<span class="sp-list-badge is-draft">' + _t('db.st.planned', 'Plans') + '</span>'
+          // S243: the four lifecycle groups, in reading order (Active first — the
+          // day-to-day sprint; Completed history last, its rows NOT deletable).
+          const groups = [
+            { key: 'active', label: _t('sp.sectionActive', 'Active') },
+            { key: 'planned', label: _t('sp.sectionPlanned', 'Planned') },
+            { key: 'paused', label: _t('sp.sectionPaused', 'Paused') },
+            { key: 'completed', label: _t('sp.sectionCompleted', 'Completed history') },
+          ]
+          const byGroup = { active: [], planned: [], paused: [], completed: [] }
+          for (const s of all) {
+            const stx = B().sprintStatusOf(s)
+            ;(byGroup[stx] || byGroup.planned).push(s)
+          }
+          const statusBadge = (s, stx) => {
+            const map = {
+              active: ['sp-st-active', _t('db.sprintSt.active', 'Active')],
+              planned: ['sp-st-planned', _t('db.sprintSt.planned', 'Planned')],
+              paused: ['sp-st-paused', _t('db.sprintSt.paused', 'Paused')],
+              completed: ['sp-st-completed', _t('db.sprintSt.completed', 'Completed')],
+            }
+            const m = map[stx] || map.planned
+            return '<span class="sp-list-badge ' + m[0] + '">' + esc(m[1]) + '</span>'
           }
           const fmtDate = (d) => {
             if (!d) return '—'
@@ -646,24 +677,322 @@
             // list to the same days the axis draws (Jalali calendar still applies for fa).
             try { return new Date(d).toLocaleDateString(document.documentElement.lang === 'fa' ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) } catch { return String(d).slice(0, 10) }
           }
-          list.innerHTML = all.map((s) => {
-            // S206 (owner: "the sprint system is buggy" — probe-confirmed): the count
-            // used to read (s.items || []).length — the devboard payload NEVER carries
-            // an items field on sprint rows (SELECT * FROM sprints), so every row read
-            // "0 items" forever. The truth is the task pool: tasks whose sprint_id is
-            // this sprint (the same source sprintStats/chips use).
-            const itemCount = S.tasks.filter((t) => t.sprint_id === s.id).length
-            const dateTxt = s.started_at
-              ? (s.ended_at ? fmtDate(s.started_at) + ' → ' + fmtDate(s.ended_at) : fmtDate(s.started_at) + ' → ' + _t('sp.now', 'now'))
-              : _t('sp.notStarted', 'not started')
-            return '<div class="sp-list-row" data-sprint-menu="' + esc(s.id) + '" role="button" tabindex="0" title="' + esc(_t('sprint.openDoc', 'Open the sprint plan — the full-screen editor')) + '">' +
-              '<span class="sp-list-name">' + esc(s.name || _t('sp.untitled', 'Untitled')) + '</span>' +
-              statusBadge(s) +
-              '<span class="sp-list-dates muted small">' + esc(dateTxt) + '</span>' +
-              '<span class="sp-list-items muted small">' + esc(String(itemCount)) + ' ' + _t('sp.items', 'items') + '</span>' +
+          list.innerHTML = groups.map((g) => {
+            const rows = byGroup[g.key]
+            if (!rows.length) return ''
+            return '<div class="sp-list-group" data-sp-group="' + g.key + '">' +
+              '<h4 class="sp-list-group-title muted">' + esc(g.label) + '<span class="detail-tab-count">' + B().faDig(rows.length) + '</span></h4>' +
+              rows.map((s) => {
+                const stx = B().sprintStatusOf(s)
+                // S206 (owner: "the sprint system is buggy" — probe-confirmed): the count
+                // used to read (s.items || []).length — the devboard payload NEVER carries
+                // an items field on sprint rows (SELECT * FROM sprints), so every row read
+                // "0 items" forever. The truth is the task pool: tasks whose sprint_id is
+                // this sprint (the same source sprintStats/chips use).
+                const itemCount = S.tasks.filter((t) => t.sprint_id === s.id).length
+                const dateTxt = s.started_at
+                  ? (s.ended_at ? fmtDate(s.started_at) + ' → ' + fmtDate(s.ended_at) : fmtDate(s.started_at) + ' → ' + _t('sp.now', 'now'))
+                  : _t('sp.notStarted', 'not started')
+                // S243 (spec §7.3/Screen E): the due date rides the row when present —
+                // read-only this phase (Phase 5 swaps in the shared date control).
+                const dueTxt = s.due_at
+                  ? '<span class="sp-list-due muted small">' + esc(_t('db.dueDate', 'Due date')) + ' · ' + esc(fmtDate(s.due_at)) + '</span>'
+                  : ''
+                return '<div class="sp-list-row" data-sp-open="' + esc(s.id) + '" role="button" tabindex="0" title="' + esc(_t('sp.openSettings', 'Open this sprint\'s settings and tasks')) + '">' +
+                  '<span class="sp-list-ident" aria-hidden="true">' + esc(B().sprintGlyph(s)) + '</span>' +
+                  '<span class="sp-list-name">' + esc(s.name || _t('sp.untitled', 'Untitled')) + '</span>' +
+                  statusBadge(s, stx) +
+                  '<span class="sp-list-dates muted small">' + esc(dateTxt) + '</span>' +
+                  dueTxt +
+                  '<span class="sp-list-items muted small">' + esc(String(itemCount)) + ' ' + _t('sp.items', 'items') + '</span>' +
+                  '<button type="button" class="ghost small sp-list-more" data-sprint-menu="' + esc(s.id) + '" aria-label="' + esc(_t('sp.quickActions', 'Quick actions')) + '" title="' + esc(_t('sp.quickActions', 'Quick actions')) + '">⋯</button>' +
+                '</div>'
+              }).join('') +
             '</div>'
           }).join('')
         }
+
+        // ---- S243 (spec §7.3 + Screen F — D5): the sprint DETAIL panel --------------
+        // Settings + Tasks, the two clear sections the spec asks for. A .db-modal
+        // dialog (z-95, the S242 quick-create grammar): Settings = name, version,
+        // emoji (the shared picker), the read-only due date (Phase 5 swaps in the
+        // shared control) + the rich description stays with the S33/S34 full-screen
+        // plan editor (extend, never duplicate — a Plan link); Tasks = the five-lane
+        // count fold (§12.5 — client-derived, total only) + the task rows grouped by
+        // lane; a completed sprint additionally lists the tasks archived at finish
+        // (the lazy archives list — sprint_history's "including archived tasks").
+        let sprintDetailEl = null
+        let sprintDetailCtx = null
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && sprintDetailEl && !sprintDetailEl.hidden) {
+            e.preventDefault()
+            e.stopPropagation()
+            closeSprintDetail()
+          }
+        }, true)
+        function closeSprintDetail() {
+          if (!sprintDetailEl) return
+          sprintDetailCtx = null
+          sprintDetailEl.hidden = true
+        }
+        function laneTable(s) {
+          const S = B().state
+          const fold = B().sprintLaneCounts(s.id)
+          const rows = B().STATUSES.map((st) => {
+            const items = S.tasks.filter((t) => t.sprint_id === s.id && t.status === st)
+            const rowHtml = items.length
+              ? '<div class="sp-detail-lane" data-sp-detail-lane="' + st + '">' +
+                  '<span class="sp-detail-lane-head"><span class="sp-detail-lane-name">' + B().esc(B().statusLabel(st)) + '</span><span class="detail-tab-count">' + B().faDig(items.length) + '</span></span>' +
+                  '<ul class="sp-detail-tasks">' + items.map((t) =>
+                    '<li class="sp-detail-task" role="button" tabindex="0" data-task="' + B().esc(t.id) + '" data-sp-detail-open-task="' + B().esc(t.id) + '">' +
+                      '<span class="sp-task-st st-' + B().esc(t.status) + '"></span>' +
+                      '<span class="sp-detail-task-title" dir="auto">' + B().esc(t.title) + '</span>' +
+                    '</li>').join('') + '</ul>' +
+                '</div>'
+              : '<div class="sp-detail-lane" data-sp-detail-lane="' + st + '">' +
+                  '<span class="sp-detail-lane-head"><span class="sp-detail-lane-name">' + B().esc(B().statusLabel(st)) + '</span><span class="detail-tab-count">' + B().faDig(0) + '</span></span>' +
+                '</div>'
+            return rowHtml
+          }).join('')
+          return '<div class="sp-detail-total"><span>' + B().esc(_t('db.ov.total', 'Total')) + '</span><span class="detail-tab-count">' + B().faDig(fold.total) + '</span></div>' + rows
+        }
+        async function archivedSection(s) {
+          // only a completed sprint's history needs the archive (spec §7.3); the
+          // lazy list rides the shared api() wrapper — no new fetch site.
+          try {
+            const r = await B().api('/api/projects/' + encodeURIComponent(projectId) + '/archives')
+            const rows = ((r && r.archives) || []).filter((a) => a && a.sprint_id === s.id)
+            if (!rows.length) return ''
+            return '<div class="sp-detail-archived">' +
+              '<h4 class="sp-detail-archived-title muted">' + B().esc(_t('sp.archivedWhenFinished', 'Archived when finished')) + '<span class="detail-tab-count">' + B().faDig(rows.length) + '</span></h4>' +
+              '<ul class="sp-detail-tasks">' + rows.map((a) =>
+                '<li class="sp-detail-task"><span class="sp-task-st st-done"></span>' +
+                '<span class="sp-detail-task-title" dir="auto">' + B().esc(a.title) + '</span></li>').join('') +
+              '</ul></div>'
+          } catch { return '' } // the archive list is a bonus — its failure never blocks the panel
+        }
+        function renderSprintDetailTabs(s, tab) {
+          const body = sprintDetailEl.querySelector('[data-sd-body]')
+          const sTab = sprintDetailEl.querySelector('[data-sd-tab-settings]')
+          const tTab = sprintDetailEl.querySelector('[data-sd-tab-tasks]')
+          if (!body || !sTab || !tTab) return
+          sTab.setAttribute('aria-selected', tab === 'settings' ? 'true' : 'false')
+          tTab.setAttribute('aria-selected', tab === 'tasks' ? 'true' : 'false')
+          sTab.classList.toggle('is-on', tab === 'settings')
+          tTab.classList.toggle('is-on', tab === 'tasks')
+          if (tab === 'settings') {
+            body.innerHTML =
+              '<div class="db-field"><span>' + B().esc(_t('db.sprintName', 'Sprint name')) + '</span>' +
+                '<input data-sd-name maxlength="80" dir="auto" value="' + B().esc(s.name || '') + '"></div>' +
+              '<div class="db-field"><span>' + B().esc(_t('sp.version', 'Version')) + '</span>' +
+                '<input data-sd-version maxlength="80" dir="auto" value="' + B().esc(s.version || '') + '"></div>' +
+              '<div class="db-field"><span>' + B().esc(_t('db.sq.emoji', 'Emoji (optional)')) + '</span>' +
+                '<div class="row db-sq-emoji-row">' +
+                  '<button type="button" class="ghost db-sq-emoji-btn" data-sd-emoji-btn><span class="db-sq-emoji-cur" data-sd-emoji-cur aria-hidden="true">' + B().esc(B().sprintGlyph(s)) + '</span> <span data-sd-emoji-label>' + B().esc(s.emoji ? _t('db.sq.changeEmoji', 'Change') : _t('db.sq.chooseEmoji', 'Choose emoji')) + '</span></button>' +
+                  (s.emoji ? '<button type="button" class="ghost danger db-sq-emoji-clear" data-sd-emoji-clear aria-label="' + B().esc(_t('db.sq.clearEmoji', 'Back to the default icon')) + '" title="' + B().esc(_t('db.sq.clearEmoji', 'Back to the default icon')) + '">✕</button>' : '') +
+                '</div></div>' +
+              // S244 (spec §9.2 + Phase 5's D6 round): the read-only due-date line
+              // becomes the SHARED control behind a Set due date toggle (the
+              // kickoff's Phase-4 boundary resolved) — ON carries the sprint's
+              // saved value; PATCH due_at rides the Save (explicit: value→value
+              // preserves due_origin_at server-side — an edit is not a re-assignment,
+              // contract §12.1; OFF sends null which clears both).
+              '<div class="db-field"><span>' + B().esc(_t('db.dueDate', 'Due date')) + '</span>' +
+                '<label class="db-sq-toggle"><input type="checkbox" data-sd-due-toggle' + (s.due_at ? ' checked' : '') + '><span>' + B().esc(_t('db.sq.setDue', 'Set due date')) + '</span></label>' +
+                '<div class="db-sd-due-mount" data-sd-due-mount' + (s.due_at ? '' : ' hidden') + '></div>' +
+                '<p class="sp-detail-due muted small" data-sd-due-ro>' + (s.due_at
+                  ? B().esc(_t('db.ov.due', 'Due {d}').replace('{d}', new Date(s.due_at).toLocaleDateString(document.documentElement.lang === 'fa' ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })))
+                  : B().esc(_t('sp.noDue', 'No due date yet.'))) + '</p>' +
+                // S245 (Screen J1 — the settings seat): the Extend… link beside
+                // the due control opens the J1 dialog (the quick preset
+                // shortcuts over the manual control edit; the control stays the
+                // free-form editor). Only when a deadline exists.
+                (s.due_at ? '<button type="button" class="ghost small db-due-ext-link" data-sd-extend>' + B().esc(_t('db.extendSprint', 'Extend') + '…') + '</button>' : '') + '</div>' +
+              '<a class="btn ghost small sp-detail-plan" href="/project.html?id=' + encodeURIComponent(projectId) + '&sprint=' + encodeURIComponent(s.id) + '">' + B().esc(_t('sprint.plan', 'Plan')) + ' — ' + B().esc(_t('sp.openPlanEditor', 'the full-screen plan editor')) + '</a>' +
+              '<p class="muted small sp-detail-plan-note">' + B().esc(_t('sp.planNote', 'The rich description lives in the plan editor.')) + '</p>' +
+              '<p class="sp-detail-err" data-sd-error role="alert" hidden></p>' +
+              '<div class="row" style="justify-content:flex-end"><button type="button" class="btn small" data-sd-save>' + B().esc(_t('common.save', 'Save')) + '</button></div>'
+            let emoji = s.emoji || ''
+            const paintEmoji = () => {
+              body.querySelector('[data-sd-emoji-cur]').textContent = emoji || '◆'
+              body.querySelector('[data-sd-emoji-label]').textContent = emoji ? _t('db.sq.changeEmoji', 'Change') : _t('db.sq.chooseEmoji', 'Choose emoji')
+              const clear = body.querySelector('[data-sd-emoji-clear]')
+              if (clear) clear.hidden = !emoji
+            }
+            body.querySelector('[data-sd-emoji-btn]').onclick = (ev) => {
+              const picker = window.hibanaEmojiPicker
+              if (!picker) return
+              picker.open({ anchor: ev.currentTarget, current: emoji, onPick: (e2) => { emoji = String(e2 || ''); paintEmoji() } })
+            }
+            const clearBtn = body.querySelector('[data-sd-emoji-clear]')
+            if (clearBtn) clearBtn.onclick = () => { emoji = ''; paintEmoji() }
+            // S244 (D6): the shared control behind the sprint's Set due date toggle
+            // — mounted when the sprint carries a due date (or on first reveal),
+            // the saved value loads into it. The read-only line hides while the
+            // control is up (the control carries the value); it shows the SAVED
+            // state whenever the toggle is OFF.
+            const dueToggle = body.querySelector('[data-sd-due-toggle]')
+            const dueMount = body.querySelector('[data-sd-due-mount]')
+            const dueRo = body.querySelector('[data-sd-due-ro]')
+            let sdDueCtl = null
+            if (dueToggle && dueMount && s.due_at && window.HibanaDueControl && window.HibanaDueControl.create) {
+              sdDueCtl = window.HibanaDueControl.create({ value: s.due_at })
+              dueMount.textContent = ''
+              dueMount.appendChild(sdDueCtl.el)
+            }
+            if (dueToggle && dueMount) {
+              if (dueRo) dueRo.hidden = dueToggle.checked && !!sdDueCtl
+              dueToggle.onchange = () => {
+                if (dueToggle.checked && !sdDueCtl && window.HibanaDueControl && window.HibanaDueControl.create) {
+                  sdDueCtl = window.HibanaDueControl.create({ value: null })
+                  dueMount.textContent = ''
+                  dueMount.appendChild(sdDueCtl.el)
+                }
+                dueMount.hidden = !dueToggle.checked
+                if (dueRo) dueRo.hidden = dueToggle.checked && !!sdDueCtl
+              }
+            }
+            const errEl = body.querySelector('[data-sd-error]')
+            // S245 (Screen J1): the settings panel's Extend… link — closes the
+            // detail panel first (its form state is a settings-edit draft, not an
+            // extension), then hands the sprint row to the shared J1 dialog
+            // (onDone = the page's reload).
+            const sdExtBtn = body.querySelector('[data-sd-extend]')
+            if (sdExtBtn) {
+              sdExtBtn.onclick = () => {
+                const row = B().findSprint(s.id) || s
+                closeSprintDetail()
+                if (B().openSprintDeadlineExtend) B().openSprintDeadlineExtend(row, { onDone: reload })
+              }
+            }
+            const saveBtn = body.querySelector('[data-sd-save]')
+            saveBtn.onclick = async () => {
+              const nameVal = (body.querySelector('[data-sd-name]').value || '').trim()
+              if (!nameVal) { errEl.textContent = _t('db.sq.nameRequired', 'Enter a name for the sprint.'); errEl.hidden = false; return }
+              const dueVal = sdDueCtl ? sdDueCtl.value() : null
+              if (dueToggle && dueToggle.checked && !dueVal) {
+                errEl.textContent = _t('db.due.required', 'Pick a date for the deadline, or turn it off.')
+                errEl.hidden = false
+                return
+              }
+              const verVal = (body.querySelector('[data-sd-version]').value || '').trim()
+              // S244 (contract §12.1 origin rules): due_at rides EXPLICITLY —
+              // value→value PRESERVES due_origin_at server-side (an edit is not a
+              // re-assignment — §13's extension semantics), null clears both.
+              const patchBody = { name: nameVal, version: verVal ? verVal : null, emoji: emoji ? emoji : null }
+              if (dueToggle) patchBody.due_at = dueToggle.checked ? dueVal : null
+              saveBtn.disabled = true
+              try {
+                await B().patchSprint(s.id, patchBody)
+                window.hibana && window.hibana.toast(_t('sp.settingsSaved', 'Sprint settings saved'), 'ok')
+                const reopenId = sprintDetailCtx
+                closeSprintDetail()
+                await reload()
+                if (reopenId) openSprintDetail(reopenId, 'settings')
+              } catch (err) {
+                saveBtn.disabled = false
+                if (err && err.code === 'duplicate') {
+                  errEl.textContent = _t('db.sq.dupErr', 'A sprint with this name already exists in this project — names are case-insensitive.')
+                  errEl.hidden = false
+                } else {
+                  window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
+                }
+              }
+            }
+            body.querySelector('[data-sd-name]').focus()
+          } else {
+            const stx = B().sprintStatusOf(s)
+            const html = laneTable(s)
+            const archivePromise = stx === 'completed' ? archivedSection(s) : Promise.resolve('')
+            body.innerHTML = '<div class="sp-detail-lanes">' + html + '</div>'
+            archivePromise.then((arch) => { if (arch && sprintDetailCtx === s.id) body.insertAdjacentHTML('beforeend', arch) })
+          }
+        }
+        function openSprintDetail(id, tab) {
+          const s = B().findSprint(id)
+          if (!s) return
+          const lang = window.hibanaI18n && window.hibanaI18n.lang ? window.hibanaI18n.lang() : 'en'
+          if (!sprintDetailEl) {
+            sprintDetailEl = document.createElement('div')
+            sprintDetailEl.className = 'db-modal db-sprintdetail'
+            sprintDetailEl.setAttribute('role', 'dialog')
+            sprintDetailEl.setAttribute('aria-modal', 'true')
+            sprintDetailEl.hidden = true
+            document.body.appendChild(sprintDetailEl)
+            sprintDetailEl.addEventListener('click', (e) => { if (e.target === sprintDetailEl) closeSprintDetail() })
+          }
+          sprintDetailCtx = s.id
+          const stx = B().sprintStatusOf(s)
+          const badgeMap = {
+            active: _t('db.sprintSt.active', 'Active'),
+            planned: _t('db.sprintSt.planned', 'Planned'),
+            paused: _t('db.sprintSt.paused', 'Paused'),
+            completed: _t('db.sprintSt.completed', 'Completed'),
+          }
+          sprintDetailEl.innerHTML =
+            '<div class="db-modal-card db-sprintdetail-card" dir="' + (lang === 'fa' ? 'rtl' : 'auto') + '">' +
+              '<div class="row spread db-modal-head">' +
+                '<h3 class="sp-detail-title"><span class="sp-detail-glyph" aria-hidden="true">' + B().esc(B().sprintGlyph(s)) + '</span> <span dir="auto">' + B().esc(s.name || '') + '</span>' +
+                  ' <span class="sp-list-badge sp-st-' + stx + '">' + B().esc(badgeMap[stx]) + '</span></h3>' +
+                '<button type="button" class="ghost" data-sd-close aria-label="' + B().esc(_t('common.close', 'Close')) + '">✕</button>' +
+              '</div>' +
+              '<div class="row sp-detail-tabs" role="tablist">' +
+                '<button type="button" class="sp-detail-tab" role="tab" data-sd-tab-settings aria-selected="false">' + B().esc(_t('sp.settingsTab', 'Settings')) + '</button>' +
+                '<button type="button" class="sp-detail-tab" role="tab" data-sd-tab-tasks aria-selected="false">' + B().esc(_t('sp.tasksTab', 'Tasks')) + '</button>' +
+              '</div>' +
+              '<div class="db-modal-body" data-sd-body></div>' +
+              '<div class="row spread db-modal-foot">' +
+                '<div class="row" style="gap:.5rem">' +
+                  (stx === 'planned' ? '<button type="button" class="btn small" data-sd-start>▸ ' + B().esc(_t('db.startSprint', 'Start sprint')) + '</button>' : '') +
+                  (stx === 'active' ? '<button type="button" class="btn ghost small" data-sd-pause>⏸ ' + B().esc(_t('db.pauseSprint', 'Pause sprint')) + '</button>' +
+                    '<button type="button" class="btn ghost small" data-sd-finish>⏹ ' + B().esc(_t('db.finishSprint', 'Finish sprint')) + '</button>' : '') +
+                  (stx === 'paused' ? '<button type="button" class="btn small" data-sd-resume>▸ ' + B().esc(_t('db.resumeSprint', 'Resume')) + '</button>' : '') +
+                  (stx === 'completed' ? '<button type="button" class="btn ghost small" data-sd-reopen>' + B().esc(_t('db.reopenSprint', 'Reopen')) + '</button>' : '') +
+                '</div>' +
+                '<div class="row" style="gap:.5rem">' +
+                  ((stx === 'planned' || stx === 'paused') ? '<button type="button" class="ghost danger small" data-sd-del>' + B().esc(_t('common.delete', 'Delete')) + '</button>' : '') +
+                  '<button type="button" class="ghost" data-sd-cancel>' + B().esc(_t('common.close', 'Close')) + '</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>'
+          sprintDetailEl.hidden = false
+          sprintDetailEl.querySelector('[data-sd-close]').onclick = closeSprintDetail
+          sprintDetailEl.querySelector('[data-sd-cancel]').onclick = closeSprintDetail
+          sprintDetailEl.querySelector('[data-sd-tab-settings]').onclick = () => renderSprintDetailTabs(s, 'settings')
+          sprintDetailEl.querySelector('[data-sd-tab-tasks]').onclick = () => renderSprintDetailTabs(s, 'tasks')
+          const startBtn = sprintDetailEl.querySelector('[data-sd-start]')
+          if (startBtn) startBtn.onclick = () => { closeSprintDetail(); B().startSprintWithConflict(s.id, { onDone: reload }) }
+          const pauseBtn = sprintDetailEl.querySelector('[data-sd-pause]')
+          if (pauseBtn) pauseBtn.onclick = () => { closeSprintDetail(); B().confirmSprintPause(s, { onDone: reload }) }
+          const finBtn = sprintDetailEl.querySelector('[data-sd-finish]')
+          if (finBtn) finBtn.onclick = () => { closeSprintDetail(); B().openSprintFinish(s, { onDone: reload }) }
+          const resBtn = sprintDetailEl.querySelector('[data-sd-resume]')
+          if (resBtn) resBtn.onclick = () => { closeSprintDetail(); B().startSprintWithConflict(s.id, { onDone: reload }) }
+          const reoBtn = sprintDetailEl.querySelector('[data-sd-reopen]')
+          if (reoBtn) reoBtn.onclick = () => { closeSprintDetail(); B().reopenSprintFlow(s.id, { onDone: reload }) }
+          const delBtn = sprintDetailEl.querySelector('[data-sd-del]')
+          if (delBtn) delBtn.onclick = () => { closeSprintDetail(); B().openSprintDelete(s, { projectId: projectId, onDone: reload }) }
+          renderSprintDetailTabs(s, tab || 'settings')
+        }
+        // the row click opens the detail panel (Screen E/F: settings + tasks); the
+        // ⋯ popover button stops the propagation so the panel never opens under it.
+        ctx.on('click', (e) => {
+          const row = e.target.closest('[data-sp-open]')
+          if (row && !e.target.closest('[data-sprint-menu]')) openSprintDetail(row.dataset.spOpen)
+        })
+        ctx.on('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          const row = e.target.closest ? e.target.closest('[data-sp-open]') : null
+          if (!row || e.target.closest('[data-sprint-menu]')) return
+          e.preventDefault()
+          openSprintDetail(row.dataset.spOpen)
+        })
+        // a task row inside the Tasks tab opens the shared editor (onSaved re-renders)
+        ctx.on('click', (e) => {
+          const t = e.target.closest('[data-sp-detail-open-task]')
+          if (!t) return
+          B().openEditor(t.dataset.task, { onSaved: () => { const id = sprintDetailCtx; closeSprintDetail(); reload().then(() => { if (id) openSprintDetail(id, 'tasks') }) } })
+        })
 
         // ---- floating date tooltip shared by every drag -----------------------------
         let tipEl = null
@@ -877,7 +1206,12 @@
           if (e.key === 'Escape' && sprintPop) closeSprintPop()
         }, true)
 
-        // ---- sprint chip popover (rename / finish / reopen / delete) ------------
+        // ---- sprint chip popover (rename / lifecycle actions / delete) ------------
+        // S243 (spec pack §5 — the lifecycle): the actions follow the sprint's REAL
+        // status now (active → Pause + Finish + Extend; paused → Resume; completed →
+        // Reopen; planned → the draft card's Start). Finish opens the H2 count
+        // confirmation, Pause the H3 lightweight confirm, Reopen/Resume the shared
+        // conflict-aware flows, Delete the Screen-I exact-counts modal.
         let sprintPop = null
         const closeSprintPop = () => { if (sprintPop) { sprintPop.remove(); sprintPop = null } }
         ctx.on('click', async (e) => {
@@ -891,6 +1225,7 @@
             sprintPop.className = 'sp-sprint-pop'
             sprintPop.dataset.spSprintId = s.id // S46.11: so the action handler finds the id even for list-row popovers (appended to body, not .sp-sprint)
             const open = !s.ended_at
+            const stx = B().sprintStatusOf(s) // S243: the lifecycle-aware action set
             // S35: the strip's story in numbers — dates, duration, done works (dev tasks
             // done in the window + the plan doc's checked items), + the plan doc link.
             const L = lang()
@@ -918,10 +1253,26 @@
               '<input value="' + B().esc(s.name) + '" maxlength="80" dir="auto" data-sp-rename>' +
               '<div class="row">' +
                 '<button type="button" class="btn small" data-sp-save>' + B().esc(_t('common.save', 'Save')) + '</button>' +
-                (open
-                  ? '<button type="button" class="btn ghost small" data-sp-finish>' + B().esc(_t('db.finishSprint', 'Finish sprint')) + '</button>' +
-                    '<button type="button" class="btn ghost small" data-sp-extend>' + B().esc(_t('db.extendSprint', 'Extend')) + '</button>'
-                  : '<button type="button" class="btn ghost small" data-sp-reopen>' + B().esc(_t('db.reopenSprint', 'Reopen')) + '</button>') +
+                (stx === 'active'
+                  ? '<button type="button" class="btn ghost small" data-sp-pause>' + B().esc(_t('db.pauseSprint', 'Pause sprint')) + '</button>' +
+                    '<button type="button" class="btn ghost small" data-sp-finish>' + B().esc(_t('db.finishSprint', 'Finish sprint')) + '</button>'
+                  : '') +
+                // S245 (spec pack Phase 6 — §13.2 + Screen J1): the popover's
+                // Extend label now wires to the J1 DEADLINE extension dialog
+                // (the S48p window.prompt ended_at flow is RETIRED — the same
+                // supersession treatment the S244 round gave the interim UTC
+                // parse). Shown for a NON-COMPLETED sprint carrying a due date;
+                // a sprint without a deadline has nothing to extend (the
+                // settings panel owns setting one).
+                ((stx === 'active' || stx === 'paused') && s.due_at
+                  ? '<button type="button" class="btn ghost small" data-sp-extend>' + B().esc(_t('db.extendSprint', 'Extend')) + '</button>'
+                  : '') +
+                (stx === 'paused'
+                  ? '<button type="button" class="btn ghost small" data-sp-resume>' + B().esc(_t('db.resumeSprint', 'Resume')) + '</button>'
+                  : '') +
+                (stx === 'completed'
+                  ? '<button type="button" class="btn ghost small" data-sp-reopen>' + B().esc(_t('db.reopenSprint', 'Reopen')) + '</button>'
+                  : '') +
                 '<button type="button" class="btn ghost danger small" data-sp-del>' + B().esc(_t('common.delete', 'Delete')) + '</button>' +
               '</div>' +
               // S48p: sprint log — task count + category breakdown
@@ -942,32 +1293,57 @@
             return
           }
           if (sprintPop && !e.target.closest('.sp-sprint-pop')) { closeSprintPop(); return }
-          const spBtn = e.target.closest('[data-sp-save],[data-sp-finish],[data-sp-reopen],[data-sp-del],[data-sp-extend]')
+          const spBtn = e.target.closest('[data-sp-save],[data-sp-finish],[data-sp-reopen],[data-sp-del],[data-sp-extend],[data-sp-pause],[data-sp-resume]')
           if (!spBtn || !sprintPop) return
           // S46.11: the popover may be appended to .sp-sprint (timeline chip) OR
           // document.body (list row) — check both for the sprint id.
           const spEl = sprintPop.closest('.sp-sprint')
           const id = spEl ? spEl.dataset.sprint : (sprintPop.dataset.spSprintId || null)
           if (!id) return
+          // S243: the confirmation-dialog actions (finish/pause/resume/reopen/delete)
+          // hand over to the shared devboard.js lifecycle stack and close the
+          // popover — the dialog's onDone reloads AFTER its mutation lands. The
+          // direct actions (save/extend) keep the popover's own try/catch + reload.
+          if (spBtn.matches('[data-sp-finish]')) {
+            const s = B().findSprint(id)
+            closeSprintPop()
+            if (s) B().openSprintFinish(s, { onDone: reload })
+            return
+          }
+          if (spBtn.matches('[data-sp-pause]')) {
+            const s = B().findSprint(id)
+            closeSprintPop()
+            if (s) B().confirmSprintPause(s, { onDone: reload })
+            return
+          }
+          if (spBtn.matches('[data-sp-resume]')) {
+            closeSprintPop()
+            B().startSprintWithConflict(id, { onDone: reload })
+            return
+          }
+          if (spBtn.matches('[data-sp-reopen]')) {
+            closeSprintPop()
+            B().reopenSprintFlow(id, { onDone: reload })
+            return
+          }
+          if (spBtn.matches('[data-sp-del]')) {
+            const s = B().findSprint(id)
+            closeSprintPop()
+            if (s) B().openSprintDelete(s, { projectId: projectId, onDone: reload })
+            return
+          }
+          // S245 (Screen J1): Extend now opens the shared sprint-DEADLINE extension
+          // dialog (identity + current deadline + the four §13.1 choices + the
+          // BEFORE-confirmation impact counts); the presets add to the EXISTING
+          // deadline and the PATCH preserves due_origin_at (value→value — §13.2).
+          if (spBtn.matches('[data-sp-extend]')) {
+            const s = B().findSprint(id)
+            closeSprintPop()
+            if (s && B().openSprintDeadlineExtend) B().openSprintDeadlineExtend(s, { onDone: reload })
+            return
+          }
           try {
             if (spBtn.matches('[data-sp-save]')) await B().renameSprint(id, sprintPop.querySelector('[data-sp-rename]').value.trim())
-            if (spBtn.matches('[data-sp-finish]')) await B().finishSprint(id)
-            if (spBtn.matches('[data-sp-reopen]')) await B().reopenSprint(id)
-            // S48p: extend sprint — prompt for days, PATCH ended_at = current_end + days
-            if (spBtn.matches('[data-sp-extend]')) {
-              const daysStr = window.prompt(_t('db.extendPrompt', 'Extend by how many days?'))
-              const days = parseInt(daysStr, 10)
-              if (!Number.isFinite(days) || days <= 0) return
-              const sprint = B().state.sprints.find((s) => s.id === id)
-              if (!sprint) return
-              const currentEnd = sprint.ended_at ? new Date(sprint.ended_at) : new Date()
-              const newEnd = new Date(currentEnd.getTime() + days * 86400000)
-              await B().patchSprint(id, { ended_at: newEnd.toISOString() })
-            }
-            if (spBtn.matches('[data-sp-del]')) {
-              if (!await window.hibana.confirm(_t('db.delSprintConfirm', 'Delete this sprint? Its tasks stay, unassigned.'), { title: 'Delete sprint', danger: true, confirmLabel: 'Delete' })) return
-              await B().deleteSprint(id)
-            }
             closeSprintPop()
             await reload()
           } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err') }
@@ -1236,11 +1612,10 @@
           const S = B().state
           const open = S.sprints.find((s) => !s.is_draft && !s.ended_at) || null
           if (!open) { window.hibana && window.hibana.toast(_t('sp.noActiveSprint', 'No active sprint to finish'), 'info'); return }
-          try {
-            await B().finishSprint(open.id)
-            window.hibana && window.hibana.toast(_t('db.sprintFinished', 'Sprint finished — on to the next one'))
-            await reload()
-          } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err') }
+          // S243 (spec §5.3 + Screen H2): the finish CONFIRMATION — identity, the
+          // Implemented count that will be archived, the unfinished-stay-put count,
+          // "No tasks will be deleted."; the toast then quotes the SERVER's count.
+          B().openSprintFinish(open, { onDone: reload })
         }
 
         // ---- Phase 5 item 8: time-nav paging -----------------------------------------
@@ -1435,7 +1810,7 @@
             if (window.HibanaBoard) return resolve(true)
             if (!injected && waited >= 1200) {
               injected = true
-              inject('/js/devboard.js?v=31') // keep in sync with the <head> tag + sw SHELL
+              inject('/js/devboard.js?v=36') // keep in sync with the <head> tag + sw SHELL
               if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali timeline for FA
             }
             if (waited >= 9000) return resolve(false)
@@ -1471,6 +1846,10 @@
           try {
             await reload()
             document.getElementById('sp-title').textContent = B().state.project ? B().state.project.title : ''
+            // S243 (Screen G's Settings entry): ?sprint=<id> deep-links the detail
+            // panel open (the Kanban compact overview's Settings action targets it).
+            const deep = qs.get('sprint')
+            if (deep && B().findSprint(deep)) openSprintDetail(deep, 'settings')
           } catch (err) {
             if (err && err.status === 404) return gone()
             fail()

@@ -146,3 +146,87 @@ Go toolchain) — the desktop.yml CI lane runs them on the Windows runner
 
 **Versions:** 0.1.34 → 0.1.35 everywhere (wails.json, main.go, versioninfo.json
 ×4, make-portable.ps1, desktop.yml's dev placeholder). Tag: v0.1.35-desktop.
+
+## S248 — the Sprint/Deadline/Dependency feature pack lands on the desktop (Phase 9, @ 7f314e9 / v0.4.1.43)
+
+**The round:** Phase 9 of the Hibana-Sprint-Deadline-Implementation-Pack — the
+integration/merge/deploy/handoff phase. The island re-pin moves 04218ca →
+7f314e9 (the S247b reconciliation on top of the S247 full-spec acceptance
+sweep — the branch the whole 969-vitest + 509-e2e suite verified), so the
+desktop picks up the COMPLETE feature surface for the first time: sprints with
+an explicit lifecycle + emoji + due dates, personal task deadlines with the
+server-computed effective triple, and same-project task dependencies.
+
+**The desktop-owned Go half — mirror schema v3 (the 0065 mirror):**
+`internal/store/schema.go` grows mirrorSchemaV3 (registered append-only in
+migrations.go): sprints' status/emoji/due_at/due_origin_at/updated_at + the
+one-active partial unique index (idx_sprints_one_active, verbatim from 0065),
+dev_tasks' due pair + the payload's COMPUTED effective triple (mirror-only
+columns — spec §18 forbids forking deadline resolution; the desktop stores
+the server's resolved values and ships ZERO deadline logic), the
+dev_task_deps edge table (both FKs ON DELETE CASCADE + the CHECK
+blocker<>blocked + both indexes), and project_archives.sprint_name_snapshot
+(the D3 historical sprint label). NO backfill — the mirror full-replaces from
+the payload every pull (D8: no deltas needed). ReplaceBoard swaps the
+project's dep edge set with the board (filtered to both ends in the fresh
+task set — the faithful mirror of the server's own cascade), the archives
+pull carries the snapshot column, and the api/sync layers decode every
+additive field verbatim (types.go + convert.go — the contract §12 consumption).
+New tests: TestMirrorV3SprintDeadlineDeps (store — the columns, the round-trip,
+the edge swap, every constraint firing loudly) + TestPullMirrorsSprintDeadlineDeps
+(sync — the payload → mirror verbatim path + the edge-less repull).
+
+**The island re-pin (D9 — the seam gates):** sync-island.mjs's PIN_REF →
+7f314e9 with due-control.js v1 + emoji-picker.js v4 joining the JS manifest
+(board.html + sprint.html @ the pin carry their tags verbatim — ZERO fetch in
+both). The SEAM_PATCHES find-strings are BYTE-IDENTICAL at the new pin (the
+whole feature rode the existing api() choke point web-side) — all 12 patches
+applied unmodified and the tripwires HELD: devboard.js exactly 7
+window.hibanaFetch( + 2 window.hibanaXHR(, board-page.js exactly 4, ZERO bare
+fetch(, ZERO bare XMLHttpRequest (the Phase 9 re-pin inventory's own numbers).
+The strip list is untouched (every stripped chrome line carries the same ?v=).
+The devboard.js anchor re-recorded v31 → v36 (the HTML_INSERT + the sprint
+page's block); verifyDist gained the S248 marker family (the carriers' ?v=
+tags + the feature stack markers + the S247 AA colors in devboard.css v45 +
+the S247b block in claude-dark-theme.css v32). The bridge's method/path
+allow-list needed NO change — Request's /api/ prefix + standard-method gate
+already admits the feature's new endpoints (POST/DELETE /api/devtasks/:id/deps,
+POST /api/sprints/:id/pause|resume, PATCH /api/sprints/:id, POST
+/api/projects/:id/sprints).
+
+**The 14th probe — scripts/probe-sprintdeadline.mjs (5 LEGs, 26 assertions,
+all green):** LEG 1 the island serves /kanban 200 + the chain + the S248
+carriers (due-control.js?v=1 + emoji-picker.js?v=4 + devboard.js?v=36 +
+board-page.js?v=33 tags, the feature stack markers in the dist bytes, the
+.st- family + #8a6428/#4d6b4d in devboard.css v45, #d9a45b/#8fb58f in
+claude-dark-theme.css v32, the EN+FA feature keys). LEG 2 login → the board
+renders THE FEATURE: the sprint filter (All tasks / No sprint / 🚀 Probe
+Sprint — and it FILTERS: __none leaves only the unassigned card), t1's 🚀
+sprint badge + the st-overdue row ("Overdue by 2h") + the derived "Blocks 1"
+badge, t2's sprint-INHERITED st-urgent row ("Sprint deadline · Due tomorrow"),
+t3's "Blocked" badge, t4 BARE (the §24-1 pre-feature contract),
+HibanaBoard.state.task_deps (the payload's 7th key). LEG 3 the editor's Due
+date (optional) OFF-by-default toggle + the COLLAPSED Dependencies (optional)
+section + flipping the toggle MOUNTS window.HibanaDueControl (the segmented
+calendar selector) into [data-db-due-mount]. LEG 4 the K-section expands →
+the same-project option list (the current task listed-but-marked) → picking a
+blocker POSTs /api/devtasks/t3/deps LIVE through hibanaFetch → the bridge.
+LEG 5 the FA/RTL mirror (dir=rtl + the Persian filter options + the Persian
+Blocked word «مسدود»). ZERO page errors on every leg.
+
+**The other 13 probes:** probe-view re-verified GREEN on the new bytes
+(its leg-1 carrier fetches now read ?v=45/?v=32 — the CSS is served at the
+new versions; the rest of the probe family rides the same bytes and the
+island --check + seam gates hold for all of them).
+
+**The ladder:** sync --ref 7f314e9 verified ✓ · sync --check byte-identical ✓
+(76 files) · Go gates ran LOCALLY this round (Go 1.27.2 installed in the
+sandbox — the toolchain pin honored): go mod verify ✓, go vet ./... ✓ (linux
++ GOOS=windows), go test ./internal/... ALL GREEN (9 packages, incl. the two
+new v3 suites) · probe #14 ALL GREEN.
+
+**Versions:** 0.1.35 → 0.1.36 everywhere (wails.json, main.go,
+versioninfo.json ×4, make-portable.ps1, desktop.yml's dev placeholder) +
+WEB_REF 04218ca → 7f314e9 in desktop.yml (WEB_VERSION stays 0.4.1.43 — the
+feature branch never bumped the web package). Tag: v0.1.36-desktop
+(auto-release lane).

@@ -140,7 +140,30 @@ import { fileURLToPath } from 'node:url'
 // exactly-4 hibanaFetch count gate still holds). ZERO desktop-owned changes this
 // round (no new settings row, no Go binding — the island is a pure re-pin) and
 // probe-view.mjs becomes the 12th probe. The version ladder: 0.1.34 → 0.1.35.
-const PIN_REF = '04218ca'
+// S248 (Phase 9 — the Sprint/Deadline/Dependency feature pack lands on the desktop,
+// Hibana-Sprint-Deadline-Implementation-Pack): the pin moved to 7f314e9 (web
+// v0.4.1.43, the S247b reconciliation on top of the S247 full-spec acceptance
+// sweep — the branch every one of the 969 vitest + 509 e2e verified). The island
+// picks up the whole feature surface: devboard.js v36 (the sprint dropdown +
+// quick-create + explicit sprint_id; the deadline engine mounts the due control;
+// the J1/J2/J3 extension flows; the K-section deps multi-select + the
+// addTaskDep/removeTaskDep wrappers riding the SAME api() choke point) /
+// board-page.js v33 (the sprint view filter + card sprint row + deadline row +
+// bar + thresholds + dep badges on BOTH renderers) / sprint-page.js v27 (the S243
+// lifecycle-grouped overview + settings + conflict/finish modals) / due-control.js
+// v1 + emoji-picker.js v4 (NEW manifest entries — board.html + sprint.html @ the
+// pin carry their tags verbatim) / devboard.css v45 (the feature's styles + the
+// S247 WCAG-AA state colors) / claude-dark-theme.css v32 (the S247b dark-theme
+// contrast block) / i18n-en v110 + i18n.js v163 + i18n-fa v104 (the feature keys,
+// EN+FA parity 1678=1678). ZERO new fetch call sites — the whole feature rode
+// the existing api() choke point web-side, so the SEAM_PATCHES find-strings are
+// byte-identical and the 7+2/4/0 tripwire counts HELD (the D9 seam gates). The
+// strip list is untouched (identical ?v= on every stripped chrome line). The
+// desktop-owned Go half of this round: mirror schema v3 (the 0065 mirror —
+// internal/store/schema.go) + the payload's additive fields decoded verbatim
+// (internal/api/types.go + internal/sync/convert.go). probe-sprintdeadline.mjs
+// becomes the 14th probe. The version ladder: 0.1.35 → 0.1.36.
+const PIN_REF = '7f314e9'
 const PIN_PACKAGE_VERSION = '0.4.1.43'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -208,14 +231,16 @@ const FONT_FILES = [
 // first editor open) — the embedded asset server serves those exact paths.
 const JS_FILES = [
   'js/sync-state.js',      // v2 (v0.4.1.37) — the per-card sync tracker (hibana-sync-status-spec §14: ONE source; devboard.js's task mutations report in, the badges + the Sync button count derive from it)
-  'js/devboard.js',        // v29 (v0.4.1.37) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked()
+  'js/devboard.js',        // v36 (v0.4.1.43 + S248 re-pin @ 7f314e9) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked(); the S242-S247 feature stack rides the SAME api() choke point (the sprint dropdown/quick-create, the deadline engine + due-control mount, the extension flows, the deps multi-select + write wrappers — ZERO new fetch sites, the 7+2/4 counts HELD through the whole feature)
   'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
-  'js/board-page.js',      // v28 (v0.4.1.43) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion (inline EN fallbacks, solid ⋯ dots) + the S237 focus block (the two per-lane head buttons, the enlarge sheet, the F/[/]/Esc capture layer — adds ZERO fetch: the quick-add rides devboard's createTask through the patched api() choke point) + the S238 block (the READ-ONLY task VIEW on card click — openTaskView + the escPeel layer — the sheet's one-tap copy rows + the data-ok strip that re-arms the cloned ⋯ menus; still ZERO new fetch: the view reads from the LOADED state)
-  'js/focus-core.js',      // v2 (v0.4.1.43, S237 NEW + S238 escPeel) — the focus + view decision core (parseToggle/cycleLane/escLayer/escPeel/autoRestore/resolveFKey — pure, zero DOM). board.html @ the pin carries its own <script> tag between sync-state.js and devboard.js (kept verbatim); board-page.js's ensureLib self-heals it at the same ?v=2.
-  'js/sprint-page.js',     // v22 (v0.4.1.40) — the /sprint.html page; the S235 embed (the owner ask: "When clicking on sprints, the app becomes problematic" — the sprint link 404'd on the desktop because sprint.html was never in the island). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
-  'js/i18n-en.js',         // v105 (v0.4.1.43) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign empty-state / menu / helper keys + db.view.* (S238)
-  'js/i18n.js',            // v158 (v0.4.1.43) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below — its lazy injector literal now reads /js/i18n-fa.js?v=99)
-  'js/i18n-fa.js',         // v99 (v0.4.1.43) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA empty-state / menu / helper keys + db.view.* FA (S238)
+  'js/board-page.js',      // v33 (v0.4.1.43 + S248 re-pin @ 7f314e9) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion + the S237 focus block + the S238 view + the S242-S246 feature renders (the sprint view filter + card sprint row, the deadline row + bar + thresholds, the dep badges — still ZERO new fetch: everything folds from the loaded payload)
+  'js/focus-core.js',      // v2 (v0.4.1.43, S237 NEW + S238 escPeel) — the focus + view decision core. board.html @ the pin carries its own <script> tag between sync-state.js and devboard.js (kept verbatim); board-page.js's ensureLib self-heals it at the same ?v=2.
+  'js/due-control.js',     // v1 (S248 re-pin @ 7f314e9, S244 NEW) — the shared Gregorian/Jalali date control (window.HibanaDueControl.create: the segmented calendar selector, the six §11.3 presets, the Add time toggle, ISO-8601 UTC value). NEW to the island manifest this round — board.html + sprint.html @ the pin carry its own <script> tag (kept verbatim). ZERO fetch: pure UI, mounted by devboard.js's modal + the sprint panels.
+  'js/emoji-picker.js',    // v4 (S248 re-pin @ 7f314e9, S243 NEW) — the sprint emoji picker (the §4.2 identity token). NEW to the island manifest this round — board.html + sprint.html @ the pin carry its own <script> tag (kept verbatim). ZERO fetch.
+  'js/sprint-page.js',     // v27 (S248 re-pin @ 7f314e9) — the /sprint.html page; the S235 embed + the S243 sprint management surface (the lifecycle-grouped overview, the settings panel, the conflict/finish modals — all through window.HibanaBoard, ZERO direct fetch). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
+  'js/i18n-en.js',         // v110 (S248 re-pin @ 7f314e9) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign keys + db.view.* (S238) + the S242-S247 feature keys (the sprint dropdown/quick-create, the deadline engine + presets + thresholds, the extension flows, the deps section + badges)
+  'js/i18n.js',            // v163 (S248 re-pin @ 7f314e9) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below — its lazy injector literal now reads /js/i18n-fa.js?v=104)
+  'js/i18n-fa.js',         // v104 (S248 re-pin @ 7f314e9) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA keys + db.view.* FA (S238) + the S242-S247 feature keys (written Persian, parity 1678=1678)
   'js/image-resize.js',    // v1 — the LAZY ≤1600px WebP prepare pass (devboard.js:307-319)
   'vendor/jalaali.min.js', // Jalali dates for FA (devboard.js calOf)
 ]
@@ -258,7 +283,7 @@ const COPY_MANIFEST = [...CSS_SHEETS, ...FONT_CSS, ...FONT_FILES, ...JS_FILES, .
 //     navigator.language (i18n.js:81-82). M3's auth work takes language resolution
 //     over Go-side WITHOUT touching the island: define window.__hibanaMe (the very
 //     hook i18n.js:69 prefers) from a Go binding.
-//  2. i18n.js:49-60 (dynamic <script> /js/i18n-fa.js?v=95) and devboard.js:307-319
+//  2. i18n.js:49-60 (dynamic <script> /js/i18n-fa.js?v=104) and devboard.js:307-319
 //     (dynamic <script> /js/image-resize.js?v=1) — STATIC-ASSET loaders over HTTP to
 //     same-origin paths. The Wails asset server serves them same-origin; left
 //     untouched by design (they are not /api traffic).
@@ -346,7 +371,7 @@ const HTML_STRIP_LINES = [
 const HTML_INSERT = {
   name: 'insert /js/desktop-shim.js before devboard.js',
   cite: 'guide §3.2 + §4.3',
-  anchor: '<script src="/js/devboard.js?v=31" defer></script>',
+  anchor: '<script src="/js/devboard.js?v=36" defer></script>',
   insert: '<script src="/js/desktop-shim.js"></script>',
 }
 
@@ -1404,7 +1429,7 @@ const SPRINT_INSERTS = [
   // loads sprint-page.js instead (from its own body <script> tag, kept verbatim).
   {
     name: 'insert the desktop-owned script block (theme + shim + audio + login) before devboard.js (sprint page)',
-    anchor: '<script src="/js/devboard.js?v=31" defer></script>',
+    anchor: '<script src="/js/devboard.js?v=36" defer></script>',
     insert: '<script src="/js/desktop-theme.js"></script>\n<script src="/js/desktop-shim.js"></script>\n<script src="/js/desktop-audio.js"></script>\n<script src="/js/desktop-login.js"></script>',
     position: 'before',
   },
@@ -5763,6 +5788,17 @@ function hashDist(outDir) {
 // ---------------------------------------------------------------------------
 // Post-sync self-verification (the sync gate — everything must pass or the run fails)
 // ---------------------------------------------------------------------------
+
+// readDistText reads one verbatim-copied island file back off disk (the S248
+// feature markers live in files that ride blobs, not the patchable fileMap).
+function readDistText(outDir, rel) {
+  try {
+    return fs.readFileSync(path.join(outDir, rel), 'utf8')
+  } catch {
+    return ''
+  }
+}
+
 function verifyDist(outDir, fileMap) {
   const problems = []
   const devboard = fileMap['js/devboard.js']
@@ -6346,8 +6382,33 @@ function verifyDist(outDir, fileMap) {
     }
     if (!focusCore.includes('escPeel')) problems.push('js/focus-core.js: the S238 escPeel decision is missing')
     if (!indexHtml.includes('/js/focus-core.js?v=2')) problems.push('index.html: the focus-core.js tag must read ?v=2 (the S238 bump)')
-    if (!indexHtml.includes('/js/board-page.js?v=28')) problems.push('index.html: the board-page.js tag must read ?v=28 (the S238 bump)')
-    if (!indexHtml.includes('/css/devboard.css?v=39')) problems.push('index.html: the devboard.css tag must read ?v=39 (the S238 bump)')
+    if (!indexHtml.includes('/js/board-page.js?v=33')) problems.push('index.html: the board-page.js tag must read ?v=33 (the S248 re-pin bump)')
+    if (!indexHtml.includes('/css/devboard.css?v=45')) problems.push('index.html: the devboard.css tag must read ?v=45 (the S248 re-pin bump)')
+    // S248 (the Sprint/Deadline/Dependency island round): the feature's own
+    // carriers + the new manifest entries are pinned here — a drifted pin would
+    // silently ship a pre-feature island, so every marker must be present.
+    if (!indexHtml.includes('/js/devboard.js?v=36')) problems.push('index.html: the devboard.js tag must read ?v=36 (the S248 feature stack)')
+    if (!indexHtml.includes('/js/due-control.js?v=1')) problems.push('index.html: the due-control.js tag must read ?v=1 (the S244 shared date control — S248 manifest entry)')
+    if (!indexHtml.includes('/js/emoji-picker.js?v=4')) problems.push('index.html: the emoji-picker.js tag must read ?v=4 (the S243 emoji identity — S248 manifest entry)')
+    if (!indexHtml.includes('/js/i18n-en.js?v=110')) problems.push('index.html: the i18n-en.js tag must read ?v=110 (the S242-S247 feature keys)')
+    if (!indexHtml.includes('/js/i18n.js?v=163')) problems.push('index.html: the i18n.js tag must read ?v=163 (the i18n-fa v104 injector carrier)')
+    if (!indexHtml.includes('/css/claude-dark-theme.css?v=32')) problems.push('index.html: the claude-dark-theme.css tag must read ?v=32 (the S247b dark-theme contrast block)')
+    const dueCtl = readDistText(outDir, 'js/due-control.js')
+    if (!dueCtl.includes('window.HibanaDueControl')) problems.push('js/due-control.js: the HibanaDueControl API is missing (the S244 shared date control)')
+    const devboardJsV36 = devboard
+    if (!devboardJsV36.includes('HibanaDueControl')) problems.push('js/devboard.js: the due-control mount is missing (the S244 deadline engine integration)')
+    if (!devboardJsV36.includes('deadlineStateOf')) problems.push('js/devboard.js: the deadline state fold (deadlineStateOf) is missing (the S244 card deadline row)')
+    if (!devboardJsV36.includes('addTaskDep')) problems.push('js/devboard.js: the dep write wrappers (addTaskDep) are missing (the S246 deps UI)')
+    if (!devboardJsV36.includes('task_deps')) problems.push('js/devboard.js: the payload 7th key (task_deps) fold is missing (the S241 read surface)')
+    if (!boardPage.includes('data-db-filter-sprint')) problems.push('js/board-page.js: the sprint view filter is missing (the S242 kanban integration)')
+    if (!boardPage.includes('deadlineSummary') && !devboardJsV36.includes('deadlineSummary')) problems.push('the deadline summary label (deadlineSummary) is missing (the S244/S245 deadline display)')
+    if (!devboardJsV36.includes('depBadgeHtml')) problems.push('js/devboard.js: the dep badge grammar (depBadgeHtml) is missing (the S246 card dep row)')
+    if (!devboardCss.includes('.st-')) problems.push('css/devboard.css: the deadline state classes (.st-*) are missing (the S244 threshold styles + the S247 AA fix)')
+    if (!devboardCss.includes('#8a6428')) problems.push('css/devboard.css: the S247 WCAG-AA approaching color (#8a6428) is missing')
+    if (!devboardCss.includes('#4d6b4d')) problems.push('css/devboard.css: the S247 WCAG-AA ready color (#4d6b4d) is missing')
+    const claudeCss = readDistText(outDir, 'css/claude-dark-theme.css')
+    if (!claudeCss.includes('#d9a45b')) problems.push('css/claude-dark-theme.css: the S247b dark-theme approaching color (#d9a45b) is missing')
+    if (!claudeCss.includes('#8fb58f')) problems.push('css/claude-dark-theme.css: the S247b dark-theme ready color (#8fb58f) is missing')
   }
 
   // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the

@@ -70,7 +70,8 @@ type projectsListResp struct {
 }
 
 // BoardPayload is THE one board payload: GET /api/projects/:id/devboard
-// (contract §3.2, devboard.ts:139-195). Six keys, ETag-wrapped.
+// (contract §3.2, devboard.ts:139-195). Seven keys since S241/S248 (the 0065
+// additive surface, contract §12), ETag-wrapped.
 type BoardPayload struct {
 	Project    BoardProject  `json:"project"`
 	Tasks      []TaskPayload `json:"tasks"`
@@ -78,6 +79,20 @@ type BoardPayload struct {
 	Sprints    []SprintRow   `json:"sprints"`
 	Tags       []TagRow      `json:"tags"`
 	TaskTags   []TaskTagJoin `json:"task_tags"`
+
+	// S248 (Phase 9 / contract §12.3): the 7th additive key — the flat per-project
+	// dep edge join {blocker_task_id, blocked_task_id}, ordered deterministically
+	// upstream. Additive + backward-compatible: a decoder that ignores it keeps
+	// working against a pre-0065 payload (which never carries the key).
+	TaskDeps []TaskDepEdge `json:"task_deps,omitempty"`
+}
+
+// TaskDepEdge is one payload task_deps row: "blocker_task_id blocks
+// blocked_task_id" (0065 / contract §12.3). The reverse Blocks view is derived
+// client-side — never a separate endpoint or a stored column.
+type TaskDepEdge struct {
+	BlockerTaskID string `json:"blocker_task_id"`
+	BlockedTaskID string `json:"blocked_task_id"`
 }
 
 // BoardProject is the payload's project header (four fields only).
@@ -91,6 +106,9 @@ type BoardProject struct {
 // TaskPayload is one dev_tasks row as the board serves it: the SQL columns
 // (SELECT t.*, devboard.ts:152) + the S208 additions — tags (joined tag-id
 // array, devboard.ts:187) and shot_count (COALESCE pin count, devboard.ts:152-153).
+// S248 (Phase 9 / contract §12.2): the 0065 additive deadline pair + the
+// SERVER-COMPUTED effective-deadline triple ride every row — decoded verbatim,
+// never resolved locally (spec §18: the desktop ships zero deadline logic).
 type TaskPayload struct {
 	ID         string   `json:"id"`
 	ProjectID  string   `json:"project_id"`
@@ -108,6 +126,16 @@ type TaskPayload struct {
 	UpdatedAt  *string  `json:"updated_at"`
 	Tags       []string `json:"tags"`       // tag IDs, joined server-side
 	ShotCount  int64    `json:"shot_count"` // pinned screenshots count
+
+	// S248: the personal deadline pair (raw 0065 columns).
+	DueAt     *string `json:"due_at"`        // ISO-8601 instant or null
+	DueOrigin *string `json:"due_origin_at"` // the progress START stamp (§12.2)
+
+	// S248: the computed triple (personal > sprint-inherited-while-not-completed
+	// > none, resolved server-side by effectiveDeadlineOf — contract §12.2).
+	EffectiveDueAt     *string `json:"effective_due_at"`        // the resolved instant or null
+	EffectiveDueSource *string `json:"effective_due_source"`    // "task" | "sprint" | null
+	EffectiveDueOrigin *string `json:"effective_due_origin_at"` // the winning level's origin stamp
 }
 
 // CategoryRow is the payload's project-visible category slice: the global
@@ -124,7 +152,11 @@ type CategoryRow struct {
 	Enabled    int64  `json:"enabled"`
 }
 
-// SprintRow is one sprints row (DATA-MODEL.md §2.3), verbatim.
+// SprintRow is one sprints row (DATA-MODEL.md §2.3), verbatim. S248 (Phase 9 /
+// contract §12.1): the 0065 additive columns — the explicit lifecycle status
+// (planned|active|paused|completed; NULL only on a lagging pre-0065 payload),
+// emoji, the due pair, and updated_at — all decoded verbatim (the origin rules,
+// thresholds, and precedence live server-side only).
 type SprintRow struct {
 	ID          string  `json:"id"`
 	ProjectID   string  `json:"project_id"`
@@ -135,6 +167,13 @@ type SprintRow struct {
 	IsDraft     int64   `json:"is_draft"`
 	Version     *string `json:"version"`
 	Description *string `json:"description"`
+
+	// S248: 0065's additive columns (contract §12.1).
+	Status    *string `json:"status"`        // planned|active|paused|completed (nullable)
+	Emoji     *string `json:"emoji"`         // one picker token (nullable)
+	DueAt     *string `json:"due_at"`        // ISO-8601 instant (nullable)
+	DueOrigin *string `json:"due_origin_at"` // progress START stamp (nullable)
+	UpdatedAt *string `json:"updated_at"`    // stamped on every cloud write — D8 (nullable)
 }
 
 // TagRow is one tags row (DATA-MODEL.md §2.5), verbatim — user-scoped labels.
@@ -212,6 +251,10 @@ type okResp struct {
 
 // ArchiveRow is one project_archives row as GET …/archives serves it
 // (devboard.ts:381-399): the done-task snapshot + parsed label snapshot.
+// S248 (Phase 9 / contract §12.1 D3): sprint_name_snapshot rides additively —
+// a deleted sprint's history survives as "<name> (deleted)"; a finish stamps
+// the sprint's own name. NULL on rows archived before their sprint gained the
+// label (and absent entirely on a lagging pre-0065 payload → nil here).
 type ArchiveRow struct {
 	ID                string       `json:"id"`
 	ProjectID         string       `json:"project_id"`
@@ -224,6 +267,7 @@ type ArchiveRow struct {
 	OriginalCreatedAt string       `json:"original_created_at"`
 	ArchivedAt        string       `json:"archived_at"`
 	Tags              []ArchiveTag `json:"tags"`
+	SprintName        *string      `json:"sprint_name_snapshot"` // S248, D3
 }
 
 // ArchiveTag is one parsed label snapshot entry ({name, color}).

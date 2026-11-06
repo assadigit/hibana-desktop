@@ -100,8 +100,8 @@ func (e *Engine) Pull(ctx context.Context, projectID string) (pulled bool, err e
 	if err := json.Unmarshal(resp.Body, &bp); err != nil {
 		return false, fmt.Errorf("sync: board payload decode: %w", err)
 	}
-	p, tasks, sprints, cats, tags, joins, projCats := boardToStore(&bp, "")
-	if err := e.store.ReplaceBoard(ctx, projectID, p, tasks, sprints, cats, tags, joins, projCats); err != nil {
+	p, tasks, sprints, cats, tags, joins, projCats, deps := boardToStore(&bp, "")
+	if err := e.store.ReplaceBoard(ctx, projectID, p, tasks, sprints, cats, tags, joins, projCats, deps); err != nil {
 		return false, fmt.Errorf("sync: mirroring board %s: %w", projectID, err)
 	}
 	_ = e.store.SetMeta(ctx, metaETagPrefix+path, resp.ETag)
@@ -131,6 +131,7 @@ func (e *Engine) PullArchives(ctx context.Context, projectID string) error {
 			OriginalCreatedAt: a.OriginalCreatedAt,
 			ArchivedAt:        a.ArchivedAt,
 			Tags:              string(tagsJSON),
+			SprintName:        a.SprintName, // S248: the D3 historical sprint label, verbatim
 		}
 		rows = append(rows, row)
 	}
