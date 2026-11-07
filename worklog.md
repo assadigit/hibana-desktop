@@ -351,3 +351,15 @@ here too, for a consistent experience.
 **Versions:** 0.1.37 → 0.1.38 everywhere (wails.json, main.go -dev stamp,
 versioninfo.json ×4, make-portable.ps1, desktop.yml's dev placeholder). Tag:
 v0.1.38-desktop (auto-release lane on push).
+
+## Session S250 close — the release (2026-11-07, continued)
+
+The WEB_REF follow-up (16a864e): the island checksum gate reads the pin from the
+workflow's `WEB_REF` env, which the S250 re-pin had moved only script-side — the gate
+refused `--ref 7f314e9` against the sealed `6dd40c0`. One line (the env follows the pin)
+→ CI green on both the fix and its auto-release bump (c9d44a7) → **v0.1.39-desktop
+released** (installer + portable zip + checksums, the auto-release lane).
+
+The web half went live the same session (be43ccb → CD): the 13-probe live verification
+on hibana.ir is recorded in hibana-source's worklog. Owner-side: the desktop app picks
+up 0.1.39 on the next update check; the Sprints page carries the strategies tier.
