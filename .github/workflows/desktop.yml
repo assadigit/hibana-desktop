@@ -21,8 +21,13 @@ on:
   workflow_dispatch: {}
 
 env:
+  # DT-1 (S252): WEB_REF and WEB_VERSION are TWINS — they move TOGETHER on every
+  # re-pin, and scripts/sync-island.mjs's PIN_REF + PIN_PACKAGE_VERSION are the
+  # source of truth they mirror. This value had drifted to 0.4.1.43 while the
+  # pin was 6dd40c0/v0.4.1.44, so every release note since v0.1.38 claimed the
+  # wrong embedded web version (same class as the 16a864e WEB_REF bug).
   WEB_REF: 6dd40c0          # the island pin (must match scripts/sync-island.mjs) — the S250 Strategies tier ref (web v0.4.1.44)
-  WEB_VERSION: "0.4.1.43"   # the pin's package version (Release notes carry BOTH)
+  WEB_VERSION: "0.4.1.44"   # the pin's package version (Release notes carry BOTH)
 
 jobs:
   build:
