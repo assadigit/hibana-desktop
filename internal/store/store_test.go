@@ -176,7 +176,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 	p, tasks, sprints, cats, tags, taskTags, projCats, deps := boardFixture(pid)
 
 	// Full board: three tasks mirrored, board order is PRIO_ORDER (b, c, a).
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps, nil); err != nil {
 		t.Fatalf("ReplaceBoard full: %v", err)
 	}
 	board, err := s.GetBoard(ctx, pid)
@@ -200,7 +200,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 	// dev_task_tags rows are gone too.
 	rest := []Task{tasks[0], tasks[2]}
 	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags,
-		[]TaskTag{{TaskID: "t-a", TagID: "tag-1"}}, projCats, nil); err != nil {
+		[]TaskTag{{TaskID: "t-a", TagID: "tag-1"}}, projCats, nil, nil); err != nil {
 		t.Fatalf("ReplaceBoard smaller: %v", err)
 	}
 	board, err = s.GetBoard(ctx, pid)
@@ -226,7 +226,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 	}
 
 	// t-b re-appears within 7 days → restored onto the board, shadow dropped.
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps, nil); err != nil {
 		t.Fatalf("ReplaceBoard restore: %v", err)
 	}
 	if board, err = s.GetBoard(ctx, pid); err != nil {
@@ -241,7 +241,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 
 	// Vanish again, then age the shadow past 7 days (injected directly) and
 	// pull once more: the shadow is purged for good.
-	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, nil); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, nil, nil); err != nil {
 		t.Fatalf("ReplaceBoard vanish again: %v", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM local_grace_tasks WHERE id = 't-b'`); n != 1 {
@@ -252,7 +252,7 @@ func TestReplaceBoardDisappearanceAndGrace(t *testing.T) {
 		`UPDATE local_grace_tasks SET seen_missing_at = ? WHERE id = 't-b'`, stale); err != nil {
 		t.Fatalf("inject stale seen_missing_at: %v", err)
 	}
-	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, nil); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, nil, nil); err != nil {
 		t.Fatalf("ReplaceBoard purge pull: %v", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM local_grace_tasks WHERE id = 't-b'`); n != 0 {
@@ -460,10 +460,10 @@ func TestTagsUniqueUpsert(t *testing.T) {
 
 	// Same tag delivered by two consecutive pulls: the id conflict is handled
 	// quietly, exactly one row exists.
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps, nil); err != nil {
 		t.Fatalf("first pull: %v", err)
 	}
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps, nil); err != nil {
 		t.Fatalf("second pull with identical tags: %v (UNIQUE(user_id,name) must not fire on identical upserts)", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM tags WHERE user_id = 'u1' AND name = 'urgent'`); n != 1 {
@@ -477,7 +477,7 @@ func TestTagsUniqueUpsert(t *testing.T) {
 		CreatedAt: "2026-10-21T00:00:00.000Z",
 	}}
 	rejoin := []TaskTag{{TaskID: "t-b", TagID: "tag-9"}}
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, retarget, rejoin, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, retarget, rejoin, projCats, deps, nil); err != nil {
 		t.Fatalf("pull with retargeted tag id: %v", err)
 	}
 	var id, color string
@@ -497,7 +497,7 @@ func TestTagsUniqueUpsert(t *testing.T) {
 		ID: "tag-10", UserID: "u1", Name: "later", Color: "#f6d365", UsageCount: 0,
 		CreatedAt: "2026-10-21T00:00:00.000Z",
 	})
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, mixed, rejoin, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, mixed, rejoin, projCats, deps, nil); err != nil {
 		t.Fatalf("pull with a new tag name: %v", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM tags WHERE user_id = 'u1'`); n != 2 {
@@ -535,7 +535,7 @@ func TestBoardTasksWithTags(t *testing.T) {
 		{TaskID: "t-b", TagID: "tag-2nd"},
 		{TaskID: "t-m1", TagID: "tag-md"},
 	}
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, nil, nil, tags, taskTags, nil, nil); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, nil, nil, tags, taskTags, nil, nil, nil); err != nil {
 		t.Fatalf("ReplaceBoard: %v", err)
 	}
 
@@ -810,11 +810,11 @@ func TestResetAccount(t *testing.T) {
 	s := openTestStore(t)
 	const pid = "p1"
 	p, tasks, sprints, cats, tags, taskTags, projCats, deps := boardFixture(pid)
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps, nil); err != nil {
 		t.Fatalf("ReplaceBoard full: %v", err)
 	}
 	// Vanish one task so a deletion shadow exists (account data too).
-	if err := s.ReplaceBoard(ctx, pid, p, tasks[1:2], sprints, cats, tags, nil, projCats, nil); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks[1:2], sprints, cats, tags, nil, projCats, nil, nil); err != nil {
 		t.Fatalf("ReplaceBoard shrink: %v", err)
 	}
 	if err := s.Enqueue(ctx, "create", "task", "t-z", `{"title":"Z"}`, ""); err != nil {
@@ -884,7 +884,7 @@ func TestResetAccount(t *testing.T) {
 	}
 
 	// The next account's first pull refills the mirror through the same path.
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps, nil); err != nil {
 		t.Fatalf("ReplaceBoard after the wipe: %v", err)
 	}
 	board, err := s.GetBoard(ctx, pid)
@@ -953,7 +953,7 @@ func TestMirrorV3SprintDeadlineDeps(t *testing.T) {
 	}
 
 	// (b) The full board lands the sprint lifecycle columns + the dep edge.
-	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, tasks, sprints, cats, tags, taskTags, projCats, deps, nil); err != nil {
 		t.Fatalf("ReplaceBoard full: %v", err)
 	}
 	var status, emoji, dueAt, dueOrigin, sprintUpdated string
@@ -995,7 +995,7 @@ func TestMirrorV3SprintDeadlineDeps(t *testing.T) {
 		{BlockerTaskID: "t-a", BlockedTaskID: "t-b"}, // t-a vanished below — filtered
 	}
 	rest := []Task{tasks[1], tasks[2]} // t-b, t-c — t-a disappears
-	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, swapped); err != nil {
+	if err := s.ReplaceBoard(ctx, pid, p, rest, sprints, cats, tags, nil, projCats, swapped, nil); err != nil {
 		t.Fatalf("ReplaceBoard swap: %v", err)
 	}
 	if n := count(t, s, `SELECT COUNT(*) FROM dev_task_deps WHERE blocker_task_id = 't-b' AND blocked_task_id = 't-c'`); n != 1 {

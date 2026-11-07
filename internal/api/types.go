@@ -85,6 +85,11 @@ type BoardPayload struct {
 	// upstream. Additive + backward-compatible: a decoder that ignores it keeps
 	// working against a pre-0065 payload (which never carries the key).
 	TaskDeps []TaskDepEdge `json:"task_deps,omitempty"`
+
+	// S250 (0066 / STRATEGIES-SPEC §4): the 8th additive key — the project's
+	// strategy registry (priority-first order upstream). Additive + omitempty:
+	// a decoder that ignores it keeps working against a pre-0066 payload.
+	Strategies []StrategyRow `json:"strategies,omitempty"`
 }
 
 // TaskDepEdge is one payload task_deps row: "blocker_task_id blocks
@@ -174,6 +179,27 @@ type SprintRow struct {
 	DueAt     *string `json:"due_at"`        // ISO-8601 instant (nullable)
 	DueOrigin *string `json:"due_origin_at"` // progress START stamp (nullable)
 	UpdatedAt *string `json:"updated_at"`    // stamped on every cloud write — D8 (nullable)
+
+	// S250: 0066's additive column — the optional strategy this sprint serves
+	// (STRATEGIES-SPEC §3; NULL = unassigned; ON DELETE SET NULL cloud-side).
+	StrategyID *string `json:"strategy_id"`
+}
+
+// StrategyRow is one strategies row (0066 / STRATEGIES-SPEC §3), verbatim — the
+// tier above sprints: the broad direction a sprint serves. Lifecycle mirrors the
+// sprint grammar (active|paused|completed — NOT NULL at birth cloud-side); the
+// priority REUSES the task vocabulary; the roll-up is derived, never stored.
+type StrategyRow struct {
+	ID          string  `json:"id"`
+	ProjectID   string  `json:"project_id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Priority    string  `json:"priority"`   // low|medium|high|urgent (the task vocabulary)
+	Status      string  `json:"status"`     // active|paused|completed
+	Emoji       *string `json:"emoji"`      // one picker token (nullable; ⚑ default)
+	SortOrder   int64   `json:"sort_order"` // future manual drag; v1 sorts priority-first upstream
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   *string `json:"updated_at"` // the D8 sync stamp (nullable)
 }
 
 // TagRow is one tags row (DATA-MODEL.md §2.5), verbatim — user-scoped labels.

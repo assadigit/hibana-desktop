@@ -96,6 +96,27 @@ type Sprint struct {
 	DueAt     *string // due_at (nullable — ISO-8601 instant)
 	DueOrigin *string // due_origin_at (nullable — the progress START stamp)
 	UpdatedAt *string // updated_at (nullable — stamped on every cloud write, D8)
+
+	// S250: 0066's additive column — the optional strategy this sprint serves
+	// (STRATEGIES-SPEC §3; NULL = unassigned).
+	StrategyID *string
+}
+
+// Strategy mirrors one strategies row (0066 / STRATEGIES-SPEC §3) — the tier
+// above sprints: the broad direction a sprint serves. Lifecycle mirrors the
+// sprint grammar; the done/total roll-up is DERIVED (tasks × sprints), never
+// stored — the island folds it client-side exactly like the web does.
+type Strategy struct {
+	ID          string  // id
+	ProjectID   string  // project_id
+	Name        string  // name
+	Description string  // description
+	Priority    string  // priority: low|medium|high|urgent (the task vocabulary)
+	Status      string  // status: active|paused|completed (NOT NULL at birth cloud-side)
+	Emoji       *string // emoji (nullable — one picker token; ⚑ default)
+	SortOrder   int64   // sort_order (future manual drag; the payload arrives priority-first)
+	CreatedAt   string  // created_at
+	UpdatedAt   *string // updated_at (nullable — the D8 sync stamp)
 }
 
 // Category mirrors one categories row — task categories (DATA-MODEL.md §2.4).
@@ -260,8 +281,8 @@ INSERT INTO dev_tasks (
 const sqlUpsertSprint = `
 INSERT INTO sprints (
   id, project_id, name, started_at, ended_at, created_at, is_draft, version, description,
-  status, emoji, due_at, due_origin_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  status, emoji, due_at, due_origin_at, updated_at, strategy_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
   project_id = excluded.project_id, name = excluded.name,
   started_at = excluded.started_at, ended_at = excluded.ended_at,
@@ -269,6 +290,29 @@ ON CONFLICT(id) DO UPDATE SET
   version = excluded.version, description = excluded.description,
   status = excluded.status, emoji = excluded.emoji,
   due_at = excluded.due_at, due_origin_at = excluded.due_origin_at,
+  updated_at = excluded.updated_at, strategy_id = excluded.strategy_id`
+
+// S250: the project's strategy registry is FULL-REPLACED each pull (DELETE +
+// INSERT — the tasks' pattern, not the sprints' upsert): the registry is pure
+// project-scoped cloud data with no local writers, and a cloud-side delete
+// must leave the mirror, not linger. ORDERING inside ReplaceBoard: the delete
+// runs BEFORE the sprint upserts — the FK's ON DELETE SET NULL nulls the
+// current sprint rows' strategy_id (exactly the cloud's own delete semantics),
+// then the fresh sprint upserts re-assert the payload's assignments. Stale
+// mirror sprints (deleted cloud-side, kept for offline history like every
+// sprint row) keep a NULLed strategy_id — the same answer the cloud's own
+// sprints would carry if the strategy went away.
+const sqlDeleteBoardStrategies = `DELETE FROM strategies WHERE project_id = ?`
+
+const sqlInsertStrategy = `
+INSERT INTO strategies (
+  id, project_id, name, description, priority, status, emoji, sort_order, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+  project_id = excluded.project_id, name = excluded.name,
+  description = excluded.description, priority = excluded.priority,
+  status = excluded.status, emoji = excluded.emoji,
+  sort_order = excluded.sort_order, created_at = excluded.created_at,
   updated_at = excluded.updated_at`
 
 const sqlUpsertCategory = `
@@ -474,7 +518,7 @@ func (s *Store) MarkProjectGone(ctx context.Context, id, at string) error {
 // projectID, p and tasks must agree (loud checks below): the board payload is
 // project-scoped and complete (API-AND-SYNC-CONTRACT.md §3.2), so anything
 // absent from the fresh set was deleted upstream.
-func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, tasks []Task, sprints []Sprint, categories []Category, tags []Tag, taskTags []TaskTag, projCategories []CategoryRef, taskDeps []TaskDep) error {
+func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, tasks []Task, sprints []Sprint, categories []Category, tags []Tag, taskTags []TaskTag, projCategories []CategoryRef, taskDeps []TaskDep, strategies []Strategy) error {
 	if p.ID != projectID {
 		return fmt.Errorf("store: ReplaceBoard: project id %q does not match board id %q", p.ID, projectID)
 	}
@@ -567,6 +611,13 @@ func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, t
 	if _, err := tx.ExecContext(ctx, sqlDeleteBoardProjectCategories, projectID); err != nil {
 		return err
 	}
+	// S250: the strategy registry's full-replace DELETE — BEFORE the fresh
+	// inserts and the sprint upserts (see sqlDeleteBoardStrategies for the FK
+	// ordering contract: ON DELETE SET NULL mirrors the cloud's delete semantics,
+	// the sprint upserts then re-assert the payload's assignments).
+	if _, err := tx.ExecContext(ctx, sqlDeleteBoardStrategies, projectID); err != nil {
+		return err
+	}
 
 	// 4. Fresh task set (the 0065 mirror: the deadline pair + the payload's
 	//    computed effective triple ride every row — verbatim, zero local
@@ -640,6 +691,22 @@ func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, t
 
 	// 7. Sprints, categories, tags — upserts by id (never deletes; tags are
 	//    user-scoped, sprints/categories may still be referenced elsewhere).
+	//    S250: the fresh strategy registry INSERTs ride FIRST (the sprints'
+	//    strategy_id FK must find its parent rows).
+	insertStrategy, err := tx.PrepareContext(ctx, sqlInsertStrategy)
+	if err != nil {
+		return err
+	}
+	for _, st := range strategies {
+		if st.ProjectID != projectID {
+			return fmt.Errorf("store: ReplaceBoard: strategy %q belongs to project %q, not %q", st.ID, st.ProjectID, projectID)
+		}
+		if _, err := insertStrategy.ExecContext(ctx, st.ID, st.ProjectID, st.Name,
+			st.Description, st.Priority, st.Status, st.Emoji, st.SortOrder,
+			st.CreatedAt, st.UpdatedAt); err != nil {
+			return err
+		}
+	}
 	upsertSprint, err := tx.PrepareContext(ctx, sqlUpsertSprint)
 	if err != nil {
 		return err
@@ -648,7 +715,7 @@ func (s *Store) ReplaceBoard(ctx context.Context, projectID string, p Project, t
 		if _, err := upsertSprint.ExecContext(ctx, sp.ID, sp.ProjectID, sp.Name,
 			sp.StartedAt, sp.EndedAt, sp.CreatedAt, sp.IsDraft, sp.Version,
 			sp.Description, sp.Status, sp.Emoji, sp.DueAt, sp.DueOrigin,
-			sp.UpdatedAt); err != nil {
+			sp.UpdatedAt, sp.StrategyID); err != nil {
 			return err
 		}
 	}

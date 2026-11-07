@@ -163,8 +163,20 @@ import { fileURLToPath } from 'node:url'
 // internal/store/schema.go) + the payload's additive fields decoded verbatim
 // (internal/api/types.go + internal/sync/convert.go). probe-sprintdeadline.mjs
 // becomes the 14th probe. The version ladder: 0.1.35 → 0.1.36.
-const PIN_REF = '7f314e9'
-const PIN_PACKAGE_VERSION = '0.4.1.43'
+// S250 (the strategies tier): the pin moved to 6dd40c0 (web v0.4.1.44) — the
+// Strategy → Sprint → Task hierarchy goes island-live: the sprint page's
+// strategies section on top (cards + focus filter + editor + ⋯ popover), the
+// together-assignment selects (define dialog + detail Settings), the strategy
+// chips (All-sprints rows + the draft panel), devboard.js's strategy wrappers
+// (createStrategy/patchStrategy/deleteStrategy riding the SAME api() choke
+// point — the seam counts HOLD), and the st.* EN/FA ×29. The drifted anchors
+// re-recorded: devboard.js v36 → v37 (board + sprint insert ops). The
+// desktop-owned Go half of this round: mirror schema v4 (the 0066 mirror —
+// internal/store/schema.go) + the payload's 8th key decoded verbatim
+// (internal/api/types.go + internal/sync/convert.go). The version ladder:
+// 0.1.37 → 0.1.38.
+const PIN_REF = '6dd40c0'
+const PIN_PACKAGE_VERSION = '0.4.1.44'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -231,15 +243,15 @@ const FONT_FILES = [
 // first editor open) — the embedded asset server serves those exact paths.
 const JS_FILES = [
   'js/sync-state.js',      // v2 (v0.4.1.37) — the per-card sync tracker (hibana-sync-status-spec §14: ONE source; devboard.js's task mutations report in, the badges + the Sync button count derive from it)
-  'js/devboard.js',        // v36 (v0.4.1.43 + S248 re-pin @ 7f314e9) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked(); the S242-S247 feature stack rides the SAME api() choke point (the sprint dropdown/quick-create, the deadline engine + due-control mount, the extension flows, the deps multi-select + write wrappers — ZERO new fetch sites, the 7+2/4 counts HELD through the whole feature)
+  'js/devboard.js',        // v37 (v0.4.1.44 + S250 re-pin @ 6dd40c0) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked(); the S242-S247 feature stack rides the SAME api() choke point (the sprint dropdown/quick-create, the deadline engine + due-control mount, the extension flows, the deps multi-select + write wrappers — ZERO new fetch sites, the 7+2/4 counts HELD through the whole feature)
   'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
-  'js/board-page.js',      // v33 (v0.4.1.43 + S248 re-pin @ 7f314e9) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion + the S237 focus block + the S238 view + the S242-S246 feature renders (the sprint view filter + card sprint row, the deadline row + bar + thresholds, the dep badges — still ZERO new fetch: everything folds from the loaded payload)
+  'js/board-page.js',      // v34 (v0.4.1.44 + S250 re-pin @ 6dd40c0) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion + the S237 focus block + the S238 view + the S242-S246 feature renders (the sprint view filter + card sprint row, the deadline row + bar + thresholds, the dep badges — still ZERO new fetch: everything folds from the loaded payload)
   'js/focus-core.js',      // v2 (v0.4.1.43, S237 NEW + S238 escPeel) — the focus + view decision core. board.html @ the pin carries its own <script> tag between sync-state.js and devboard.js (kept verbatim); board-page.js's ensureLib self-heals it at the same ?v=2.
   'js/due-control.js',     // v1 (S248 re-pin @ 7f314e9, S244 NEW) — the shared Gregorian/Jalali date control (window.HibanaDueControl.create: the segmented calendar selector, the six §11.3 presets, the Add time toggle, ISO-8601 UTC value). NEW to the island manifest this round — board.html + sprint.html @ the pin carry its own <script> tag (kept verbatim). ZERO fetch: pure UI, mounted by devboard.js's modal + the sprint panels.
   'js/emoji-picker.js',    // v4 (S248 re-pin @ 7f314e9, S243 NEW) — the sprint emoji picker (the §4.2 identity token). NEW to the island manifest this round — board.html + sprint.html @ the pin carry its own <script> tag (kept verbatim). ZERO fetch.
-  'js/sprint-page.js',     // v27 (S248 re-pin @ 7f314e9) — the /sprint.html page; the S235 embed + the S243 sprint management surface (the lifecycle-grouped overview, the settings panel, the conflict/finish modals — all through window.HibanaBoard, ZERO direct fetch). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
-  'js/i18n-en.js',         // v110 (S248 re-pin @ 7f314e9) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign keys + db.view.* (S238) + the S242-S247 feature keys (the sprint dropdown/quick-create, the deadline engine + presets + thresholds, the extension flows, the deps section + badges)
-  'js/i18n.js',            // v163 (S248 re-pin @ 7f314e9) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below — its lazy injector literal now reads /js/i18n-fa.js?v=104)
+  'js/sprint-page.js',     // v28 (S250 re-pin @ 6dd40c0) — the /sprint.html page; the S235 embed + the S243 sprint management surface (the lifecycle-grouped overview, the settings panel, the conflict/finish modals — all through window.HibanaBoard, ZERO direct fetch). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
+  'js/i18n-en.js',         // v111 (S250 re-pin @ 6dd40c0) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign keys + db.view.* (S238) + the S242-S247 feature keys (the sprint dropdown/quick-create, the deadline engine + presets + thresholds, the extension flows, the deps section + badges)
+  'js/i18n.js',            // v164 (S250 re-pin @ 6dd40c0) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below — its lazy injector literal now reads /js/i18n-fa.js?v=104)
   'js/i18n-fa.js',         // v104 (S248 re-pin @ 7f314e9) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA keys + db.view.* FA (S238) + the S242-S247 feature keys (written Persian, parity 1678=1678)
   'js/image-resize.js',    // v1 — the LAZY ≤1600px WebP prepare pass (devboard.js:307-319)
   'vendor/jalaali.min.js', // Jalali dates for FA (devboard.js calOf)
@@ -371,7 +383,7 @@ const HTML_STRIP_LINES = [
 const HTML_INSERT = {
   name: 'insert /js/desktop-shim.js before devboard.js',
   cite: 'guide §3.2 + §4.3',
-  anchor: '<script src="/js/devboard.js?v=36" defer></script>',
+  anchor: '<script src="/js/devboard.js?v=37" defer></script>',
   insert: '<script src="/js/desktop-shim.js"></script>',
 }
 
@@ -1429,7 +1441,7 @@ const SPRINT_INSERTS = [
   // loads sprint-page.js instead (from its own body <script> tag, kept verbatim).
   {
     name: 'insert the desktop-owned script block (theme + shim + audio + login) before devboard.js (sprint page)',
-    anchor: '<script src="/js/devboard.js?v=36" defer></script>',
+    anchor: '<script src="/js/devboard.js?v=37" defer></script>',
     insert: '<script src="/js/desktop-theme.js"></script>\n<script src="/js/desktop-shim.js"></script>\n<script src="/js/desktop-audio.js"></script>\n<script src="/js/desktop-login.js"></script>',
     position: 'before',
   },
@@ -6382,19 +6394,37 @@ function verifyDist(outDir, fileMap) {
     }
     if (!focusCore.includes('escPeel')) problems.push('js/focus-core.js: the S238 escPeel decision is missing')
     if (!indexHtml.includes('/js/focus-core.js?v=2')) problems.push('index.html: the focus-core.js tag must read ?v=2 (the S238 bump)')
-    if (!indexHtml.includes('/js/board-page.js?v=33')) problems.push('index.html: the board-page.js tag must read ?v=33 (the S248 re-pin bump)')
-    if (!indexHtml.includes('/css/devboard.css?v=45')) problems.push('index.html: the devboard.css tag must read ?v=45 (the S248 re-pin bump)')
+    if (!indexHtml.includes('/js/board-page.js?v=34')) problems.push('index.html: the board-page.js tag must read ?v=34 (the S250 re-pin bump)')
+    if (!indexHtml.includes('/css/devboard.css?v=46')) problems.push('index.html: the devboard.css tag must read ?v=46 (the S250 re-pin bump — the strategies section styles)')
     // S248 (the Sprint/Deadline/Dependency island round): the feature's own
     // carriers + the new manifest entries are pinned here — a drifted pin would
     // silently ship a pre-feature island, so every marker must be present.
-    if (!indexHtml.includes('/js/devboard.js?v=36')) problems.push('index.html: the devboard.js tag must read ?v=36 (the S248 feature stack)')
+    if (!indexHtml.includes('/js/devboard.js?v=37')) problems.push('index.html: the devboard.js tag must read ?v=37 (the S250 strategies wrappers ride the S248 feature stack)')
     if (!indexHtml.includes('/js/due-control.js?v=1')) problems.push('index.html: the due-control.js tag must read ?v=1 (the S244 shared date control — S248 manifest entry)')
     if (!indexHtml.includes('/js/emoji-picker.js?v=4')) problems.push('index.html: the emoji-picker.js tag must read ?v=4 (the S243 emoji identity — S248 manifest entry)')
-    if (!indexHtml.includes('/js/i18n-en.js?v=110')) problems.push('index.html: the i18n-en.js tag must read ?v=110 (the S242-S247 feature keys)')
-    if (!indexHtml.includes('/js/i18n.js?v=163')) problems.push('index.html: the i18n.js tag must read ?v=163 (the i18n-fa v104 injector carrier)')
+    if (!indexHtml.includes('/js/i18n-en.js?v=111')) problems.push('index.html: the i18n-en.js tag must read ?v=111 (the S242-S247 feature keys + the S250 st.* set)')
+    if (!indexHtml.includes('/js/i18n.js?v=164')) problems.push('index.html: the i18n.js tag must read ?v=164 (the i18n-fa v105 injector carrier)')
     if (!indexHtml.includes('/css/claude-dark-theme.css?v=32')) problems.push('index.html: the claude-dark-theme.css tag must read ?v=32 (the S247b dark-theme contrast block)')
     const dueCtl = readDistText(outDir, 'js/due-control.js')
     if (!dueCtl.includes('window.HibanaDueControl')) problems.push('js/due-control.js: the HibanaDueControl API is missing (the S244 shared date control)')
+    // S250 (the strategies tier): the feature's own drift gates — a pre-S250
+    // island must NEVER silently ship. The wrappers + the state key in
+    // devboard.js, the section + the renders in the sprint page, the section
+    // markup in both island documents (index.html never shows it — sprint.html
+    // is the only strategies surface — but devboard.js's wrappers ride every
+    // page), and the st.* keys in BOTH dictionaries.
+    if (!devboard.includes('createStrategy')) problems.push('js/devboard.js: the strategy write wrappers are missing (the S250 strategies tier)')
+    if (!devboard.includes('state.strategies = data.strategies || []')) problems.push('js/devboard.js: the payload 8th key (strategies) is not folded into state (the S250 strategies tier)')
+    const sprintPageJs = readDistText(outDir, 'js/sprint-page.js')
+    if (!sprintPageJs.includes('renderStrategies')) problems.push('js/sprint-page.js: the strategies section render is missing (the S250 strategies tier)')
+    if (!sprintPageJs.includes('strategySelectHtml')) problems.push('js/sprint-page.js: the shared strategy select grammar is missing (the S250 together-assignment)')
+    const sprintHtml = readDistText(outDir, 'sprint.html')
+    if (!sprintHtml.includes('id="sp-strategies"')) problems.push('sprint.html: the strategies section markup is missing (the S250 strategies tier)')
+    if (!sprintHtml.includes('id="sp-new-strategy"')) problems.push('sprint.html: the New strategy button is missing (the S250 strategies tier)')
+    const i18nEn = readDistText(outDir, 'js/i18n-en.js')
+    if (!i18nEn.includes("'st.section'")) problems.push('js/i18n-en.js: the st.* strategy keys are missing (the S250 strategies tier)')
+    const i18nFa = readDistText(outDir, 'js/i18n-fa.js')
+    if (!i18nFa.includes("'st.section'")) problems.push('js/i18n-fa.js: the st.* strategy keys are missing (the S250 strategies tier)')
     const devboardJsV36 = devboard
     if (!devboardJsV36.includes('HibanaDueControl')) problems.push('js/devboard.js: the due-control mount is missing (the S244 deadline engine integration)')
     if (!devboardJsV36.includes('deadlineStateOf')) problems.push('js/devboard.js: the deadline state fold (deadlineStateOf) is missing (the S244 card deadline row)')

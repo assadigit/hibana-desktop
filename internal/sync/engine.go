@@ -100,8 +100,8 @@ func (e *Engine) Pull(ctx context.Context, projectID string) (pulled bool, err e
 	if err := json.Unmarshal(resp.Body, &bp); err != nil {
 		return false, fmt.Errorf("sync: board payload decode: %w", err)
 	}
-	p, tasks, sprints, cats, tags, joins, projCats, deps := boardToStore(&bp, "")
-	if err := e.store.ReplaceBoard(ctx, projectID, p, tasks, sprints, cats, tags, joins, projCats, deps); err != nil {
+	p, tasks, sprints, cats, tags, joins, projCats, deps, strategies := boardToStore(&bp, "")
+	if err := e.store.ReplaceBoard(ctx, projectID, p, tasks, sprints, cats, tags, joins, projCats, deps, strategies); err != nil {
 		return false, fmt.Errorf("sync: mirroring board %s: %w", projectID, err)
 	}
 	_ = e.store.SetMeta(ctx, metaETagPrefix+path, resp.ETag)

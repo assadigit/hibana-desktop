@@ -2249,3 +2249,165 @@ main.board-shell .db-frame .db-toolbar { padding: 0.25rem 0.2rem 0.85rem; }
 @media (prefers-reduced-motion: reduce) {
   .db-sm-action { transition: none; }
 }
+
+/* --- S250 (0066): the strategies section — the tier above sprints ---------------
+   STRATEGIES-SPEC §5: "a special section on top which shows the strategies, their
+   priority etc." The flat-board grammar — hairline borders, soft fills, zero shadows.
+   The head row doubles as the zero-strategy slim strip (discoverable, not clutter);
+   the cards row renders only when strategies exist + the section is expanded. */
+.sp-strategies {
+  padding: 0.55rem 1.5rem 0.75rem;
+  border-block-end: 1px solid var(--line);
+  background: var(--bg-soft);
+}
+.sp-strategies-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.sp-strategies-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  padding: 0.15rem 0.2rem;
+  cursor: pointer;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+}
+.sp-strategies-toggle:hover { background: color-mix(in srgb, var(--muted) 10%, transparent); }
+.sp-strategies-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sp-strategies-chevron { font-size: 0.8rem; color: var(--muted); width: 1em; text-align: center; }
+.sp-strategies-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.sp-strategies-count { font-weight: 400; }
+.sp-strategies-head .btn { margin-inline-start: auto; }
+.sp-strategy-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-block-start: 0.6rem;
+}
+.sp-strategy-card {
+  flex: 1 1 240px;
+  min-inline-size: 220px;
+  max-inline-size: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem 0.75rem 0.7rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.sp-strategy-card:hover { border-color: color-mix(in srgb, var(--muted) 45%, var(--line)); }
+.sp-strategy-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sp-strategy-card.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.sp-strategy-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-inline-size: 0;
+}
+.sp-strategy-glyph { flex: none; font-size: 1rem; line-height: 1; }
+.sp-strategy-name {
+  font-weight: 600;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-strategy-more { flex: none; opacity: 0.55; }
+.sp-strategy-card:hover .sp-strategy-more { opacity: 1; }
+.sp-strategy-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.sp-strategy-prio {
+  font-size: var(--fs-xs);
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--color-medium) 55%, transparent);
+  color: var(--color-medium-ink);
+}
+.sp-strategy-prio.prio-low { background: color-mix(in srgb, var(--color-low) 60%, transparent); color: var(--color-low-ink); }
+.sp-strategy-prio.prio-high { background: color-mix(in srgb, var(--color-high) 16%, transparent); color: var(--color-high); }
+.sp-strategy-prio.prio-urgent { background: color-mix(in srgb, var(--color-urgent) 14%, transparent); color: var(--color-urgent); }
+.sp-strategy-progress {
+  block-size: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+  overflow: hidden;
+}
+.sp-strategy-progress span {
+  display: block;
+  block-size: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: inline-size 0.25s ease;
+}
+.sp-strategy-active { color: var(--accent-ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-strategy-desc {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* The All-sprints list row's strategy chip (glyph + name) — display-only context. */
+.sp-list-strategy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 9%, transparent);
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+}
+/* The define dialog's strategy seat (the together-assignment). */
+.sp-define-strategy {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-start: 0.55rem;
+}
+.sp-define-strategy select {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+/* The strategy editor's priority segmented row (the task editor's prio chips grammar). */
+.sp-stg-prio-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.sp-stg-prio-row button {
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  border-radius: 999px;
+  padding: 0.18rem 0.7rem;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text);
+}
+.sp-stg-prio-row button.is-on.prio-low { background: color-mix(in srgb, var(--color-low) 60%, transparent); color: var(--color-low-ink); border-color: color-mix(in srgb, var(--color-low-ink) 35%, var(--line)); }
+.sp-stg-prio-row button.is-on.prio-medium { background: color-mix(in srgb, var(--color-medium) 70%, transparent); color: var(--color-medium-ink); border-color: color-mix(in srgb, var(--color-medium-ink) 35%, var(--line)); }
+.sp-stg-prio-row button.is-on.prio-high { background: color-mix(in srgb, var(--color-high) 22%, transparent); color: var(--color-high); border-color: color-mix(in srgb, var(--color-high) 55%, var(--line)); }
+.sp-stg-prio-row button.is-on.prio-urgent { background: color-mix(in srgb, var(--color-urgent) 20%, transparent); color: var(--color-urgent); border-color: color-mix(in srgb, var(--color-urgent) 55%, var(--line)); }
+/* Dark theme: the accent-soft selected card + progress keep contrast on claude-dark. */
+[data-theme="claude-dark"] .sp-strategy-card.is-on { background: color-mix(in srgb, var(--accent) 14%, transparent); }

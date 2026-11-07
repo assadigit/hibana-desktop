@@ -27,10 +27,14 @@ type migration struct {
 //	     unique index), dev_tasks' deadline pair + the payload's computed
 //	     effective-deadline triple, the dev_task_deps edge table, and
 //	     project_archives.sprint_name_snapshot (schema.go's mirrorSchemaV3).
+//	v4 — S250: the 0066 mirror — the strategies registry (the tier above sprints:
+//	     name/description/priority/lifecycle/emoji/sort_order) + the nullable
+//	     sprints.strategy_id FK, ON DELETE SET NULL (schema.go's mirrorSchemaV4).
 var migrations = []migration{
 	{version: 1, sql: mirrorSchemaV1},
 	{version: 2, sql: localSchemaV2},
 	{version: 3, sql: mirrorSchemaV3},
+	{version: 4, sql: mirrorSchemaV4},
 }
 
 // migrationsTableDDL is the local bookkeeping table (see migrations above).

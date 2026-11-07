@@ -22,15 +22,15 @@
   <link rel="stylesheet" href="/css/notifications.css?v=12">
   <link rel="stylesheet" href="/css/polish-batch.css?v=30">
   <link rel="stylesheet" href="/css/project-header.css?v=51">
-  <link rel="stylesheet" href="/css/devboard.css?v=45">
+  <link rel="stylesheet" href="/css/devboard.css?v=46">
   <link rel="stylesheet" href="/css/misc.css?v=24">
   <link rel="stylesheet" href="/css/themes.css?v=9">
   <link rel="stylesheet" href="/css/claude-dark-theme.css?v=32">
   <link rel="stylesheet" href="/css/rtl.css?v=5">
   <link rel="stylesheet" href="/vendor/manrope/font-face.css">
   <link rel="stylesheet" href="/css/desktop-login.css?v=2">
-  <script src="/js/i18n-en.js?v=110" defer></script>
-  <script src="/js/i18n.js?v=163" defer></script>
+  <script src="/js/i18n-en.js?v=111" defer></script>
+  <script src="/js/i18n.js?v=164" defer></script>
   <script src="/vendor/jalaali.min.js" defer></script>
   <!-- S244 (spec pack Phase 5 — D6): the shared Gregorian/Jalali deadline control -->
   <script src="/js/due-control.js?v=1" defer></script>
@@ -39,7 +39,7 @@
 <script src="/js/desktop-shim.js"></script>
 <script src="/js/desktop-audio.js"></script>
 <script src="/js/desktop-login.js"></script>
-  <script src="/js/devboard.js?v=36" defer></script>
+  <script src="/js/devboard.js?v=37" defer></script>
 </head>
 <body>
   <!-- The desktop login gate (guide §5.5 — the M2 pick LANDED; v0.1.2: the WEB LOGIN
@@ -113,6 +113,23 @@
       <button type="button" class="btn small" id="sp-new-sprint">◆ <span data-i18n="db.defineSprint">Sprint</span></button>
       <button type="button" class="btn ghost danger small sp-finish-btn" id="sp-finish-btn" data-i18n-title="db.finishSprintHint" title="Finish this sprint — its window closes and the next one can be defined">⏹ <span id="sp-finish-lbl" data-i18n="db.finishSprint">Finish sprint</span><span class="sp-finish-name" id="sp-finish-name" hidden></span></button>
     </div>
+    <!-- S250 (0066 — STRATEGIES-SPEC §5): the strategies strip — the owner's ask:
+         "a special section on top which shows the strategies, their priority etc."
+         Collapsible (the chevron; state persists in localStorage, the spHideLanes
+         pattern). Zero-strategy projects keep the slim one-line strip (discoverable,
+         not clutter); populated projects render the flat card row. -->
+    <section class="sp-strategies" id="sp-strategies" aria-labelledby="sp-strategies-title">
+      <div class="sp-strategies-head">
+        <button type="button" class="sp-strategies-toggle" id="sp-strategies-toggle" aria-expanded="true">
+          <span class="sp-strategies-chevron" aria-hidden="true">▾</span>
+          <h3 class="sp-strategies-title" id="sp-strategies-title"><span aria-hidden="true">⚑</span> <span data-i18n="st.section">Strategies</span> <span class="sp-strategies-count muted small" id="sp-strategies-count"></span></h3>
+        </button>
+        <button type="button" class="btn ghost small" id="sp-new-strategy">＋ <span data-i18n="st.new">New strategy</span></button>
+      </div>
+      <div class="sp-strategies-body" id="sp-strategies-body">
+        <div class="sp-strategy-cards" id="sp-strategy-cards"></div>
+      </div>
+    </section>
     <!-- Phase 5 item 7: the DRAFT sprint panel — a defined-but-not-started sprint lives
          here (name + item count + Start/Delete + a drop target that assigns tasks to it)
          until the user starts it, at which point it moves onto the timeline. -->
@@ -133,7 +150,7 @@
       <div class="sp-sprints-list" id="sp-sprints-list"></div>
     </section>
   </main>
-  <script src="/js/sprint-page.js?v=27" defer></script>
+  <script src="/js/sprint-page.js?v=28" defer></script>
 <script>
 (function(){
   document.addEventListener("click",function(e){

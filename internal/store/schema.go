@@ -172,3 +172,39 @@ CREATE TABLE local_grace_tasks (
 CREATE INDEX idx_mirror_dev_tasks_project ON dev_tasks(project_id);
 CREATE INDEX idx_mirror_tags_user ON tags(user_id);
 `
+
+// mirrorSchemaV4 is the S250 mirror of the web's migration
+// 0066_strategies.sql — the Strategies layer (STRATEGIES-SPEC.md §3, the
+// owner's Strategy → Sprint → Task hierarchy). Semantics are IDENTICAL to 0066
+// where the columns exist cloud-side:
+//
+//   - the per-project `strategies` registry: name + description + the REUSED
+//     task priority vocabulary + the explicit active|paused|completed lifecycle
+//     (NOT NULL here — a fresh table pins its CHECKs, unlike 0065's backfilled
+//     sprints.status) + the optional emoji identity + sort_order (future drag).
+//   - sprints gains the nullable strategy_id FK (ON DELETE SET NULL — a deleted
+//     strategy's sprints survive unassigned, exactly the cloud grammar).
+//
+// NO backfill runs here (the v3 doctrine): the mirror never migrates legacy
+// rows — every ReplaceBoard full-replaces the project's rows from the live
+// payload, so the new columns + the registry simply arrive on the next pull.
+const mirrorSchemaV4 = `
+-- ---- strategies: the tier above sprints (0066 / STRATEGIES-SPEC §3) ---------
+CREATE TABLE strategies (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low','medium','high','urgent')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','completed')),
+  emoji TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT
+);
+CREATE INDEX idx_strategies_project ON strategies(project_id);
+
+-- ---- sprints: the optional strategy this sprint serves (0066) ----------------
+ALTER TABLE sprints ADD COLUMN strategy_id TEXT REFERENCES strategies(id) ON DELETE SET NULL;
+CREATE INDEX idx_sprints_strategy ON sprints(strategy_id);
+`

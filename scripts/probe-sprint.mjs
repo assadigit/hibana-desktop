@@ -62,14 +62,38 @@ const P1 = '11111111-1111-4111-8111-111111111111'
 const freshTasks = () => [
   { id: 't1', project_id: P1, title: 'Sprint embed task', status: 'planned', priority: 'high', category_id: null, sprint_id: null, sort_order: 0, created_at: '2026-01-01T00:00:00.000Z', done_at: null, start_at: null, end_at: null, search_tags: '', updated_at: '2026-01-02T00:00:00.000Z', tags: [], shot_count: 0 },
 ]
+// S250: the strategies leg's mock state — two strategies (one urgent+active
+// owning the sprint + its tasks, one medium+paused with nothing assigned) + the
+// sprints/tasks that exercise the roll-up + the focus filter + the chips.
+const STRAT1 = '21111111-1111-4111-8111-111111111111'
+const STRAT2 = '21111111-1111-4111-8111-111111111112'
+const SPR1 = '31111111-1111-4111-8111-111111111111'
+const SPR2 = '31111111-1111-4111-8111-111111111112'
 const probe = {
   authed: false,
   lang: 'en',
   theme: null,
   projects: [{ id: P1, title: 'Hibana Sprint Probe', status: 'planning', type: 'personal' }],
-  tasks: freshTasks(),
-  sprints: [],
+  tasks: [
+    { id: 't1', project_id: P1, title: 'Sprint embed task', status: 'planned', priority: 'high', category_id: null, sprint_id: null, sort_order: 0, created_at: '2026-01-01T00:00:00.000Z', done_at: null, start_at: null, end_at: null, search_tags: '', updated_at: '2026-01-02T00:00:00.000Z', tags: [], shot_count: 0 },
+    // S250: STRAT1's roll-up — one done, one open (50%).
+    { id: 't2', project_id: P1, title: 'Keyword research', status: 'done', priority: 'high', category_id: null, sprint_id: SPR1, sort_order: 0, created_at: '2026-01-01T00:00:00.000Z', done_at: '2026-01-03T00:00:00.000Z', start_at: null, end_at: null, search_tags: '', updated_at: '2026-01-03T00:00:00.000Z', tags: [], shot_count: 0 },
+    { id: 't3', project_id: P1, title: 'On-page SEO pass', status: 'in_progress', priority: 'medium', category_id: null, sprint_id: SPR1, sort_order: 1, created_at: '2026-01-02T00:00:00.000Z', done_at: null, start_at: null, end_at: null, search_tags: '', updated_at: '2026-01-02T00:00:00.000Z', tags: [], shot_count: 0 },
+  ],
+  sprints: [
+    // S250: an ACTIVE sprint serving STRAT1 (the ▸ line + the chip + the filter hit).
+    { id: SPR1, project_id: P1, name: 'SEO', started_at: '2026-01-02T00:00:00.000Z', ended_at: null, created_at: '2026-01-02T00:00:00.000Z', is_draft: 0, version: null, description: null, status: 'active', emoji: null, due_at: null, due_origin_at: null, updated_at: '2026-01-02T00:00:00.000Z', strategy_id: STRAT1 },
+    // A completed UNASSIGNED sprint (the filter's exclusion case).
+    { id: SPR2, project_id: P1, name: 'Old push', started_at: '2025-12-01T00:00:00.000Z', ended_at: '2025-12-15T00:00:00.000Z', created_at: '2025-12-01T00:00:00.000Z', is_draft: 0, version: null, description: null, status: 'completed', emoji: null, due_at: null, due_origin_at: null, updated_at: '2025-12-15T00:00:00.000Z', strategy_id: null },
+  ],
+  strategies: [
+    { id: STRAT1, project_id: P1, name: 'Make website more seen', description: 'The broad direction', priority: 'urgent', status: 'active', emoji: null, sort_order: 0, created_at: '2026-01-01T00:00:00.000Z', updated_at: '2026-01-01T00:00:00.000Z' },
+    { id: STRAT2, project_id: P1, name: 'Speed up checkout', description: '', priority: 'medium', status: 'paused', emoji: '\u{1F680}', sort_order: 0, created_at: '2026-01-05T00:00:00.000Z', updated_at: '2026-01-05T00:00:00.000Z' },
+  ],
   createdSprints: [],
+  createdStrategies: [],
+  patchedStrategies: [],
+  deletedStrategies: [],
   deleted: [],
   patched: [],
   loginCalls: [],
@@ -101,6 +125,8 @@ const serveDocument = (send, isSprint) => {
 const devboardPayload = (p) => JSON.stringify({
   project: { id: p.id, title: p.title, status: p.status, type: p.type },
   tasks: probe.tasks, categories: [], sprints: probe.sprints, tags: [], task_tags: [],
+  // S250: the payload's 8th additive key — the strategy registry.
+  strategies: probe.strategies,
 })
 
 const server = http.createServer((req, res) => {
@@ -152,6 +178,33 @@ const server = http.createServer((req, res) => {
         probe.createdSprints.push(sp)
         probe.sprints.push(sp)
         return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: JSON.stringify(sp) }))
+      }
+      // S250: the strategies CRUD (the leg's create/patch/delete assertions).
+      m = /^\/api\/projects\/([^/]+)\/strategies$/.exec(rp)
+      if (m && (rm || 'GET').toUpperCase() === 'POST') {
+        let parsed = {}
+        try { parsed = JSON.parse(body || '{}') } catch (e) { /* */ }
+        const st = { id: 'stg-' + (probe.createdStrategies.length + 1), project_id: m[1], name: parsed.name || 'Strategy', description: parsed.description || '', priority: parsed.priority || 'medium', status: 'active', emoji: parsed.emoji || null, sort_order: 0, created_at: '2026-01-07T00:00:00.000Z', updated_at: '2026-01-07T00:00:00.000Z' }
+        probe.createdStrategies.push(st)
+        probe.strategies.push(st)
+        return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: JSON.stringify({ ok: true, id: st.id }) }))
+      }
+      m = /^\/api\/strategies\/([^/]+)$/.exec(rp)
+      if (m) {
+        const method = (rm || 'GET').toUpperCase()
+        if (method === 'DELETE') {
+          probe.deletedStrategies.push(m[1])
+          probe.strategies = probe.strategies.filter((x) => x.id !== m[1])
+          return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: '{"ok":true}' }))
+        }
+        if (method === 'PATCH') {
+          let parsed = {}
+          try { parsed = JSON.parse(body || '{}') } catch (e) { /* */ }
+          probe.patchedStrategies.push({ id: m[1], ...parsed })
+          const st = probe.strategies.find((x) => x.id === m[1])
+          if (st) Object.assign(st, parsed)
+          return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: '{"ok":true}' }))
+        }
       }
       // The task mutations (the sound round's original surface).
       m = /^\/api\/devtasks\/([^/]+)$/.exec(rp)
@@ -337,6 +390,100 @@ async function main() {
     } else {
       check('the Board link points to /kanban', false, JSON.stringify(boardHref))
     }
+
+    // LEG 6 (S250): the strategies tier — the section on top, the cards, the
+    // focus filter, the together-assignment selects, and the CRUD through the seam.
+    console.log('\n— leg 6: the strategies section (S250)')
+    await page.goto(base + '/sprint.html?project=' + P1, { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('#sp-wrap', { state: 'visible', timeout: 10000 })
+    await page.waitForSelector('#sp-strategies', { state: 'visible', timeout: 5000 })
+    const strat = await page.evaluate(() => {
+      const section = document.getElementById('sp-strategies')
+      const cards = Array.from(section.querySelectorAll('[data-strategy-card]'))
+      const first = cards[0]
+      return {
+        sectionShown: !!section && !section.hidden,
+        count: cards.length,
+        bodyShown: !document.getElementById('sp-strategies-body').hidden,
+        firstName: first ? first.querySelector('.sp-strategy-name').textContent : null,
+        firstPrio: first ? (first.querySelector('.sp-strategy-prio') || {}).className : null,
+        firstStatus: first ? (first.querySelector('.sp-list-badge') || {}).className : null,
+        firstActive: first ? (first.querySelector('.sp-strategy-active') || {}).textContent : null,
+        firstProgress: first ? first.querySelector('.sp-strategy-progress span').style.inlineSize : null,
+        secondGlyph: cards[1] ? cards[1].querySelector('.sp-strategy-glyph').textContent : null,
+        newBtn: !!document.getElementById('sp-new-strategy'),
+        listRows: document.querySelectorAll('#sp-sprints-list [data-sp-open]').length,
+        listStrategyChips: document.querySelectorAll('#sp-sprints-list .sp-list-strategy').length,
+        draftStrategyChip: !!document.querySelector('#sp-draft .sp-list-strategy'),
+      }
+    })
+    check('the strategies section renders on top (#sp-strategies visible + body shown)', strat.sectionShown && strat.bodyShown)
+    check('two strategy cards render (the registry)', strat.count === 2, 'count=' + strat.count)
+    check('the cards sort priority-first (urgent first)', strat.firstName === 'Make website more seen', JSON.stringify(strat.firstName))
+    check('the first card carries the urgent priority badge', strat.firstPrio && strat.firstPrio.indexOf('prio-urgent') >= 0, JSON.stringify(strat.firstPrio))
+    check('the first card carries the active lifecycle badge', strat.firstStatus && strat.firstStatus.indexOf('sp-st-active') >= 0, JSON.stringify(strat.firstStatus))
+    check('the first card names the sprint it owns (the \u25b8 line)', strat.firstActive && strat.firstActive.indexOf('SEO') >= 0, JSON.stringify(strat.firstActive))
+    check('the roll-up progress bar reads 50% (1/2 tasks done)', strat.firstProgress === '50%', JSON.stringify(strat.firstProgress))
+    check('the second card carries its emoji glyph (\u{1F680})', strat.secondGlyph === '\u{1F680}', JSON.stringify(strat.secondGlyph))
+    check('the New strategy button rides the section head', strat.newBtn)
+    check('the All-sprints list renders every sprint (the 2 seeded + leg 3\'s create)', strat.listRows === 3, 'rows=' + strat.listRows)
+    check('the assigned sprint row carries the strategy chip', strat.listStrategyChips === 1, 'chips=' + strat.listStrategyChips)
+    await page.screenshot({ path: path.join(args.out, '03-strategies-section.png') })
+
+    // The focus filter: card click narrows the All-sprints list to SEO; a second
+    // click restores both.
+    await page.click('[data-strategy-card=\'' + STRAT1 + '\']')
+    await page.waitForTimeout(300)
+    let filtered = await page.evaluate(() => ({
+      rows: document.querySelectorAll('#sp-sprints-list [data-sp-open]').length,
+      isOn: !!document.querySelector('[data-strategy-card].is-on'),
+      names: Array.from(document.querySelectorAll('#sp-sprints-list .sp-list-name')).map((n) => n.textContent),
+    }))
+    check('the focus filter narrows the list to the strategy\'s sprint', filtered.rows === 1 && filtered.names[0] === 'SEO', JSON.stringify(filtered))
+    check('the focused card wears the is-on look', filtered.isOn)
+    await page.click('[data-strategy-card=\'' + STRAT1 + '\']')
+    await page.waitForTimeout(300)
+    filtered = await page.evaluate(() => document.querySelectorAll('#sp-sprints-list [data-sp-open]').length)
+    check('a second card click restores the full list', filtered === 3, 'rows=' + filtered)
+    await page.screenshot({ path: path.join(args.out, '04-strategies-filter.png') })
+
+    // The together-assignment: the define dialog carries the strategy select.
+    await page.click('#sp-new-sprint')
+    await page.waitForSelector('.sp-define-pop', { state: 'visible', timeout: 5000 })
+    const defineSel = await page.evaluate(() => {
+      const sel = document.querySelector('[data-sp-define-strategy]')
+      if (!sel) return null
+      return { options: Array.from(sel.options).map((o) => o.textContent), value: sel.value }
+    })
+    check('the define dialog carries the strategy select', !!defineSel, 'missing')
+    if (defineSel) {
+      check('the select lists No strategy + both strategies (assignable: active + paused)', defineSel.options.length === 3, JSON.stringify(defineSel.options))
+      check('the select defaults to No strategy', defineSel.value === '', JSON.stringify(defineSel.value))
+    }
+    await page.keyboard.press('Escape')
+
+    // The detail Settings tab carries the same select, seeded with the sprint's
+    // strategy; a change PATCHes through the seam.
+    await page.click('#sp-sprints-list [data-sp-open=\'' + SPR1 + '\']')
+    await page.waitForSelector('.db-sprintdetail', { state: 'visible', timeout: 5000 })
+    const sdSel = await page.evaluate(() => {
+      const sel = document.querySelector('[data-sd-strategy]')
+      if (!sel) return null
+      return { value: sel.value, options: Array.from(sel.options).map((o) => o.textContent) }
+    })
+    check('the detail Settings carries the strategy select', !!sdSel, 'missing')
+    if (sdSel) {
+      check('the select is seeded with the sprint\'s strategy (SEO \u2192 STRAT1)', sdSel.value === STRAT1, JSON.stringify(sdSel.value))
+    }
+    await page.keyboard.press('Escape')
+
+    // The New strategy flow: the editor opens + a create crosses the seam.
+    await page.click('#sp-new-strategy')
+    await page.waitForSelector('.db-strategy-modal', { state: 'visible', timeout: 5000 })
+    await page.fill('[data-stg-name]', 'Ship the portfolio')
+    await page.click('.db-strategy-modal [data-stg-save]')
+    await page.waitForTimeout(600)
+    check('the strategy create crossed the seam (createdStrategies)', probe.createdStrategies.length === 1 && probe.createdStrategies[0].name === 'Ship the portfolio', JSON.stringify(probe.createdStrategies))
 
     check('ZERO page errors through the whole sprint flow', pageErrors.length === 0, pageErrors.join(' | '))
     await page.screenshot({ path: path.join(args.out, '02-back-on-board.png') })

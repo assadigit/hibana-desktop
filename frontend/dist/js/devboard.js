@@ -163,7 +163,7 @@
     return lang === 'fa' ? (wd + 1) % 7 : wd
   }
 
-  const state = { projectId: null, project: null, tasks: [], categories: [], sprints: [], tags: [], task_deps: [] }
+  const state = { projectId: null, project: null, tasks: [], categories: [], sprints: [], tags: [], task_deps: [], strategies: [] }
 
   async function load(projectId) {
     state.projectId = projectId
@@ -179,6 +179,11 @@
     // blocked/ready classification) reads THIS pool — never a second endpoint,
     // never a stored reverse column (spec §15's derived rule + the S241 decision).
     state.task_deps = data.task_deps || []
+    // S250 (0066 — STRATEGIES-SPEC §4): the payload's 8th key — the strategy
+    // registry, priority-first from the server. The || [] belt covers both a
+    // lagging pre-0066 server (the catch→[] payload belt) and any older cached
+    // shape — the sprint page renders an empty strategies strip, never a crash.
+    state.strategies = data.strategies || []
     return data
   }
 
@@ -186,6 +191,13 @@
   const findCategory = (id) => state.categories.find((x) => x.id === id) || null
   const findSprint = (id) => state.sprints.find((x) => x.id === id) || null
   const tagById = (id) => state.tags.find((x) => x.id === id) || null
+  // S250 (0066 — STRATEGIES-SPEC §4): the strategy tier's client lookups. status is
+  // NOT NULL at birth server-side (a fresh 0066 table pins its CHECKs); the ||
+  // 'active' belt only covers a hypothetical degenerate row, same defensive read
+  // as sprintStatusOf's coalescing twin.
+  const findStrategy = (id) => (state.strategies || []).find((x) => x.id === id) || null
+  const strategyStatusOf = (st) => (st && st.status) || 'active'
+  const strategyGlyph = (st) => (st && st.emoji ? String(st.emoji) : '⚑')
   // S242 (spec pack §4.2 — emoji identity): the sprint's identity glyph — the
   // user-picked emoji token, else the default sprint glyph ◆ (the diamond the
   // card badge has always worn; the SVG table's 'diamond' is the nav/icon twin).
@@ -534,10 +546,14 @@
 
   // S48n: createSprint now accepts optional started_at/ended_at. If both provided,
   // the sprint is created as STARTED (skips the draft step). Presets compute the dates.
-  const createSprint = (name, startedAt, endedAt) => {
+  // S250 (0066 — owner decision #11): opts.strategy_id rides the together-assignment —
+  // the define dialog picks the strategy WITH the sprint (a 4th optional arg would be
+  // unreadable; the options object stays forward-compatible).
+  const createSprint = (name, startedAt, endedAt, opts) => {
     const body = {}
     if (name) body.name = name
     if (startedAt) { body.started_at = startedAt; if (endedAt) body.ended_at = endedAt }
+    if (opts && opts.strategy_id !== undefined) body.strategy_id = opts.strategy_id
     return api('/api/projects/' + state.projectId + '/sprints', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     })
@@ -558,6 +574,19 @@
   // (subject to the one-active 409 — the conflict modal resolves it). Ridden
   // through the shared api() wrapper, so the fetch-site seam counts never move.
   const pauseSprint = (id) => api('/api/sprints/' + id + '/pause', { method: 'POST' })
+  // S250 (0066 — STRATEGIES-SPEC §4): the strategy tier's write wrappers — ridden
+  // through the shared api() choke point, so the desktop seam's fetch-site counts
+  // never move (the S246 deps precedent). createStrategy carries the owner-approved
+  // grammar: name + optional description/emoji/priority, born active. patchStrategy
+  // carries every field INCLUDING the lifecycle status (the server guards the
+  // completed transition); deleteStrategy is the hard delete behind the UI confirm.
+  const createStrategy = (body) => api('/api/projects/' + state.projectId + '/strategies', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })
+  const patchStrategy = (id, body) => api('/api/strategies/' + id, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })
+  const deleteStrategy = (id) => api('/api/strategies/' + id, { method: 'DELETE' })
   const resumeSprint = (id) => api('/api/sprints/' + id + '/resume', { method: 'POST' })
   const reorderCategories = (ids) => api('/api/projects/' + state.projectId + '/categories/reorder', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
@@ -2412,6 +2441,10 @@
           window.hibana && window.hibana.toast(t('db.h1.stale', 'Another sprint became active just now — the board reloaded to show it.'), 'err')
           if (o.onDone) o.onDone()
         }
+      } else if (err && err.code === 'strategy_completed') {
+        // S250 (0066): starting a sprint whose strategy is COMPLETED is refused —
+        // a finished direction takes no running sprints. Name the reason + the fix.
+        window.hibana && window.hibana.toast(t('st.startBlocked', 'This sprint\u2019s strategy is completed — re-assign it to an active one first (Settings → Strategy).'), 'err')
       } else {
         window.hibana && window.hibana.toast(t('sparks.saveFailed', "Couldn't save"), 'err')
       }
@@ -2968,6 +3001,13 @@
     createTask, patchTask, deleteTask, reorderTasks, addTaskTag, removeTaskTag,
     createCategory, patchCategory, deleteCategory, reorderCategories,
     createSprint, startSprint, patchSprint, renameSprint, finishSprint, reopenSprint, deleteSprint,
+    // S250 (0066 — STRATEGIES-SPEC §4): the strategy tier's shared stack — lookups,
+    // lifecycle coalescing, the glyph, and the three write wrappers. Exported so
+    // sprint.html owns the ONLY strategies surface this phase (spec §5: task cards
+    // carry nothing; board/project pages stay untouched) without forking a second
+    // implementation (spec §18 — no forking).
+    createStrategy, patchStrategy, deleteStrategy,
+    findStrategy, strategyStatusOf, strategyGlyph,
     // S243 (spec pack Phase 4): pause/resume wrappers + the lifecycle UI stack —
     // statusOf/laneCounts helpers, the H2 finish + Screen-I delete confirmations,
     // the H1 one-active conflict modal + the shared start/resume/reopen flows,

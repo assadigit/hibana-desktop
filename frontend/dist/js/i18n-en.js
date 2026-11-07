@@ -839,6 +839,27 @@ window.__hibanaDictEN = {
       'sp.planNote': 'The rich description lives in the plan editor.',
       // S45: the sprint lane's rich empty state (one-line hint under the title)
       'sp.emptyHint': 'Define it, add items, start it — it runs here as a strip.',
+      // S250 (0066 — STRATEGIES-SPEC): the strategies tier — the section on top of the
+      // sprint page, the editor, the lifecycle actions, the focus filter, the assignment
+      // dropdowns (define dialog + detail Settings), and the two 409 reasons.
+      'st.section': 'Strategies', 'st.new': 'New strategy',
+      'st.noStrategy': 'No strategy', 'st.assign': 'Strategy',
+      'st.name': 'Strategy name', 'st.namePh': 'Make the website more seen…',
+      'st.nameRequired': 'Enter a name for the strategy.',
+      'st.desc': 'Description (optional)', 'st.descPh': 'The broad direction — why these sprints exist…',
+      'st.newTitle': 'New strategy', 'st.editTitle': 'Edit strategy', 'st.edit': 'Edit',
+      'st.newSprint': 'New sprint', 'st.sprintsCount': '{n} sprints', 'st.progressOf': '{p}% done',
+      'st.servesStrategy': 'Serves: {name}',
+      'st.filterHint': 'Show only this strategy’s sprints',
+      'st.filterClear': 'Showing only this strategy — click again to show all',
+      'st.complete': 'Complete strategy', 'st.delete': 'Delete strategy',
+      'st.delConfirm': 'Delete this strategy? Its sprints stay — they become unassigned.',
+      'st.completed': 'Strategy completed — its sprints stay as history',
+      'st.completeBlocked': 'Finish or pause its active sprint first.',
+      'st.defined': 'Strategy defined', 'st.saved': 'Strategy saved', 'st.deleted': 'Strategy deleted',
+      'st.dupErr': 'A strategy with this name already exists in this project — names are case-insensitive.',
+      'st.completedAssignBlocked': 'That strategy is completed — pick an active one or clear it.',
+      'st.startBlocked': 'This sprint’s strategy is completed — re-assign it to an active one first (Settings → Strategy).',
       // S44: the sprint timeline's today-flag chip (rides the today line)
       'db.today': 'Today',
       'db.tags': 'Tags', 'db.addTag': 'Add tag + Enter', 'db.taskAdded': 'Task added', 'db.taskDeleted': 'Task deleted',

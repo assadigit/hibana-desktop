@@ -20,7 +20,10 @@ import (
 // the tasks' deadline pair + the server-computed effective triple, the sprints'
 // lifecycle columns, and the flat task_deps edge set. Zero local resolution:
 // whatever the server computed is what lands in the mirror (spec §18).
-func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []store.Task, []store.Sprint, []store.Category, []store.Tag, []store.TaskTag, []store.CategoryRef, []store.TaskDep) {
+// S250 (0066 mirror): the 8th key — the strategy registry + the sprints'
+// strategy_id, both verbatim (the roll-ups stay DERIVED client-side on both
+// platforms — never mirrored).
+func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []store.Task, []store.Sprint, []store.Category, []store.Tag, []store.TaskTag, []store.CategoryRef, []store.TaskDep, []store.Strategy) {
 	p := store.Project{
 		ID:     bp.Project.ID,
 		Title:  bp.Project.Title,
@@ -73,6 +76,7 @@ func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []stor
 			DueAt:       s.DueAt,
 			DueOrigin:   s.DueOrigin,
 			UpdatedAt:   s.UpdatedAt,
+			StrategyID:  s.StrategyID, // S250: the optional strategy this sprint serves
 		})
 	}
 
@@ -120,7 +124,26 @@ func boardToStore(bp *api.BoardPayload, userScope string) (store.Project, []stor
 		deps = append(deps, store.TaskDep{BlockerTaskID: d.BlockerTaskID, BlockedTaskID: d.BlockedTaskID})
 	}
 
-	return p, tasks, sprints, cats, tags, joins, projCats, deps
+	// S250: the 8th payload key — the strategy registry, mirrored verbatim
+	// (priority-first order upstream; ReplaceBoard full-replaces the project's
+	// rows). A pre-0066 payload simply decodes an empty set.
+	strategies := make([]store.Strategy, 0, len(bp.Strategies))
+	for _, st := range bp.Strategies {
+		strategies = append(strategies, store.Strategy{
+			ID:          st.ID,
+			ProjectID:   st.ProjectID,
+			Name:        st.Name,
+			Description: st.Description,
+			Priority:    st.Priority,
+			Status:      st.Status,
+			Emoji:       st.Emoji,
+			SortOrder:   st.SortOrder,
+			CreatedAt:   st.CreatedAt,
+			UpdatedAt:   st.UpdatedAt,
+		})
+	}
+
+	return p, tasks, sprints, cats, tags, joins, projCats, deps, strategies
 }
 
 // projectListToStore converts one projects-list row into the mirror shape.

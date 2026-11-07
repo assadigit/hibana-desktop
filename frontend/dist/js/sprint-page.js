@@ -234,6 +234,7 @@
           const S = B().state
           return S.sprints
             .filter((s) => !s.is_draft) // Phase 5: drafts are panel-rendered, never axis-rendered
+            .filter((s) => !strategyFilter || s.strategy_id === strategyFilter) // S250: the focus filter — chips narrow to the strategy
             .slice()
             .sort((a, b) => B().dayIdx(a.started_at) - B().dayIdx(b.started_at))
             .map((s) => {
@@ -436,6 +437,10 @@
           const lanesHtml = groups.map((g) => {
             const color = g.cat ? g.cat.color_fill : '#CCD5F0'
             const visTasks = g.tasks.filter((task) => {
+              // S250: the focus filter — a task shows when its sprint serves the focused
+              // strategy (tasks without a sprint belong to no strategy → hidden while
+              // a filter is on; the SIDEBAR stays unfiltered — it is the workbench).
+              if (strategyFilter && taskStrategyId(task) !== strategyFilter) return false
               const b = tEndFixed(task)
               if (b != null && b < range.start) return false // ended before the window
               const a = tStart(task)
@@ -510,7 +515,7 @@
           }
         }
 
-        const render = () => { computeRange(); renderSide(); renderTimeline(); renderDraft(); renderTimeNav(); renderFinishBtn(); renderSprintsList(); wrap.hidden = false; if (loading) loading.hidden = true }
+        const render = () => { computeRange(); renderSide(); renderTimeline(); renderDraft(); renderTimeNav(); renderFinishBtn(); renderStrategies(); renderSprintsList(); wrap.hidden = false; if (loading) loading.hidden = true }
         const reload = async () => { await B().load(projectId); render() }
 
         // ---- Phase 5 item 7: the DRAFT sprint panel ---------------------------------
@@ -531,6 +536,9 @@
               '<div class="sp-draft-head">' +
                 '<span class="sp-diamond">◆</span>' +
                 '<input class="sp-draft-name" data-sp-draft-name maxlength="80" dir="auto" value="' + B().esc(draft.name) + '" aria-label="' + B().esc(_t('db.sprintName', 'Sprint name')) + '">' +
+                // S250: the draft's strategy chip (glyph + name) — assigned at define
+                // time (the together-assignment) or later via the detail Settings.
+                strategyChip(draft) +
                 '<span class="detail-tab-count">' + B().faDig(items.length) + '</span>' +
               '</div>' +
               '<p class="sp-draft-hint muted small">' + B().esc(_t('db.draftHint', 'Add items in the sidebar or drag them here — they join this sprint. Start it when ready.')) + '</p>' +
@@ -624,6 +632,272 @@
           }
         }
 
+        // ---- S250 (0066 — STRATEGIES-SPEC §5): the strategies section ----------------
+        // The owner's ask: "a special section on top which shows the strategies, their
+        // priority etc." — the broad-direction tier ABOVE sprints (Strategy → Sprint →
+        // Task). Cards in a flat row (hairline borders, pastel, zero shadows — the
+        // flat-board grammar): glyph (emoji or ⚑), name, the REUSED task priority badge,
+        // the lifecycle badge, the derived roll-up (done/total across ITS sprints' tasks
+        // — tasks without a sprint never count), and — when this strategy owns the
+        // project's ONE active sprint — the ▸ line naming it. Card body click = the
+        // focus filter (timeline chips + clips + the All-sprints list narrow to it; a
+        // second click resets). The SIDEBAR and the DRAFT panel deliberately stay
+        // UNFILTERED — they are the assignment workbench (the pool), not the picture.
+
+        // The focus filter (null = all). Reset when the filtered strategy disappears.
+        let strategyFilter = null
+        const strategyFilterSanity = () => {
+          if (strategyFilter && !B().findStrategy(strategyFilter)) strategyFilter = null
+        }
+        // A task's strategy, THROUGH its sprint (tasks carry no strategy — owner
+        // decision #1: strategies are sprint-page context only).
+        const taskStrategyId = (t) => {
+          if (!t.sprint_id) return null
+          const s = B().findSprint(t.sprint_id)
+          return s ? (s.strategy_id || null) : null
+        }
+        // Collapse persistence (the spHideLanes pattern — per-browser UI pref).
+        const STRAT_COLLAPSE_KEY = 'spStrategiesCollapsed'
+        const strategiesCollapsed = () => { try { return localStorage.getItem(STRAT_COLLAPSE_KEY) === '1' } catch { return false } }
+        const setStrategiesCollapsed = (on) => { try { localStorage.setItem(STRAT_COLLAPSE_KEY, on ? '1' : '0') } catch { /* private mode — the toggle just won't persist */ } }
+
+        // The assignable set for every dropdown (owner decision #11): active + paused
+        // only — a completed strategy is a finished direction; existing assignments
+        // stay visible as chips but take no new sprints.
+        const assignableStrategies = () => (B().state.strategies || []).filter((x) => B().strategyStatusOf(x) !== 'completed')
+
+        /** S250: the sprint's strategy chip — the All-sprints list row's small glyph +
+         *  name label (the task cards carry NOTHING — owner decision #1). */
+        const strategyChip = (s) => {
+          if (!s || !s.strategy_id) return ''
+          const st = B().findStrategy(s.strategy_id)
+          if (!st) return '' // a deleted strategy — the FK already nulled server-side; belt only
+          return '<span class="sp-list-strategy small" title="' + B().esc(_t('st.servesStrategy', 'Serves: {name}').replace('{name}', st.name)) + '">' +
+            B().esc(B().strategyGlyph(st)) + ' <span dir="auto">' + B().esc(st.name) + '</span></span>'
+        }
+
+        /** The shared strategy <select> markup — the define dialog AND the detail
+         *  Settings tab render the SAME grammar (spec §18 — no forking). `current`
+         *  pre-selects (the sprint's strategy_id, or a prefill for the together-assign);
+         *  `keepCompleted` ALSO lists the currently-assigned completed strategy (the
+         *  settings tab must SHOW what a sprint serves, not silently drop the option —
+         *  saving without a change never re-sends it, so the 409 never fires). */
+        const strategySelectHtml = (current, attrs, keepCompleted) => {
+          const opts = assignableStrategies().slice()
+          if (keepCompleted && current) {
+            const cur = B().findStrategy(current)
+            if (cur && B().strategyStatusOf(cur) === 'completed' && !opts.some((o) => o.id === cur.id)) opts.push(cur)
+          }
+          return '<select ' + (attrs || '') + '>' +
+            '<option value="">' + B().esc(_t('st.noStrategy', 'No strategy')) + '</option>' +
+            opts.map((st) => {
+              const done = B().strategyStatusOf(st) === 'completed'
+              return '<option value="' + B().esc(st.id) + '"' + (current === st.id ? ' selected' : '') + '>' +
+                B().esc(B().strategyGlyph(st) + ' ' + st.name + (done ? ' (' + _t('db.sprintSt.completed', 'Completed') + ')' : '')) +
+              '</option>'
+            }).join('') +
+          '</select>'
+        }
+
+        function renderStrategies() {
+          strategyFilterSanity()
+          const section = document.getElementById('sp-strategies')
+          if (!section) return
+          const S = B().state
+          const list = S.strategies || []
+          const cardsEl = document.getElementById('sp-strategy-cards')
+          const bodyEl = document.getElementById('sp-strategies-body')
+          const countEl = document.getElementById('sp-strategies-count')
+          const toggleBtn = document.getElementById('sp-strategies-toggle')
+          const collapsed = strategiesCollapsed()
+          if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
+            const chev = toggleBtn.querySelector('.sp-strategies-chevron')
+            if (chev) chev.textContent = collapsed ? '▸' : '▾'
+          }
+          // The slim strip: zero strategies OR collapsed → the head row alone stays
+          // (discoverable, not clutter — the spec's zero-strategy rule).
+          const showBody = !collapsed && list.length > 0
+          if (bodyEl) bodyEl.hidden = !showBody
+          if (countEl) countEl.textContent = list.length ? '· ' + B().faDig(list.length) : ''
+          if (!cardsEl) return
+          if (!list.length) { cardsEl.textContent = ''; return }
+          const esc = B().esc
+          const activeSprint = S.sprints.find((s) => B().sprintStatusOf(s) === 'active') || null
+          const statusBadge = (stx) => {
+            const map = {
+              active: ['sp-st-active', _t('db.sprintSt.active', 'Active')],
+              paused: ['sp-st-paused', _t('db.sprintSt.paused', 'Paused')],
+              completed: ['sp-st-completed', _t('db.sprintSt.completed', 'Completed')],
+            }
+            const m = map[stx] || map.active
+            return '<span class="sp-list-badge ' + m[0] + '">' + esc(m[1]) + '</span>'
+          }
+          cardsEl.innerHTML = list.map((st) => {
+            const stx = B().strategyStatusOf(st)
+            const mySprints = S.sprints.filter((s) => s.strategy_id === st.id)
+            const sprintIds = mySprints.map((s) => s.id)
+            // The roll-up (owner decision #5): derived PURELY from its sprints' tasks.
+            const myTasks = S.tasks.filter((t) => t.sprint_id && sprintIds.indexOf(t.sprint_id) >= 0)
+            const done = myTasks.filter((t) => t.status === 'done').length
+            const pct = myTasks.length ? Math.round((done / myTasks.length) * 100) : 0
+            const ownsActive = activeSprint && activeSprint.strategy_id === st.id ? activeSprint : null
+            const isOn = strategyFilter === st.id
+            const sprintsTxt = _t('st.sprintsCount', '{n} sprints').replace('{n}', B().faDig(mySprints.length))
+            const tasksTxt = B().faDig(done) + '/' + B().faDig(myTasks.length)
+            return '<div class="sp-strategy-card' + (isOn ? ' is-on' : '') + '" data-strategy-card="' + esc(st.id) + '" role="button" tabindex="0"' +
+              ' title="' + esc(isOn ? _t('st.filterClear', 'Showing only this strategy — click again to show all') : _t('st.filterHint', 'Show only this strategy\u2019s sprints')) + '">' +
+              '<div class="sp-strategy-card-head">' +
+                '<span class="sp-strategy-glyph" aria-hidden="true">' + esc(B().strategyGlyph(st)) + '</span>' +
+                '<span class="sp-strategy-name" dir="auto">' + esc(st.name) + '</span>' +
+                statusBadge(stx) +
+                '<button type="button" class="ghost small sp-strategy-more" data-strategy-menu="' + esc(st.id) + '" aria-label="' + esc(_t('sp.quickActions', 'Quick actions')) + '" title="' + esc(_t('sp.quickActions', 'Quick actions')) + '">⋯</button>' +
+              '</div>' +
+              '<div class="sp-strategy-meta small">' +
+                '<span class="sp-strategy-prio prio-' + esc(st.priority) + '">' + esc(B().prioLabel(st.priority)) + '</span>' +
+                '<span class="muted">' + esc(sprintsTxt) + ' · ' + esc(tasksTxt) + '</span>' +
+              '</div>' +
+              '<div class="sp-strategy-progress" role="img" aria-label="' + esc(_t('st.progressOf', '{p}% done').replace('{p}', String(pct))) + '"><span style="inline-size:' + pct + '%"></span></div>' +
+              (ownsActive ? '<div class="sp-strategy-active small">▸ <span dir="auto">' + esc(ownsActive.name) + '</span></div>' : '') +
+              (st.description ? '<p class="sp-strategy-desc muted small" dir="auto">' + esc(st.description) + '</p>' : '') +
+            '</div>'
+          }).join('')
+        }
+
+        // The strategy editor (create + edit share ONE modal — the sprint-detail
+        // grammar): name, priority select, emoji picker, description textarea.
+        let strategyModal = null
+        const closeStrategyEditor = () => { if (strategyModal) { strategyModal.remove(); strategyModal = null } }
+        function openStrategyEditor(st) {
+          closeStrategyEditor()
+          const L = lang()
+          const isNew = !st
+          const P = B().PRIORITIES
+          strategyModal = document.createElement('div')
+          strategyModal.className = 'db-modal db-strategy-modal'
+          strategyModal.setAttribute('role', 'dialog')
+          strategyModal.setAttribute('aria-modal', 'true')
+          strategyModal.innerHTML =
+            '<div class="db-modal-card" dir="' + (L === 'fa' ? 'rtl' : 'auto') + '">' +
+              '<div class="row spread db-modal-head">' +
+                '<h3 class="sp-detail-title"><span class="sp-detail-glyph" aria-hidden="true">' + B().esc(isNew ? '⚑' : B().strategyGlyph(st)) + '</span> ' + B().esc(isNew ? _t('st.newTitle', 'New strategy') : _t('st.editTitle', 'Edit strategy')) + '</h3>' +
+                '<button type="button" class="ghost" data-stg-close aria-label="' + B().esc(_t('common.close', 'Close')) + '">✕</button>' +
+              '</div>' +
+              '<div class="db-modal-body">' +
+                '<div class="db-field"><span>' + B().esc(_t('st.name', 'Strategy name')) + '</span>' +
+                  '<input data-stg-name maxlength="80" dir="auto" placeholder="' + B().esc(_t('st.namePh', 'Make the website more seen…')) + '" value="' + B().esc(st ? st.name : '') + '"></div>' +
+                '<div class="db-field"><span>' + B().esc(_t('db.priority', 'Priority')) + '</span>' +
+                  '<div class="sp-stg-prio-row">' + P.map((p) =>
+                    '<button type="button" data-stg-prio="' + p + '" class="prio-' + p + (st && st.priority === p ? ' is-on' : (!st && p === 'medium' ? ' is-on' : '')) + '">' + B().esc(B().prioLabel(p)) + '</button>').join('') + '</div></div>' +
+                '<div class="db-field"><span>' + B().esc(_t('db.sq.emoji', 'Emoji (optional)')) + '</span>' +
+                  '<div class="row db-sq-emoji-row">' +
+                    '<button type="button" class="ghost db-sq-emoji-btn" data-stg-emoji-btn><span class="db-sq-emoji-cur" data-stg-emoji-cur aria-hidden="true">' + B().esc(st ? B().strategyGlyph(st) : '⚑') + '</span> <span data-stg-emoji-label>' + B().esc(st && st.emoji ? _t('db.sq.changeEmoji', 'Change') : _t('db.sq.chooseEmoji', 'Choose emoji')) + '</span></button>' +
+                    (st && st.emoji ? '<button type="button" class="ghost danger db-sq-emoji-clear" data-stg-emoji-clear aria-label="' + B().esc(_t('db.sq.clearEmoji', 'Back to the default icon')) + '" title="' + B().esc(_t('db.sq.clearEmoji', 'Back to the default icon')) + '">✕</button>' : '') +
+                  '</div></div>' +
+                '<div class="db-field"><span>' + B().esc(_t('st.desc', 'Description (optional)')) + '</span>' +
+                  '<textarea data-stg-desc maxlength="2000" dir="auto" rows="3" placeholder="' + B().esc(_t('st.descPh', 'The broad direction — why these sprints exist…')) + '">' + B().esc(st ? st.description || '' : '') + '</textarea></div>' +
+                '<p class="sp-detail-err" data-stg-error role="alert" hidden></p>' +
+              '</div>' +
+              '<div class="row spread db-modal-foot">' +
+                '<div class="row" style="gap:.5rem">' +
+                  (st ? '<button type="button" class="btn ghost small" data-stg-complete>' + B().esc(_t('st.complete', 'Complete strategy')) + '</button>' : '') +
+                '</div>' +
+                '<div class="row" style="gap:.5rem">' +
+                  '<button type="button" class="ghost" data-stg-cancel>' + B().esc(_t('common.cancel', 'Cancel')) + '</button>' +
+                  '<button type="button" class="btn small" data-stg-save>' + B().esc(_t('common.save', 'Save')) + '</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>'
+          document.body.appendChild(strategyModal)
+          let prio = st ? st.priority : 'medium'
+          let emoji = st ? st.emoji || '' : ''
+          const paintEmoji = () => {
+            const cur = strategyModal.querySelector('[data-stg-emoji-cur]')
+            const lbl = strategyModal.querySelector('[data-stg-emoji-label]')
+            if (cur) cur.textContent = emoji || '⚑'
+            if (lbl) lbl.textContent = emoji ? _t('db.sq.changeEmoji', 'Change') : _t('db.sq.chooseEmoji', 'Choose emoji')
+            const clear = strategyModal.querySelector('[data-stg-emoji-clear]')
+            if (clear) clear.hidden = !emoji
+          }
+          const errEl = strategyModal.querySelector('[data-stg-error]')
+          const fail = (msg) => { errEl.textContent = msg; errEl.hidden = false }
+          strategyModal.querySelector('[data-stg-close]').onclick = closeStrategyEditor
+          strategyModal.querySelector('[data-stg-cancel]').onclick = closeStrategyEditor
+          strategyModal.addEventListener('click', (e) => { if (e.target === strategyModal) closeStrategyEditor() })
+          strategyModal.querySelectorAll('[data-stg-prio]').forEach((btn) => {
+            btn.onclick = () => {
+              prio = btn.dataset.stgPrio
+              strategyModal.querySelectorAll('[data-stg-prio]').forEach((b) => b.classList.toggle('is-on', b === btn))
+            }
+          })
+          const emojiBtn = strategyModal.querySelector('[data-stg-emoji-btn]')
+          if (emojiBtn) emojiBtn.onclick = (ev) => {
+            const picker = window.hibanaEmojiPicker
+            if (!picker) return
+            picker.open({ anchor: ev.currentTarget, current: emoji, onPick: (e2) => { emoji = String(e2 || ''); paintEmoji() } })
+          }
+          const clearBtn = strategyModal.querySelector('[data-stg-emoji-clear]')
+          if (clearBtn) clearBtn.onclick = () => { emoji = ''; paintEmoji() }
+          const completeBtn = strategyModal.querySelector('[data-stg-complete]')
+          if (completeBtn) completeBtn.onclick = async () => {
+            // The owner decision #9 flow — the server is the guard (a still-active
+            // sprint answers 409), the client only names the reason.
+            try {
+              await B().patchStrategy(st.id, { status: 'completed' })
+              window.hibana && window.hibana.toast(_t('st.completed', 'Strategy completed — its sprints stay as history'), 'ok')
+              closeStrategyEditor()
+              await reload()
+            } catch (err) {
+              if (err && err.code === 'strategy_active_sprint') fail(_t('st.completeBlocked', 'Finish or pause its active sprint first.'))
+              else window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
+            }
+          }
+          const saveBtn = strategyModal.querySelector('[data-stg-save]')
+          saveBtn.onclick = async () => {
+            const name = (strategyModal.querySelector('[data-stg-name]').value || '').trim()
+            if (!name) { fail(_t('st.nameRequired', 'Enter a name for the strategy.')); return }
+            const desc = (strategyModal.querySelector('[data-stg-desc]').value || '').trim()
+            const body = { name, priority: prio, emoji: emoji || null, description: desc || null }
+            saveBtn.disabled = true
+            try {
+              if (isNew) await B().createStrategy({ ...body, description: desc })
+              else await B().patchStrategy(st.id, body)
+              window.hibana && window.hibana.toast(isNew ? _t('st.defined', 'Strategy defined') : _t('st.saved', 'Strategy saved'), 'ok')
+              closeStrategyEditor()
+              await reload()
+            } catch (err) {
+              saveBtn.disabled = false
+              if (err && err.code === 'duplicate') fail(_t('st.dupErr', 'A strategy with this name already exists in this project — names are case-insensitive.'))
+              else window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
+            }
+          }
+          strategyModal.querySelector('[data-stg-name]').focus()
+        }
+
+        // The strategy card's ⋯ quick-action popover (the sprint chip's twin).
+        let strategyPop = null
+        const closeStrategyPop = () => { if (strategyPop) { strategyPop.remove(); strategyPop = null } }
+        const openStrategyMenu = (st) => {
+          closeStrategyPop()
+          const stx = B().strategyStatusOf(st)
+          strategyPop = document.createElement('div')
+          strategyPop.className = 'sp-sprint-pop sp-strategy-pop'
+          strategyPop.dataset.stgId = st.id
+          const sprintsTxt = _t('st.sprintsCount', '{n} sprints').replace('{n}', B().faDig(B().state.sprints.filter((s) => s.strategy_id === st.id).length))
+          strategyPop.innerHTML =
+            '<div class="sp-pop-lab">' + B().esc(st.name) + ' · ' + B().esc(sprintsTxt) + '</div>' +
+            '<div class="row" style="flex-wrap:wrap">' +
+              '<button type="button" class="btn ghost small" data-stg-edit>' + B().esc(_t('st.edit', 'Edit')) + '</button>' +
+              '<button type="button" class="btn ghost small" data-stg-newsprint>◆ ' + B().esc(_t('st.newSprint', 'New sprint')) + '</button>' +
+              (stx === 'active' ? '<button type="button" class="btn ghost small" data-stg-pause>⏸ ' + B().esc(_t('db.pauseSprint', 'Pause sprint')) + '</button>' : '') +
+              (stx === 'paused' ? '<button type="button" class="btn ghost small" data-stg-resume>▸ ' + B().esc(_t('db.resumeSprint', 'Resume')) + '</button>' : '') +
+              (stx !== 'completed' ? '<button type="button" class="btn ghost small" data-stg-complete>⏹ ' + B().esc(_t('st.complete', 'Complete strategy')) + '</button>' : '') +
+              (stx === 'completed' ? '<button type="button" class="btn ghost small" data-stg-reopen>' + B().esc(_t('db.reopenSprint', 'Reopen')) + '</button>' : '') +
+              '<button type="button" class="btn ghost danger small" data-stg-del>' + B().esc(_t('common.delete', 'Delete')) + '</button>' +
+            '</div>'
+          document.body.appendChild(strategyPop)
+        }
+
         // S46.10 (owner: "see the sprints in a list — Sprint A, Sprint B. Create this
         // section below the sprint timeline as a separate section.") — S243 (spec §7.3
         // + Screen E — D5): the flat list became the lifecycle-grouped OVERVIEW —
@@ -638,7 +912,7 @@
           const list = document.getElementById('sp-sprints-list')
           if (!section || !list) return
           const S = B().state
-          const all = [...(S.sprints || [])].sort((a, b) => {
+          const all = [...(S.sprints || [])].filter((s) => !strategyFilter || s.strategy_id === strategyFilter).sort((a, b) => {
             const da = a.started_at || a.created_at || ''
             const db = b.started_at || b.created_at || ''
             return db.localeCompare(da)
@@ -702,6 +976,7 @@
                   '<span class="sp-list-ident" aria-hidden="true">' + esc(B().sprintGlyph(s)) + '</span>' +
                   '<span class="sp-list-name">' + esc(s.name || _t('sp.untitled', 'Untitled')) + '</span>' +
                   statusBadge(s, stx) +
+                  strategyChip(s) +
                   '<span class="sp-list-dates muted small">' + esc(dateTxt) + '</span>' +
                   dueTxt +
                   '<span class="sp-list-items muted small">' + esc(String(itemCount)) + ' ' + _t('sp.items', 'items') + '</span>' +
@@ -786,6 +1061,13 @@
                 '<input data-sd-name maxlength="80" dir="auto" value="' + B().esc(s.name || '') + '"></div>' +
               '<div class="db-field"><span>' + B().esc(_t('sp.version', 'Version')) + '</span>' +
                 '<input data-sd-version maxlength="80" dir="auto" value="' + B().esc(s.version || '') + '"></div>' +
+              // S250: the assignment seat — the SAME shared select grammar as the define
+              // dialog (spec §18). keepCompleted=true: a sprint already serving a
+              // COMPLETED strategy sees it (labelled) so the state is never a mystery;
+              // the save only re-sends strategy_id on a real CHANGE (below), so the
+              // no-op save never trips the completed-409.
+              '<div class="db-field"><span>' + B().esc(_t('st.assign', 'Strategy')) + '</span>' +
+                strategySelectHtml(s.strategy_id || null, 'data-sd-strategy aria-label="' + B().esc(_t('st.assign', 'Strategy')) + '"', true) + '</div>' +
               '<div class="db-field"><span>' + B().esc(_t('db.sq.emoji', 'Emoji (optional)')) + '</span>' +
                 '<div class="row db-sq-emoji-row">' +
                   '<button type="button" class="ghost db-sq-emoji-btn" data-sd-emoji-btn><span class="db-sq-emoji-cur" data-sd-emoji-cur aria-hidden="true">' + B().esc(B().sprintGlyph(s)) + '</span> <span data-sd-emoji-label>' + B().esc(s.emoji ? _t('db.sq.changeEmoji', 'Change') : _t('db.sq.chooseEmoji', 'Choose emoji')) + '</span></button>' +
@@ -880,6 +1162,12 @@
               // value→value PRESERVES due_origin_at server-side (an edit is not a
               // re-assignment — §13's extension semantics), null clears both.
               const patchBody = { name: nameVal, version: verVal ? verVal : null, emoji: emoji ? emoji : null }
+              // S250: strategy_id rides ONLY on a change — re-asserting a completed
+              // strategy verbatim would 409 (a finished direction takes no assignments,
+              // not even a no-op one), and clearing is always legal.
+              const sdStratSel = body.querySelector('[data-sd-strategy]')
+              const sdStratVal = sdStratSel ? (sdStratSel.value || null) : null
+              if (sdStratVal !== (s.strategy_id || null)) patchBody.strategy_id = sdStratVal
               if (dueToggle) patchBody.due_at = dueToggle.checked ? dueVal : null
               saveBtn.disabled = true
               try {
@@ -1487,7 +1775,10 @@
         // SAME popover directly — a synthetic #sp-new-sprint.click() would nest a
         // second bubbling event inside the CTA's own, and the outside-click guard
         // (below) would close the popover in the same tick it opened.
-        const openDefinePop = () => {
+        // S250: prefillStrategyId — the strategy card's ⋯ "New sprint" action opens the
+        // SAME dialog with the strategy pre-selected (the together-assignment ease path,
+        // owner decision #11: "assign strategy and sprint together").
+        const openDefinePop = (prefillStrategyId) => {
           if (definePop) { closeDefinePop(); return }
           definePop = document.createElement('div')
           definePop.className = 'sp-sprint-pop sp-define-pop'
@@ -1528,6 +1819,11 @@
             '<div class="sp-define-presets">' +
               presets.map((p) => '<button type="button" class="chip" data-sp-preset="' + p.ms + '">' + (L === 'fa' ? p.label : p.en) + '</button>').join('') +
             '</div>' +
+            // S250: the together-assignment seat — one select, the shared grammar
+            // (active + paused strategies + "No strategy"). The dropdown renders even
+            // when empty so the grammar is discoverable and stable across projects.
+            '<label class="sp-define-strategy"><span class="sp-date-label">' + B().esc(_t('st.assign', 'Strategy')) + '</span>' +
+              strategySelectHtml(prefillStrategyId || null, 'data-sp-define-strategy aria-label="' + B().esc(_t('st.assign', 'Strategy')) + '"') + '</label>' +
             '<div class="row">' +
               '<button type="button" class="btn small" data-sp-define-ok>' + B().esc(_t('db.defineSprintOk', 'Define')) + '</button>' +
               '<button type="button" class="ghost small" data-sp-define-cancel>' + B().esc(_t('common.cancel', 'Cancel')) + '</button>' +
@@ -1560,19 +1856,26 @@
             const name = nameIn.value.trim()
             const startVal = startIn.value
             const endVal = endIn.value
+            // S250: the together-assignment — the select's value rides the create
+            // ("" = No strategy → null; the strategy card's ⋯ pre-filled it).
+            const strategySel = definePop.querySelector('[data-sp-define-strategy]')
+            const strategyVal = strategySel ? (strategySel.value || null) : null
+            const stratOpts = { strategy_id: strategyVal }
             // If start date is provided, create as STARTED with dates
             // S206: UTC-midnight parse (the presets' twin fix) — see the preset note above.
             if (startVal) {
               const startedAt = new Date(startVal + 'T00:00:00Z').toISOString()
               const endedAt = endVal ? new Date(endVal + 'T23:59:59Z').toISOString() : null
               try {
-                await B().createSprint(name || undefined, startedAt, endedAt)
+                await B().createSprint(name || undefined, startedAt, endedAt, stratOpts)
                 closeDefinePop()
                 window.hibana && window.hibana.toast(_t('db.sprintStarted', 'Sprint started'))
                 dayOffset = 0
                 await reload()
               } catch (err) {
-                if (err && err.status === 409) {
+                if (err && err.code === 'strategy_completed') {
+                  window.hibana && window.hibana.toast(_t('st.completedAssignBlocked', 'That strategy is completed — pick an active one or clear it.'), 'err')
+                } else if (err && err.status === 409) {
                   window.hibana && window.hibana.toast(_t('db.draftExists', 'A sprint is already being defined — start it or delete it first'), 'err')
                 } else {
                   window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
@@ -1582,7 +1885,7 @@
             }
             // No start date — create as DRAFT (original behavior)
             try {
-              await B().createSprint(name || undefined)
+              await B().createSprint(name || undefined, undefined, undefined, stratOpts)
               closeDefinePop()
               window.hibana && window.hibana.toast(_t('db.sprintDefined', 'Sprint defined — add items, then start it'))
               dayOffset = 0
@@ -1606,6 +1909,81 @@
         }
         document.getElementById('sp-new-sprint').onclick = openDefinePop
         ctx.on('click', (e) => { if (definePop && !e.target.closest('.sp-define-pop') && !e.target.closest('#sp-new-sprint') && !e.target.closest('[data-sp-empty-define]')) closeDefinePop() })
+
+        // ---- S250: the strategies section's interactions --------------------------------
+        document.getElementById('sp-new-strategy').onclick = () => openStrategyEditor(null)
+        document.getElementById('sp-strategies-toggle').onclick = () => {
+          setStrategiesCollapsed(!strategiesCollapsed())
+          renderStrategies()
+        }
+        // The focus filter: card body click toggles (⋯ menu stops propagation); the
+        // card is also keyboard-operable (role=button + Enter/Space — the S136 recipe).
+        ctx.on('click', (e) => {
+          const more = e.target.closest('[data-strategy-menu]')
+          if (more) {
+            e.stopPropagation()
+            closeStrategyPop()
+            const st = B().findStrategy(more.dataset.strategyMenu)
+            if (st) openStrategyMenu(st)
+            return
+          }
+          const card = e.target.closest('[data-strategy-card]')
+          if (card) {
+            strategyFilter = strategyFilter === card.dataset.strategyCard ? null : card.dataset.strategyCard
+            render()
+            return
+          }
+          if (strategyPop && !e.target.closest('.sp-strategy-pop')) { closeStrategyPop(); return }
+          // The popover's own actions (appended to body — the S46.11 list-row twin).
+          const act = e.target.closest('[data-stg-edit],[data-stg-newsprint],[data-stg-pause],[data-stg-resume],[data-stg-complete],[data-stg-reopen],[data-stg-del]')
+          if (!act || !strategyPop) return
+          const st = B().findStrategy(strategyPop.dataset.stgId)
+          closeStrategyPop()
+          if (!st) return
+          if (act.hasAttribute('data-stg-edit')) { openStrategyEditor(st); return }
+          if (act.hasAttribute('data-stg-newsprint')) { openDefinePop(st.id); return }
+          if (act.hasAttribute('data-stg-pause')) {
+            B().patchStrategy(st.id, { status: 'paused' }).then(reload).catch(() => window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err'))
+            return
+          }
+          if (act.hasAttribute('data-stg-resume') || act.hasAttribute('data-stg-reopen')) {
+            B().patchStrategy(st.id, { status: 'active' }).then(reload).catch(() => window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err'))
+            return
+          }
+          if (act.hasAttribute('data-stg-complete')) {
+            B().patchStrategy(st.id, { status: 'completed' })
+              .then(() => { window.hibana && window.hibana.toast(_t('st.completed', 'Strategy completed — its sprints stay as history'), 'ok'); return reload() })
+              .catch((err) => {
+                window.hibana && window.hibana.toast(err && err.code === 'strategy_active_sprint'
+                  ? _t('st.completeBlocked', 'Finish or pause its active sprint first.')
+                  : _t('sparks.saveFailed', "Couldn't save"), 'err')
+              })
+            return
+          }
+          if (act.hasAttribute('data-stg-del')) {
+            // The S210 design-system confirm (the desktop shim implements it too — v0.1.29).
+            window.hibana.confirm(_t('st.delConfirm', 'Delete this strategy? Its sprints stay — they become unassigned.'), { title: _t('st.delete', 'Delete strategy'), danger: true, confirmLabel: _t('common.delete', 'Delete') })
+              .then(async (ok) => {
+                if (!ok) return
+                try {
+                  await B().deleteStrategy(st.id)
+                  if (strategyFilter === st.id) strategyFilter = null
+                  window.hibana && window.hibana.toast(_t('st.deleted', 'Strategy deleted'), 'ok')
+                  await reload()
+                } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err') }
+              })
+            return
+          }
+        })
+        // Keyboard parity for the cards (Enter/Space — the S136 card recipe).
+        ctx.on('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          const card = e.target.closest ? e.target.closest('[data-strategy-card]') : null
+          if (!card || e.target.closest('[data-strategy-menu]')) return
+          e.preventDefault()
+          strategyFilter = strategyFilter === card.dataset.strategyCard ? null : card.dataset.strategyCard
+          render()
+        })
 
         // ---- Phase 5: toolbar FINISH button (the running sprint's big red button) ---
         document.getElementById('sp-finish-btn').onclick = async () => {
@@ -1810,7 +2188,7 @@
             if (window.HibanaBoard) return resolve(true)
             if (!injected && waited >= 1200) {
               injected = true
-              inject('/js/devboard.js?v=36') // keep in sync with the <head> tag + sw SHELL
+              inject('/js/devboard.js?v=37') // keep in sync with the <head> tag + sw SHELL
               if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali timeline for FA
             }
             if (waited >= 9000) return resolve(false)

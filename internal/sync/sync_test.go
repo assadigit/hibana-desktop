@@ -580,7 +580,7 @@ func TestBoardPayloadDecodesRealShape(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &bp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	p, tasks, _, _, _, joins, _, _ := boardToStore(&bp, "")
+	p, tasks, _, _, _, joins, _, _, _ := boardToStore(&bp, "")
 	if p.ID != "p1" || tasks[0].CategoryID == nil || *tasks[0].CategoryID != "c9" {
 		t.Fatalf("converter lost fields: %+v %+v", p, tasks[0])
 	}

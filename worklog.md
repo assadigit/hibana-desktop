@@ -302,3 +302,52 @@ agree). The other 13 probes ride the same untouched island bytes.
 versioninfo.json ×4, make-portable.ps1, desktop.yml's dev placeholder). No
 island re-pin (PIN_REF stays 7f314e9 — zero frontend/dist bytes moved). Tag:
 v0.1.37-desktop (auto-release lane).
+
+## Session S250 — the strategies tier, the desktop half (2026-11-07)
+
+**The web round (hibana-source 6dd40c0, v0.4.1.44)** shipped the owner's Strategy →
+Sprint → Task hierarchy end to end (migration 0066 on both D1s, the 8-key payload,
+strategies CRUD + the assignment/lifecycle guards, the sprint page's strategies section).
+This round mirrors it on the desktop — the owner's standing rule: every web change lands
+here too, for a consistent experience.
+
+**The Go half:**
+- Mirror **schema v4** (`internal/store/schema.go`): the `strategies` registry + the
+  nullable `sprints.strategy_id` FK (ON DELETE SET NULL — the cloud's 0066 grammar).
+  No backfill (the v3 doctrine: ReplaceBoard full-replaces from the live payload).
+- `ReplaceBoard` gains the `strategies` param: the registry is FULL-REPLACED per pull
+  (DELETE + INSERT — the tasks' pattern, not the sprints' upsert), with the FK ordering
+  documented (the delete's ON DELETE SET NULL mirrors the cloud's delete semantics; the
+  fresh sprint upserts then re-assert the payload's assignments).
+- `api/types.go`: `StrategyRow` + the payload's 8th additive key + `SprintRow.StrategyID`.
+- `sync/convert.go`: the verbatim mapping.
+
+**The island half (`scripts/sync-island.mjs` — the only mutator):**
+- The pin moved 7f314e9 → **6dd40c0** (v0.4.1.43 → 0.4.1.44). The drifted anchors
+  re-recorded (devboard.js v36 → v37 on the board + sprint insert ops); the verify
+  needles moved with the carriers (board-page v34, devboard.css v46, i18n-en v111,
+  i18n v164/i18n-fa v105).
+- NEW **S250 drift gates**: a pre-strategies island can never silently ship — the
+  wrappers + the 8th-key state fold in devboard.js, the section renders + the shared
+  select grammar in sprint-page.js, the section markup in sprint.html, the st.* keys in
+  BOTH dictionaries.
+- The seam counts HELD (the S246 deps precedent): every strategy call rides the ONE
+  `api()` choke point — zero new fetch sites.
+- `--check` green: 76 files byte-identical, idempotent.
+
+**The proof:**
+- **probe-sprint.mjs grows LEG 6** (the strategies leg): the section renders on top
+  (2 cards, priority-first — urgent first), the urgent/active badges, the ▸ SEO line,
+  the 50% roll-up bar, the 🚀 emoji glyph, the focus filter (narrow to 1 row + the
+  is-on look + the restore), the define dialog's select (No strategy + both
+  assignable strategies, default empty), the detail Settings' select (seeded with the
+  sprint's strategy id), and a create crossing the seam — ZERO page errors.
+- ALL 14 probes green on the new bytes (login/logout/newproject/refresh/labels/
+  focus/view/soundfx/update/settings/completefacts/uiredesign/sprintdeadline + the
+  extended sprint) — the sprintdeadline carriers re-pinned (v37/v34).
+- Go: gofmt clean, vet green linux AND windows, `go test -count=1 -race` green
+  (9 packages), the cgo-free Windows cross-build PE-compiles.
+
+**Versions:** 0.1.37 → 0.1.38 everywhere (wails.json, main.go -dev stamp,
+versioninfo.json ×4, make-portable.ps1, desktop.yml's dev placeholder). Tag:
+v0.1.38-desktop (auto-release lane on push).
