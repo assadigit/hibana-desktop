@@ -21,7 +21,7 @@ on:
   workflow_dispatch: {}
 
 env:
-  WEB_REF: 7f314e9          # the island pin (must match scripts/sync-island.mjs) — the S248 Sprint/Deadline/Dependency feature ref (S247b reconciliation @ v0.4.1.43)
+  WEB_REF: 6dd40c0          # the island pin (must match scripts/sync-island.mjs) — the S250 Strategies tier ref (web v0.4.1.44)
   WEB_VERSION: "0.4.1.43"   # the pin's package version (Release notes carry BOTH)
 
 jobs:
