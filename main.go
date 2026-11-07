@@ -56,7 +56,7 @@ import (
 //	wails build -platform windows/amd64 -ldflags \
 //	  "-s -w -X main.Version=0.1.4 -X main.WebRef=e6661c8"
 var (
-	Version = "0.1.36-dev"
+	Version = "0.1.37-dev"
 	WebRef  = "unpinned"
 )
 
@@ -643,18 +643,21 @@ func main() {
 			// once via the island's own guard (:29) — by design, so the deep
 			// link state matches the web app byte-for-byte.
 			//
-			// TWO document lanes (the v0.1.0/v0.1.1 dogfood lesson — ONE root
-			// cause, fixed in v0.1.2): Wails injects its runtime scripts
-			// (ipc.js + runtime.js — the window.go bindings) ONLY into
-			// "/"-suffix documents (assetserver.isRuntimeInjectionMatch), but
-			// the island's guard lands the WebView on /kanban, where they are
-			// never injected — window.go was missing on the page the user
-			// actually sees and every bridge call died with "bridge not wired".
-			// The aliased document therefore carries the runtime tags itself
-			// (KanbanIndexMiddleware); the true "/" keeps Wails' own injection.
-			// Both lanes put the live auth state on the <html> tag (the login
-			// card's visibility is a first-paint CSS decision, never a JS
-			// flash).
+			// THREE document lanes (the v0.1.0/v0.1.1 dogfood lesson — ONE root
+			// cause, fixed in v0.1.2; the S249 sprint round grew the third):
+			// Wails injects its runtime scripts (ipc.js + runtime.js — the
+			// window.go bindings) ONLY into "/"-suffix documents
+			// (assetserver.isRuntimeInjectionMatch), but the island's guard
+			// lands the WebView on /kanban, where they are never injected —
+			// window.go was missing on the page the user actually sees and
+			// every bridge call died with "bridge not wired". The aliased
+			// document therefore carries the runtime tags itself
+			// (KanbanIndexMiddleware); the true "/" keeps Wails' own
+			// injection. The S235 sprint page (/sprint.html — a second
+			// island document, not a "/"-suffix path) gets the same recipe
+			// through SprintMiddleware. Every lane puts the live auth state
+			// on the <html> tag (the login card's visibility is a
+			// first-paint CSS decision, never a JS flash).
 			Middleware: func(next http.Handler) http.Handler {
 				// THE MEDIA PROXY (the upload round's thumbnail
 				// half): the island loads shot tiles as
@@ -666,10 +669,32 @@ func main() {
 				media := bridge.MediaMiddleware(next)
 				root := bridge.IndexMiddleware(media)
 				kanban := bridge.KanbanIndexMiddleware(media)
+				// THE S249 SPRINT LANE (the "clicking Sprints
+				// sends me back to login" dogfood fix): the
+				// S235 sprint page is a SECOND island document,
+				// and its link (board-page.js's db-sprint-link →
+				// /sprint.html?project=…) navigates the WebView
+				// to a path the two lanes above never matched —
+				// it fell to the raw file server and was served
+				// VERBATIM: no data-desktop-authed on <html>
+				// (the fail-visible gate painted over a LIVE
+				// session — the reported "back to login") and
+				// no Wails runtime tags (window.go missing —
+				// every sprint-page bridge call died with
+				// "bridge not wired"). Same recipe as /kanban,
+				// minus the rewrite: the path stays
+				// /sprint.html and SprintMiddleware stamps the
+				// live auth state + the runtime tags onto the
+				// sprint document's own bytes.
+				sprint := bridge.SprintMiddleware(media)
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if p := r.URL.Path; p == "/kanban" || p == "/kanban.html" || p == "/board.html" {
 						r.URL.Path = "/"
 						kanban.ServeHTTP(w, r)
+						return
+					}
+					if r.URL.Path == "/sprint.html" {
+						sprint.ServeHTTP(w, r)
 						return
 					}
 					root.ServeHTTP(w, r)

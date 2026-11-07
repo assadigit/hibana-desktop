@@ -57,7 +57,10 @@ const htmlOpenTag = `<html lang="en">`
 // here). main.go aliases /kanban (+ /kanban.html, /board.html) to the root
 // document and serves them through KanbanIndexMiddleware, which adds these
 // tags; the true "/" keeps Wails' own injection (never duplicated — the
-// Contains guard below skips an already-injected document).
+// Contains guard below skips an already-injected document). The S235 sprint
+// page (/sprint.html — a SECOND island document, NOT a /"-suffix path) rides
+// the same rule through SprintMiddleware: without the tags every bridge call
+// on the sprint timeline dies the same v0.1.1 death.
 const wailsRuntimeScripts = `<script src="/wails/ipc.js"></script><script src="/wails/runtime.js"></script>`
 
 // InjectShellState rewrites the island's index.html bytes with the live
@@ -136,7 +139,7 @@ func InjectWailsRuntime(body []byte) []byte {
 // explicitly no-store. The Wails runtime scripts are NOT injected here — the
 // asset server's own top-level recorder handles "/" documents.
 func (a *API) IndexMiddleware(next http.Handler) http.Handler {
-	return a.indexMiddleware(next, false)
+	return a.indexMiddleware(next, false, "/", "/index.html")
 }
 
 // KanbanIndexMiddleware serves the root document for the /kanban entry
@@ -147,12 +150,42 @@ func (a *API) IndexMiddleware(next http.Handler) http.Handler {
 // actually boots on carries no window.go and every bridge call dies with
 // "bridge not wired".
 func (a *API) KanbanIndexMiddleware(next http.Handler) http.Handler {
-	return a.indexMiddleware(next, true)
+	return a.indexMiddleware(next, true, "/", "/index.html")
 }
 
-func (a *API) indexMiddleware(next http.Handler, injectWailsRuntime bool) http.Handler {
+// SprintMiddleware serves the S235-embedded sprint timeline document
+// (/sprint.html — board-page.js's db-sprint-link target, its OWN island
+// document with its own login-gate markup and the full desktop chain) with
+// the same live-auth + Wails-runtime injections as the kanban lane. The path
+// is NOT rewritten — the file server serves sprint.html itself; only the
+// shell state and the runtime tags are stamped onto its bytes.
+//
+// The S249 dogfood lesson ("clicking Sprints sends me back to login even
+// though I'm signed in"): the sprint page carries the identical fail-visible
+// login gate as the board, and the S235 embed wired its LINK + its probe but
+// never its SERVING lane — /sprint.html fell through to the raw file server,
+// which serves it verbatim: no data-desktop-authed (the gate paints over a
+// LIVE session — to the user, a redirect to login) and no /wails/ipc.js +
+// runtime.js (window.go missing — every sprint-page bridge call, including
+// the login form itself, dies with "bridge not wired"). One lane, same
+// recipe as /kanban: the auth state on the <html> tag at first paint, the
+// runtime tags as <head>'s first children, and no-store so the WebView can
+// never cache a stale gate state across a sign-in.
+func (a *API) SprintMiddleware(next http.Handler) http.Handler {
+	return a.indexMiddleware(next, true, "/sprint.html")
+}
+
+func (a *API) indexMiddleware(next http.Handler, injectWailsRuntime bool, docPaths ...string) http.Handler {
+	docs := make(map[string]struct{}, len(docPaths))
+	for _, p := range docPaths {
+		docs[p] = struct{}{}
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || (r.URL.Path != "/" && r.URL.Path != "/index.html") {
+		if r.Method != http.MethodGet {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if _, ok := docs[r.URL.Path]; !ok {
 			next.ServeHTTP(w, r)
 			return
 		}

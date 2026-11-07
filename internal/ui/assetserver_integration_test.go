@@ -20,6 +20,11 @@ package ui
 //
 // The v0.1.0 white board AND the v0.1.1 "The desktop bridge is not wired —
 // restart the app." dogfood report were both the /kanban lane's missing tags.
+// The S249 "clicking Sprints sends me back to login" report was the SAME
+// disease on the /sprint.html lane — S235 embedded the page but never wired
+// its serving path, so an authed user's sprint navigation was served verbatim
+// (gate over a live session + no runtime). The lane tests below hold all
+// three lanes to the contract.
 
 import (
 	"bytes"
@@ -137,10 +142,15 @@ func serveIsland(t *testing.T, a *API) http.Handler {
 	middleware := func(next http.Handler) http.Handler {
 		rootLane := a.IndexMiddleware(next)
 		kanbanLane := a.KanbanIndexMiddleware(next)
+		sprintLane := a.SprintMiddleware(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if p := r.URL.Path; p == "/kanban" || p == "/kanban.html" || p == "/board.html" {
 				r.URL.Path = "/"
 				kanbanLane.ServeHTTP(w, r)
+				return
+			}
+			if r.URL.Path == "/sprint.html" {
+				sprintLane.ServeHTTP(w, r)
 				return
 			}
 			rootLane.ServeHTTP(w, r)
@@ -221,6 +231,94 @@ func TestRootLaneKeepsWailsInjectionSingle(t *testing.T) {
 	}
 	if !strings.Contains(body, `data-desktop-authed="false"`) {
 		t.Fatal("/ must carry the auth state")
+	}
+}
+
+// TestSprintLaneCarriesTheRuntime — the S249 dogfood regression: the S235
+// sprint-page embed wired the LINK (board-page.js's db-sprint-link →
+// /sprint.html?project=…) and its probe, but never the SERVING lane — the
+// path fell through to the raw file server and was served VERBATIM, so an
+// AUTHED user clicking Sprints got the fail-visible login gate painted over
+// a live session ("it goes back to login even though I'm logged in") and a
+// dead bridge underneath (no window.go). The lane must serve the sprint
+// document ITSELF (not index.html) with the live auth state + the runtime
+// tags, exactly like the kanban lane.
+func TestSprintLaneCarriesTheRuntime(t *testing.T) {
+	_, _, a := loginFake(t)
+	h := serveIsland(t, a)
+
+	// Unauthed first: the gate is SUPPOSED to show here (fresh session).
+	rec := get(t, h, "/sprint.html?project=11111111-1111-4111-8111-111111111111")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/sprint.html status %d", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, need := range []string{
+		// The sprint document itself — NOT the board (index.html).
+		`<title>Sprints — Hibana</title>`,
+		`id="sp-timeline"`,
+		`id="sp-new-sprint"`,
+		// The desktop chain + the gate markup both live in sprint.html.
+		`<script src="/js/desktop-shim.js"></script>`,
+		`<script src="/js/desktop-login.js"></script>`,
+		`class="login-gate auth-page auth-split-page"`,
+		// The fresh-session stamp.
+		`data-desktop-authed="false"`,
+		// The runtime tags the raw lane never carried.
+		`<script src="/wails/ipc.js"></script>`,
+		`<script src="/wails/runtime.js"></script>`,
+	} {
+		if !strings.Contains(body, need) {
+			t.Fatalf("/sprint.html missing %q (head: %.200s)", need, body)
+		}
+	}
+	if strings.Count(body, "/wails/ipc.js") != 1 || strings.Count(body, "/wails/runtime.js") != 1 {
+		t.Fatalf("/sprint.html must carry the runtime tags exactly once (got ipc=%d runtime=%d)",
+			strings.Count(body, "/wails/ipc.js"), strings.Count(body, "/wails/runtime.js"))
+	}
+	// Parse order: ipc.js must precede the island's own desktop chain (the
+	// shim resolves window.go at USE time, but the tags must be first-head
+	// children exactly like Wails' own injection order).
+	ipcAt := strings.Index(body, "/wails/ipc.js")
+	shimAt := strings.Index(body, "js/desktop-shim.js")
+	loginAt := strings.Index(body, "js/desktop-login.js")
+	if !(ipcAt < shimAt && shimAt < loginAt) {
+		t.Fatalf("/sprint.html runtime order broken: ipc@%d shim@%d login@%d", ipcAt, shimAt, loginAt)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("/sprint.html Cache-Control %q", got)
+	}
+	// The authed <html> stamp replaces the verbatim marker — the verbatim
+	// tag on the wire is how the bug manifested (gate over a live session).
+	if strings.Contains(body, "<html lang=\"en\">") {
+		t.Fatal("/sprint.html was served VERBATIM — the shell state never landed (the S249 bug)")
+	}
+
+	// THE REPORTED SYMPTOM: an authed session clicks Sprints and must NOT
+	// be sent back to login — the same document, now stamped authed.
+	if _, err := a.Login("user@example.com", "pw"); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	rec = get(t, h, "/sprint.html?project=11111111-1111-4111-8111-111111111111")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/sprint.html (authed) status %d", rec.Code)
+	}
+	authedBody := rec.Body.String()
+	if !strings.Contains(authedBody, `data-desktop-authed="true"`) {
+		t.Fatal("/sprint.html must carry the live authed state after login — the gate would paint over a live session")
+	}
+	// Still the sprint document, still exactly one runtime pair.
+	if !strings.Contains(authedBody, `<title>Sprints — Hibana</title>`) {
+		t.Fatal("/sprint.html (authed) must still be the sprint document")
+	}
+	if strings.Count(authedBody, "/wails/ipc.js") != 1 {
+		t.Fatal("/sprint.html (authed) must not double the runtime tags")
+	}
+	// And the board lane still serves the BOARD (no cross-contamination
+	// from the sprint lane's path set).
+	rec = get(t, h, "/kanban")
+	if !strings.Contains(rec.Body.String(), `<script src="/js/board-page.js`) {
+		t.Fatal("/kanban must still serve the board document")
 	}
 }
 

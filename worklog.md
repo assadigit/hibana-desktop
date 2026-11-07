@@ -230,3 +230,75 @@ versioninfo.json ×4, make-portable.ps1, desktop.yml's dev placeholder) +
 WEB_REF 04218ca → 7f314e9 in desktop.yml (WEB_VERSION stays 0.4.1.43 — the
 feature branch never bumped the web package). Tag: v0.1.36-desktop
 (auto-release lane).
+
+## S249 — the sprint-page serving lane: "clicking Sprints sends me back to login" (0.1.37)
+
+**The report:** in the shipped desktop app, an AUTHED user clicks Sprints (the
+toolbar's db-sprint-link) and lands on the login card — "it goes back to login
+again, but it shouldn't because the user is already logged in." Behind the
+gate the page was also dead: the login form itself failed with "The desktop
+bridge is not wired — restart the app."
+
+**The root cause — ONE missing serving lane, the S235 embed's blind spot:**
+the desktop never opens hibana.ir; it serves the byte-pinned island from the
+embedded asset server, and every HTML document must be served through a
+middleware lane that stamps the LIVE auth state onto the <html> tag
+(data-desktop-authed — the login gate's visibility is a first-paint CSS
+decision, fail-visible by design) and splices the Wails runtime tags into
+<head> (ipc.js + runtime.js — Wails' own injector only fires for "/"-suffix
+documents, assetserver.isRuntimeInjectionMatch). v0.1.2 wired exactly TWO
+lanes: "/" (IndexMiddleware) and the /kanban aliases (KanbanIndexMiddleware).
+S235 then embedded sprint.html as a SECOND island document (its own login-gate
+markup, its own desktop chain, its own entry guard) and pointed
+board-page.js's db-sprint-link at /sprint.html?project=… — but the alias list
+in main.go was never extended. The WebView's /sprint.html navigation matched
+NO lane, fell through to the raw file server, and was served VERBATIM: no
+data-desktop-authed (the fail-visible gate painted over a LIVE session — the
+reported "back to login") and no runtime tags (window.go missing — every
+sprint-page bridge call, the login form included, died "bridge not wired").
+
+**Why the gates didn't catch it:** probe-sprint.mjs's mock server implements
+the INTENDED serving contract (serveDocument stamps data-desktop-authed and
+injects the runtime tags into /sprint.html — scripts/probe-sprint.mjs:91-99),
+so the browser probe was green while the production asset server never had
+the lane; assetserver_integration_test.go only covered the /kanban, / and
+asset paths. The mock was right, the server was wrong — the exact shape of
+gap a serving-lane test has to pin.
+
+**The fix (Go-side only — the island bytes are untouched, checksums hold):**
+internal/ui/authinject.go's indexMiddleware generalizes from the hardcoded
+"/" + "/index.html" pair to a path SET (variadic docPaths → a set lookup),
+and grows SprintMiddleware — /sprint.html, WITH the runtime injection, NO
+path rewrite (the file server serves sprint.html itself; only the shell state
+and the runtime tags are stamped onto its bytes). main.go's middleware
+dispatch grows the third lane between the kanban aliases and the root
+fallback. InjectShellState/InjectWailsRuntime work on sprint.html as-is (it
+carries the identical <html lang="en"> marker and a <head>), and the lane's
+no-store + conditional-header stripping keeps the WebView from caching a
+stale gate state across a sign-in — a login-from-expiry on the sprint page
+(location.reload keeps ?project=) now re-serves the document stamped authed.
+
+**The regression test — TestSprintLaneCarriesTheRuntime:** the Wails-dispatch
+replica (assetserver_integration_test.go) mirrors the new main.go contract
+and pins the lane: /sprint.html serves the SPRINT document (not index.html)
+with data-desktop-authed="false" when fresh, the runtime tags EXACTLY once
+and ordered (ipc.js before the desktop chain), no-store, and NO verbatim
+<html lang="en"> on the wire; after a.Login it serves
+data-desktop-authed="true" (the reported symptom, held as an assertion), and
+/kanban still serves the board (no lane cross-contamination).
+
+**The verification ladder:** go mod verify ✓, go vet ./... ✓ (linux AND
+GOOS=windows — Go 1.27.2 installed in the sandbox, the toolchain pin
+honored), go test ./... ALL GREEN (9 packages incl. the new lane test), plus
+a live wire-level harness (the real middleware + the real island bytes + the
+replica dispatch on a real socket): an authed /sprint.html?project=… serves
+<html … data-desktop-authed="true" data-desktop-theme="…"> + exactly one
+/wails/ipc.js + runtime.js pair + the Sprints title — and /kanban matches
+byte-for-byte semantics. probe-sprint re-run GREEN on the real island (all
+6 LEGs — the browser-level flow is unchanged; the mock and the server now
+agree). The other 13 probes ride the same untouched island bytes.
+
+**Versions:** 0.1.36 → 0.1.37 everywhere (wails.json, main.go,
+versioninfo.json ×4, make-portable.ps1, desktop.yml's dev placeholder). No
+island re-pin (PIN_REF stays 7f314e9 — zero frontend/dist bytes moved). Tag:
+v0.1.37-desktop (auto-release lane).
