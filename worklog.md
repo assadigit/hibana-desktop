@@ -422,3 +422,52 @@ The desktop sync stays on the DEFAULT board payload (the web spec's call — the
 mirror keeps `sprints[].description`; the conditional poll's ETag store is what
 BE-25's 304s ride). Adopting `lean=1` in the Go mirror is a later optional round
 (the doc endpoint `GET /api/sprints/:id/doc` is its fetch-on-open counterpart).
+
+## Session S256 — the CSS/asset diet, THE HEAVIEST re-pin (2026-11-09)
+
+**The round:** the desktop half of the web's S256 (hibana-source @ 6db3ae94,
+web v0.4.1.49 — audit remediation Phase 5: FE-5's per-page CSS bundles + FE-13's
+byte-equal-twin consolidation). The island's CSS manifest collapses 19 sheets →
+ONE `css/board-bundle.css` (board.html@pin carries a single stylesheet link —
+the island mirrors it exactly); the rtl-LAST contract (guide §3.1) moves INSIDE
+the bundle: rtl.css is its 19th and final PART, asserted by the new verifyDist
+tail-check that reads the pinned rtl.css bytes via git-show and demands the
+island's bundle ENDS with them. The devboard/claude-dark/polish-batch/quicknotes
+marker gates + the S238 weight gates now read the parts INSIDE the bundle
+(devboard is part 16 of 19, claude-dark 18, polish-batch 13, quicknotes 8).
+
+**What did NOT move:** devboard.js, chip-render.js and sprint-page.js are
+byte-untouched by the web round — so every HTML_STRIP_LINES anchor (the strip
+list is all web-chrome scripts, none bumped), every SEAM_PATCHES find-string
+and the 7+2/4/0 seam tripwire counts HELD without a single re-record. The only
+tag pins that moved are FE-13's carriers (board-page v36→v37,
+due-control v2→v3) + the one stylesheet link. island.checksums.json: 76 → 58
+files (18 sheets folded into the bundle).
+
+**DT-5 closed in the same edit** (the audit's Info finding, spec §8 step 6):
+the stale KNOWN-REMAINS block pruned — items 1/3/4 are long-closed (the shim
+has defined window.__hibanaMe since the M3 login round — i18n.js's
+/api/auth/me bootstrap prefers the hook; bridge.MediaMiddleware serves the
+/api/media/screenshots content URLs since v0.1.15; KanbanIndexMiddleware has
+owned the /kanban entry since v0.1.2) — item 2 (the lazy i18n-fa.js +
+image-resize.js static loaders) stays, reworded; and the v104/v105 comment
+drift fixed (the i18n.js injector literal has read /js/i18n-fa.js?v=105 since
+S250; the i18n-fa.js entry itself is v105, not v104).
+
+**The probes:** probe-focus / probe-sprintdeadline / probe-view /
+probe-uiredesign needles re-pinned to the bundle (the devboard.css /
+claude-dark-theme.css / polish-batch.css / quicknotes.css fetches now read
+`/css/board-bundle.css?v=1` — the content is provably inside it);
+**ALL 14 probes GREEN** on the real island bytes.
+
+**The release:** the push (f02c37c) fired the autorelease lane → the lockstep
+bump (6de0d2f5) → the windows runner built + published **v0.1.50-desktop**
+("island @ 6db3ae94" — the release notes carry the right web ref + version, the
+DT-1 lesson holding). Asset chain verified against the release's own
+checksums.txt: the portable zip e3d83802… MATCHES and the EMBEDDED hibana.exe
+afe11198… MATCHES its own line (the updater's chain proven against the real
+release, the S255 pattern).
+
+desktop.yml WEB_REF+WEB_VERSION twins moved together (6db3ae94 / 0.4.1.49).
+The web's probe-sw-synthesis contract (the SW synthesizing the bundles at
+install) is web-only — the island has no service worker, nothing to mirror.
