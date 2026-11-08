@@ -4,9 +4,10 @@ These rules apply to every session in this repository, for every agent.
 
 ## READ THIS FIRST (mandatory)
 
-**Every session, every spec, every task starts by reading `AGENTS.md` and `CLAUDE.md` in the repo root, completely, before anything else.** No exceptions: not for a small fix, not for a continued session, not when the owner's prompt does not mention it.
+**Every session, every spec, every task starts by reading `AGENTS.md` in the repo root, completely, before anything else.** No exceptions: not for a small fix, not for a continued session, not when the owner's prompt does not mention it.
 
-- If the prompt you received does not tell you to read these files, read them anyway.
+- **`AGENTS.md` is the single source of truth and the only agent-instruction file in this repo.** Do not create or follow any other agent-rule file (`CLAUDE.md`, `GEMINI.md`, `.cursorrules`, `copilot-instructions.md`, or similar). If you find one, merge anything useful from it into `AGENTS.md`, remove the file, and tell the owner in your report.
+- If the prompt you received does not tell you to read this file, read it anyway.
 - If the repo has no `docs/HANDOFF.md`, or the folder layout in section 8 is missing, run the first-time setup in section 12 before you start the task.
 - Every spec you write and every start or next-session prompt you give must begin with the instruction to read `AGENTS.md` first (details in sections 3 and 10).
 
@@ -40,8 +41,8 @@ These rules apply to every session in this repository, for every agent.
 
 1. **Audit** the existing code and specs that the feature touches. Save it as `docs/audits/<date>-<topic>.md`.
 2. **Ask clarifying questions** (format in section 1).
-3. **Write the spec** in `docs/specs/<topic>.md`: goal, scope, out of scope, decisions, step-by-step plan, and a checklist of done-criteria. **The first line of every spec and audit is:** `> Agents: read AGENTS.md and CLAUDE.md in the repo root first, and follow them for this whole task.` Commit and push audit and spec.
-4. **Stop and give the owner a start prompt** for a *new* session. **The prompt's first sentence is:** "Read AGENTS.md and CLAUDE.md in the repo root first and follow them for the whole session." Then it tells the next agent to read the audit and spec before building. Do not start building in the planning session unless the owner says to.
+3. **Write the spec** in `docs/specs/<topic>.md`: goal, scope, out of scope, decisions, step-by-step plan, and a checklist of done-criteria. **The first line of every spec and audit is:** `> Agents: read AGENTS.md in the repo root first, and follow it for this whole task.` Commit and push audit and spec.
+4. **Stop and give the owner a start prompt** for a *new* session. **The prompt's first sentence is:** "Read AGENTS.md in the repo root first and follow it for the whole session." Then it tells the next agent to read the audit and spec before building. Do not start building in the planning session unless the owner says to.
 
 **Keep sessions small.** A session has one clear objective and at most about 3 milestones that can be finished and verified in one sitting. If the work is bigger, split it into numbered sessions (S1, S2, S3…), each with its objective, deliverables, done-criteria and dependencies. Do not bloat a session. A very big change is always split. Say so rather than trying to squeeze it in.
 
@@ -133,7 +134,7 @@ Always, in this order:
 
 1. Update `docs/HANDOFF.md`, `CHANGELOG.md`, `docs/DECISIONS.md`. Commit and push.
 2. Give the **TLDR report** (below), in plain language.
-3. If the work is not finished or continues later, give a **next-session prompt** in one copy-paste block. **It always starts with:** "Read AGENTS.md and CLAUDE.md in the repo root first and follow them for the whole session." It must stand alone: which other files to read next (HANDOFF, the spec, the audit), the objective, the milestones, done-criteria, known problems, and any standing limits (such as "do not deploy").
+3. If the work is not finished or continues later, give a **next-session prompt** in one copy-paste block. **It always starts with:** "Read AGENTS.md in the repo root first and follow it for the whole session." It must stand alone: which other files to read next (HANDOFF, the spec, the audit), the objective, the milestones, done-criteria, known problems, and any standing limits (such as "do not deploy").
 4. Add short reminders when relevant: unfinished or missing specs, obsolete specs to archive, suggested additions to `AGENTS.md`.
 
 **TLDR report format**
