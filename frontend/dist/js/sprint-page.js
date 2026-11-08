@@ -275,7 +275,7 @@
             if (list) list.push(t.title)
             else days.set(i, [t.title])
           })
-          const docChecked = (String(s.description || '').match(/^- \[x\] /gm) || []).length
+          const docChecked = B().sprintDocChecked(s) // S255 (BE-3): reads doc_checked under the lean boot, folds description when present
           // S48p: category breakdown — count tasks per category in this sprint
           const catMap = new Map()
           assigned.forEach((t) => {
@@ -471,21 +471,14 @@
                 (isDone ? '<span class="sp-dot-check">✓</span>' : '') +
               '</div>'
             }).join('')
-            // Also render the full bars for ALL tasks but HIDDEN (opacity:0, pointer-events:none)
-            // — they're still draggable/editable via the sidebar. The visible graph is circles only.
-            const hiddenBars = visTasks.map((task, ti) => {
-              const a0 = tStart(task)
-              const t0 = clampIdx(a0 == null ? range.start : a0)
-              const t1 = clampIdx(tEnd(task))
-              const left = pctOf(t0)
-              const w = Math.max(pctOf(t1) - left, 0.8)
-              const cls = 'sp-bar st-' + task.status
-              return '<div class="' + cls + '" draggable="true" data-bar="' + task.id + '" data-task="' + task.id + '" ' +
-                'style="--bar-c:' + color + ';inset-inline-start:' + left + '%;inline-size:' + w + '%;inset-block-start:' + (5 + ti * 28) + 'px;opacity:0;pointer-events:none;height:0;overflow:hidden">' +
-                '<span class="sp-bar-title">' + B().esc(task.title) + '</span>' +
-              '</div>'
-            }).join('')
-            return '<div class="sp-lane" data-lane="' + (g.cat ? g.cat.id : 'none') + '" style="min-block-size:' + laneH + 'px">' + bars + hiddenBars + '</div>'
+            // S255 (FE-7 — the audit's timeline double-render): the hidden duplicate
+            // .sp-bar copies of every task are RETIRED. They were rendered at
+            // opacity:0 + pointer-events:none + height:0 — provably inert (no JS
+            // query reads .sp-bar; the dots carry the same data-bar/data-task drag
+            // + edit affordances; the [data-trim] grips they once hosted stopped
+            // existing renders ago) — pure dead DOM, one node per task on every
+            // render. The visible circles-only graph is untouched.
+            return '<div class="sp-lane" data-lane="' + (g.cat ? g.cat.id : 'none') + '" style="min-block-size:' + laneH + 'px">' + bars + '</div>'
           }).join('')
 
           tlEl.innerHTML =
@@ -516,7 +509,10 @@
         }
 
         const render = () => { computeRange(); renderSide(); renderTimeline(); renderDraft(); renderTimeNav(); renderFinishBtn(); renderStrategies(); renderSprintsList(); wrap.hidden = false; if (loading) loading.hidden = true }
-        const reload = async () => { await B().load(projectId); render() }
+        // S255 (BE-3): the reload rides the LEAN payload — the ☑ stat reads the
+        // derived doc_checked (sprintDocChecked), so nothing on this page needs
+        // the heavy description field on the re-pull either.
+        const reload = async () => { await B().load(projectId, { lean: true }); render() }
 
         // ---- Phase 5 item 7: the DRAFT sprint panel ---------------------------------
         // A defined-but-not-started sprint (started_at NULL) renders HERE — name (inline
@@ -2267,7 +2263,7 @@
           const injectAll = () => {
             if (injected || window.HibanaBoard) return
             injected = true
-            inject('/js/devboard.js?v=38') // keep in sync with the <head> tag + sw SHELL
+            inject('/js/devboard.js?v=39') // keep in sync with the <head> tag + sw SHELL
             if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali timeline for FA
           }
           const onResErr = (e) => {
@@ -2316,7 +2312,10 @@
             // wrapper made the load wait out the /api/auth/me + FA-dictionary dance
             // first (a serial waterfall on every cold visit; the render itself still
             // needs the language, so BOTH are awaited — no English flash for FA).
-            await Promise.all([B().load(projectId), i18nReady])
+            // S255 (BE-3): the boot rides the LEAN board payload (descriptions
+            // omitted, doc_checked derived) — the ☑ chip stat reads it through
+            // sprintDocChecked, identical render, fewer bytes on every boot.
+            await Promise.all([B().load(projectId, { lean: true }), i18nReady])
             render()
             document.getElementById('sp-title').textContent = B().state.project ? B().state.project.title : ''
             // S243 (Screen G's Settings entry): ?sprint=<id> deep-links the detail

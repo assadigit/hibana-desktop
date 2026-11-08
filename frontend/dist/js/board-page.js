@@ -825,7 +825,9 @@
           refreshSheet()
         }
 
-        const reload = async () => { await B().load(projectId); render() }
+        // S255 (BE-3): the reload rides the LEAN payload — the board renders nothing
+        // from sprints[].description, so the re-pull ships fewer bytes.
+        const reload = async () => { await B().load(projectId, { lean: true }); render() }
 
         // ---- S254 (FE-1b): the single-column repaint ---------------------------------
         // After a task mutation (patchTask/createTask/reorder/delete), the affected
@@ -1820,7 +1822,7 @@
           const injectAll = () => {
             if (injected || window.HibanaBoard) return
             injected = true
-            inject('/js/devboard.js?v=38') // keep in sync with the <head> tag + sw SHELL
+            inject('/js/devboard.js?v=39') // keep in sync with the <head> tag + sw SHELL
             if (!window.HibanaFocusCore) inject('/js/focus-core.js?v=2') // S237/S238: the focus + view decision core — keep in sync with the <head> tag
             if (!window.HibanaChips) inject('/js/chip-render.js?v=14') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
             if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA
@@ -1876,7 +1878,8 @@
               let last = null
               try { last = localStorage.getItem('hibana-kanban-last') } catch {}
               if (last) {
-                try { await B().load(last); projectId = last; preloaded = true }
+                // S255 (BE-3): the preload rides the LEAN payload (no description bytes).
+                try { await B().load(last, { lean: true }); projectId = last; preloaded = true }
                 catch (err) { if (!err || err.status !== 404) throw err }
               }
               if (!projectId) {
@@ -1901,8 +1904,10 @@
             // lazy FA dictionary fetch) BEFORE boot() even started the load, a serial
             // waterfall on every cold visit. The first render still waits for BOTH:
             // an FA user must never see an English flash (the S30 batch 5 rule).
+            // S255 (BE-3): the boot rides the LEAN board payload — descriptions are
+            // dead bytes on this surface; the sprint ☑ stat is a sprint-page fold.
             if (preloaded) { await i18nReady; render() }
-            else { await Promise.all([B().load(projectId), i18nReady]); render() }
+            else { await Promise.all([B().load(projectId, { lean: true }), i18nReady]); render() }
             recordBoard()
           } catch (err) {
             await i18nReady

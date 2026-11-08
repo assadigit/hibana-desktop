@@ -177,7 +177,7 @@ const server = http.createServer((req, res) => {
       if (rp === '/api/projects?sort=recent') {
         return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: JSON.stringify({ projects: probe.projects }) }))
       }
-      const m = /^\/api\/projects\/([^/]+)\/devboard$/.exec(rp)
+      const m = /^\/api\/projects\/([^/]+)\/devboard(\?lean=1)?$/.exec(rp)
       if (m) {
         return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: devboardPayload(probe.projects.find((x) => x.id === m[1]) || probe.projects[0]) }))
       }

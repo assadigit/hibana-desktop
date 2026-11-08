@@ -218,7 +218,7 @@ const server = http.createServer((req, res) => {
         probe.board.tasks.push(t)
         return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: JSON.stringify(t) }))
       }
-      m = /^\/api\/projects\/([^/]+)\/devboard$/.exec(rp)
+      m = /^\/api\/projects\/([^/]+)\/devboard(\?lean=1)?$/.exec(rp)
       if (m) {
         const found = probe.projects.find((x) => x.id === m[1])
         if (!found) return send(200, 'application/json', JSON.stringify({ status: 404, body: '{"error":"not_found"}' }))
@@ -321,12 +321,12 @@ async function main() {
       hasDueControl: !!(window.HibanaDueControl && typeof window.HibanaDueControl.create === 'function'),
       dueCtlTag: !!Array.from(document.querySelectorAll('script[src*="/js/due-control.js?v=2"]')).length,
       emojiTag: !!Array.from(document.querySelectorAll('script[src*="/js/emoji-picker.js?v=4"]')).length,
-      devboardTag: !!Array.from(document.querySelectorAll('script[src*="/js/devboard.js?v=38"]')).length,
-      boardPageTag: !!Array.from(document.querySelectorAll('script[src*="/js/board-page.js?v=35"]')).length,
+      devboardTag: !!Array.from(document.querySelectorAll('script[src*="/js/devboard.js?v=39"]')).length,
+      boardPageTag: !!Array.from(document.querySelectorAll('script[src*="/js/board-page.js?v=36"]')).length,
     }))
     check('the desktop chain loaded (hibanaFetch + hibana toast)', chain.hasFetch && chain.hasHibana, JSON.stringify(chain))
     check('js/due-control.js?v=2 loaded + window.HibanaDueControl.create (the S244 shared date control — S254 i18n-guard bump)', chain.hasDueControl && chain.dueCtlTag, JSON.stringify(chain))
-    check('js/emoji-picker.js?v=4 + devboard.js?v=38 + board-page.js?v=35 tags all present (the S254 carriers)', chain.emojiTag && chain.devboardTag && chain.boardPageTag, JSON.stringify(chain))
+    check('js/emoji-picker.js?v=4 + devboard.js?v=39 + board-page.js?v=36 tags all present (the S255 carriers)', chain.emojiTag && chain.devboardTag && chain.boardPageTag, JSON.stringify(chain))
 
     // The S248 carriers, from the REAL dist bytes.
     const devboardJs = fs.readFileSync(path.join(args.dist, 'js/devboard.js'), 'utf8')

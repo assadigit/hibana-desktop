@@ -165,7 +165,7 @@ const server = http.createServer((req, res) => {
         probe.tags = probe.tags.filter((t) => t.id !== src)
         return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: JSON.stringify({ ok: true }) }))
       }
-      const board = /^\/api\/projects\/([^/]+)\/devboard$/.exec(rp)
+      const board = /^\/api\/projects\/([^/]+)\/devboard(\?lean=1)?$/.exec(rp)
       if (board) {
         return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: devboardPayload() }))
       }

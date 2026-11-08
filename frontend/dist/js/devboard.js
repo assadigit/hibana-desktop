@@ -177,9 +177,14 @@
 
   const state = { projectId: null, project: null, tasks: [], categories: [], sprints: [], tags: [], task_deps: [], strategies: [] }
 
-  async function load(projectId) {
+  async function load(projectId, opts) {
     state.projectId = projectId
-    const data = await api('/api/projects/' + projectId + '/devboard')
+    // S255 (BE-3 — AUDIT-REMEDIATION-SPEC §7 step 1): the OPT-IN payload diet.
+    // { lean: true } rides ?lean=1 — sprints[].description is omitted and the tiny
+    // derived doc_checked rides instead (sprintDocChecked below reads BOTH shapes,
+    // so this library works against either payload; the desktop island's bridge
+    // fetch and the Go mirror's default-payload sync both stay decode-safe).
+    const data = await api('/api/projects/' + projectId + '/devboard' + (opts && opts.lean ? '?lean=1' : ''))
     state.project = data.project
     state.tasks = data.tasks
     state.categories = data.categories
@@ -216,6 +221,19 @@
   // Shared by the modal dropdown, the toolbar filter and the card sprint row —
   // one helper so every surface reads the same identity.
   const sprintGlyph = (s) => (s && s.emoji ? String(s.emoji) : '◆')
+  // S255 (BE-3): the ☑ doc-checked stat reads EITHER payload shape — the lean
+  // board's derived doc_checked (the server's exact twin of this fold) or, when
+  // the full description rides (the default payload), the island's own grammar.
+  // One seam: the sprint chip's "☑ N" stat never depends on which variant booted.
+  const sprintDocChecked = (s) => (s && s.doc_checked != null)
+    ? Number(s.doc_checked) || 0
+    : (String((s && s.description) || '').match(/^- \[x\] /gm) || []).length
+  // S255 (BE-3): the doc-fetch affordance — GET /api/sprints/:id/doc, the FULL
+  // sprint row (description included), riding the SAME api() choke point (the
+  // signal-wrapped GET contract + the desktop bridge seam — zero new fetch sites,
+  // the seam count stays 7). Consumers that need the heavy field (a doc preview,
+  // the desktop island's later lean adoption) fetch it ON OPEN, never per boot.
+  const sprintDoc = (id) => api('/api/sprints/' + id + '/doc')
   // S242 (spec §8/§5.4): completed check for the assignment rules — status is
   // authoritative post-0065; ended_at is the lock-step belt (the invariant keeps
   // ended_at NOT NULL ⇔ completed, so a lagging null-status row still reads right).
@@ -3175,6 +3193,10 @@
     // and project.html share ONE implementation (spec §18 — no forking).
     pauseSprint, resumeSprint,
     sprintGlyph, sprintCompleted, sprintStatusOf, sprintLaneCounts,
+    // S255 (BE-3): the payload-diet stack — the both-shapes ☑ fold + the doc-fetch
+    // affordance (the choke-point rider). Exported so every sprint surface reads
+    // the stat through ONE seam regardless of which payload variant booted.
+    sprintDocChecked, sprintDoc,
     // S244 (spec pack Phase 5 — §12): the shared deadline RENDER stack — the
     // classification (§12.3 thresholds, client-side rendering of the
     // server-resolved triple), the elapsed-time ratio (§12.2, from the payload's

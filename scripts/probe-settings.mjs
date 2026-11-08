@@ -289,7 +289,7 @@ const server = http.createServer((req, res) => {
       if (rp === '/api/projects?sort=recent') {
         return send(200, 'application/json', JSON.stringify({ status: 200, etag: null, body: JSON.stringify({ projects: probe.projects }) }))
       }
-      const m = /^\/api\/projects\/([^/]+)\/devboard$/.exec(rp)
+      const m = /^\/api\/projects\/([^/]+)\/devboard(\?lean=1)?$/.exec(rp)
       if (m) {
         const found = probe.projects.find((x) => x.id === m[1])
         if (!found) return send(200, 'application/json', JSON.stringify({ status: 404, body: '{"error":"not_found"}' }))
