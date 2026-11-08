@@ -1,7 +1,7 @@
-Desktop 0.1.49 — auto-release: every update to main ships a release.
+Desktop 0.1.50 — auto-release: every update to main ships a release.
 
-Changes since v0.1.48-desktop:
+Changes since v0.1.49-desktop:
 
-- docs(worklog): the S255 re-pin close — the island @ 8ef1ffa9 (web v0.4.1.48), the payload & network diet round; ALL 14 probes green (the 12 mock bridges learned the lean query — the real Go bridge needed nothing); v0.1.48-desktop building
+- chore(island): S256 re-pin — THE HEAVIEST of the plan: the island moves to 6db3ae94 @ web v0.4.1.49 (the CSS/asset diet round: FE-5's per-page bundles — board.html@pin carries ONE stylesheet link now, so the island's CSS manifest collapses 19 sheets → css/board-bundle.css, the exact concatenation in the exact order with rtl.css LAST as the bundle's final PART, asserted by the new verifyDist tail-check against the pinned rtl.css bytes; the devboard/claude/polish/quicknotes marker gates + the S238 weight gates now read the parts INSIDE the bundle; FE-13's esc-twin consolidation bumped board-page v37 + due-control v3 — devboard.js/chip-render.js/sprint-page.js byte-untouched, so every strip/seam anchor + the 7+2/4/0 seam counts HELD); DT-5 closed in the same edit (the stale KNOWN-REMAINS items 1/3/4 pruned — __hibanaMe lives in the shim since the M3 login round, MediaMiddleware since v0.1.15, KanbanIndexMiddleware since v0.1.2; item 2 stays reworded; + the v104/v105 comment drift fixed — the injector literal has read ?v=105 since S250); island.checksums 76→58 files; desktop.yml WEB_REF+WEB_VERSION twins → 6db3ae94/0.4.1.49; ALL 14 probes GREEN on the real island bytes (probe-focus/sprintdeadline/view/uiredesign needles re-pinned to the bundle)
 
-Embedded web island: hibana-source 8ef1ffa9 (v0.4.1.48). Sign in with your hibana.ir account; once you sign in, the kanban loads, and a live session boots straight to the board. See checksums.txt.
+Embedded web island: hibana-source 6db3ae94 (v0.4.1.49). Sign in with your hibana.ir account; once you sign in, the kanban loads, and a live session boots straight to the board. See checksums.txt.
