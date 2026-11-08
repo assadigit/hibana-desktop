@@ -170,3 +170,104 @@ Run this at the start of the first session in a repo, or whenever the folder lay
 6. **List unfinished and obsolete specs** in `docs/HANDOFF.md`. Compare every spec with the real code, and list what is missing, half-built or outdated.
 7. **Commit and push** each step as you go.
 8. **End with the TLDR report** from section 10.
+
+## 13. Root tidy-up procedure (standing instruction)
+
+The owner uploads files into the root of repositories without organizing them. When the root needs tidying, follow this procedure end to end, yourself, from start to finish.
+
+### CONFIGURATION (edit only if the owner wants something different)
+
+- **REPOS_TO_TIDY:** the current repository. If given access to several repositories, do them one by one, each on its own.
+- **WORK_ON_BRANCH:** create a new branch called `chore/tidy-root` in each repo. Never work directly on `main` or `master`.
+- **OPEN_PULL_REQUEST:** yes (if you can). If not, just push the branch.
+- **FILES_ALLOWED_AT_ROOT_EXTRA:** none (add any file names here that the owner wants to keep at root).
+- **DELETE_FILES:** never. Move or archive only.
+- **CREATE_NEW_FOLDERS:** only when truly necessary (see STEP 3).
+- **ASK_ME_QUESTIONS:** no. Decide on your own using the rules below. If something is truly risky, leave it where it is and list it in the final report.
+
+### YOUR JOB
+
+Tidy up the root of the repository so that only the important files remain there, and every other file lives in a sensible folder that fits that project's own structure. Important files such as AGENTS.md must be easy to see at the root.
+
+### STEP 1: UNDERSTAND THE PROJECT FIRST
+
+Before moving anything:
+
+- List every file and folder in the whole repository, not just the root.
+- Read README, `package.json` / `pyproject.toml` / `requirements.txt` / `go.mod` / `wrangler.toml` / `composer.json` / any build or deploy config, and any CI files (`.github/workflows`).
+- Work out what kind of project it is (WordPress plugin, Python tool, Cloudflare Worker, desktop app, web app, Go app, etc.).
+- Write down (for yourself) a map of every folder that already exists and what it is used for. You will use this map in STEP 3.
+
+### STEP 2: WHAT MUST STAY AT ROOT
+
+Keep these at root (only the ones that exist):
+
+- AGENTS.md and any other agent rules file (per the READ THIS FIRST section, AGENTS.md is the only agent-instruction file — never create another)
+- README, LICENSE, CHANGELOG, CONTRIBUTING, SECURITY
+- `.gitignore`, `.gitattributes`, `.editorconfig`, `.env.example`
+- Dependency and build files that tools require at root: `package.json`, `package-lock.json`, `pyproject.toml`, `requirements.txt`, `go.mod`, `go.sum`, `composer.json`, `Makefile`, `Dockerfile`, `docker-compose.yml`, `wrangler.toml`, vite/webpack/tsconfig/eslint/prettier configs, and the main plugin file of a WordPress plugin
+- Hidden config folders: `.github`, `.vscode`, `.claude` and similar
+- The main source folders (src, app, lib, etc.)
+- Anything listed in FILES_ALLOWED_AT_ROOT_EXTRA
+
+AGENTS.md must be the most visible thing: make sure it sits at root and is not buried or duplicated. If there are several copies or variants, keep the newest one at root and move the others into the project's existing archive folder (or, if none exists, see STEP 3).
+
+### STEP 3: WHERE THINGS GO (REUSE FIRST, CREATE LAST)
+
+This is the most important rule for choosing folders:
+
+**RULE A. Use the project's existing structure first.** For every file that leaves the root, look at the folder map from STEP 1 and put the file into the existing folder that already serves that purpose, even if the folder name is different from what you would have chosen. Examples:
+
+- If specs and documents already live in a folder called `spec`, put new spec and document files there. Do NOT create `docs` or `documents-and-specs` next to it.
+- If images already live in `img`, `images`, `static` or `public`, use that. Do NOT create `assets`.
+- If scripts already live in `tools` or `bin`, use that. Do NOT create `scripts`.
+- If there is already an `old`, `backup` or `archive` folder, use it. Do NOT create `docs/archive`.
+
+**RULE B. Never create overlapping or duplicate folders.** Before creating any folder, check if an existing folder, under any name, already covers the same kind of content. If one does, use it. Never end up with two folders that mean the same thing (for example `docs` and `documentation`, or `scripts` and `tools` doing the same job).
+
+**RULE C. Create a new folder only if all of these are true:**
+1. No existing folder covers that kind of file.
+2. There are enough files of that kind to justify a folder (a single stray file can go into the closest existing folder instead).
+3. The new folder name follows the naming style the project already uses (lowercase or capitalized, singular or plural, etc.).
+
+**RULE D. Keep it flat.** Do not create sub-folders unless the files truly need them. One level is the default. Do not add nested folders such as `docs/archive/old` just for neatness.
+
+**RULE E. If no structure exists at all** (a brand-new messy repo), use the normal convention for that project type, and keep it as small as possible. Common choices: `docs`, `scripts`, `assets`, `data`, `tests`, `config`, `archive`. Create only the ones you actually need.
+
+**RULE F. When unsure where a file belongs**, put it in the closest existing folder, or the existing archive folder, and mention it in the report. Never leave a file at root just because you are unsure.
+
+### STEP 4: DO NOT BREAK ANYTHING
+
+This matters more than tidiness. For every file you move:
+
+- Use `git mv` so history is kept.
+- Search the whole repo for references to that file (imports, require, includes, paths in scripts, README links, CI workflows, Dockerfile, config files, WordPress include/require paths) and update them so everything still works.
+- Never move a file that a tool or platform requires at a fixed location (for example `wrangler.toml`, the WordPress main plugin file, workflow files, `package.json`). When in doubt, leave it.
+- Never touch, print, or move secrets (`.env`, keys, tokens). If a secret is committed in the repo, do not copy it anywhere. Add it to the final report as a warning.
+- Never delete anything.
+- Never rewrite file contents except to fix paths after a move.
+- Do not rename or reorganize folders that already exist. Only add files into them.
+
+### STEP 5: CHECK YOUR WORK
+
+After moving:
+
+- Run the project's build, tests, or at least a syntax/import check (for example: `npm run build`, `python -m py_compile`, `go build`, `php -l`).
+- Check that no broken paths remain by searching for the old file names.
+- Check that the root now contains only the allowed items from STEP 2.
+- Check that you did not create any folder that overlaps with an existing one. If you did, merge it into the existing folder.
+- If a check fails, fix it or undo that specific move.
+
+### STEP 6: COMMIT AND REPORT
+
+- Make small, clear commits (for example `chore: move loose specs into spec/`, `chore: move old backups into archive/`).
+- Push the branch and open a pull request if possible.
+- Finish with a short plain-language report (no technical jargon):
+  1. What the root looked like before and after (two short lists)
+  2. Where each moved file went and why (one line each)
+  3. Any new folder you created and why none of the existing folders could be used (if you created none, say so)
+  4. Any path references you updated
+  5. Anything you left alone and why
+  6. Any warnings (committed secrets, duplicate files, broken things you could not fix)
+
+Start when the owner asks for a tidy-up, and do not stop until every repository's root is clean and verified.
