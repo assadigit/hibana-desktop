@@ -274,8 +274,9 @@ async function main() {
     }))
     check('the desktop chain loaded (theme → shim → audio → login; hibanaFetch + __hibanaPage + hibana)', chain.hasFetch && chain.hasPage && chain.hasHibana && chain.hasAudio && chain.hasTheme, JSON.stringify(chain))
     check('js/focus-core.js loaded (window.HibanaFocusCore + the <script> tag)', chain.hasFocusCore && chain.focusTag, JSON.stringify(chain))
-    const devCss = await page.evaluate(() => fetch('/css/devboard.css?v=38').then((r) => r.text()))
-    check('css/devboard.css?v=38 carries the focus recipe (.db-dim + the sheet + the <800px hide)',
+    // S256 (FE-5): devboard.css rides INSIDE board-bundle.css (part 16 of 19)
+    const devCss = await page.evaluate(() => fetch('/css/board-bundle.css?v=1').then((r) => r.text()))
+    check('css/board-bundle.css?v=1 carries the focus recipe (.db-dim + the sheet + the <800px hide, inside the devboard part)',
       devCss.includes('.db-cols[data-focus-active] .pd-col.db-dim') && devCss.includes('.db-focus-overlay') && devCss.includes('@media (max-width: 799px)'),
       'len=' + devCss.length)
     await page.screenshot({ path: path.join(args.out, '00-leg1-chain.png') })

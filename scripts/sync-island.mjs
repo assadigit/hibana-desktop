@@ -175,8 +175,19 @@ import { fileURLToPath } from 'node:url'
 // internal/store/schema.go) + the payload's 8th key decoded verbatim
 // (internal/api/types.go + internal/sync/convert.go). The version ladder:
 // 0.1.37 → 0.1.38.
-const PIN_REF = '8ef1ffa9'
-const PIN_PACKAGE_VERSION = '0.4.1.48'
+// S256 (audit remediation Phase 5 — the CSS/asset diet): the pin moved to 6db3ae94
+// (web v0.4.1.49) — THE HEAVIEST RE-PIN of the plan: board.html@pin carries ONE
+// stylesheet link now (/css/board-bundle.css?v=1 — FE-5's per-page bundle, the
+// deterministic concatenation of the exact 19-sheet set in the exact order), so the
+// island's CSS manifest collapses 19 files → 1 (the island mirrors board.html's
+// head; the rtl-last contract moves INSIDE the bundle — rtl.css is its LAST part,
+// asserted by the new verifyDist tail-check). FE-13's twin consolidation touched
+// board-page.js (v36→v37), due-control.js (v2→v3) and project-page.js (web-only,
+// not in the island); devboard.js + chip-render.js + sprint-page.js are
+// byte-untouched, so every strip/seam anchor held. DT-5 closed in the same edit:
+// the stale KNOWN-REMAINS items pruned + the v104/v105 comment drift fixed.
+const PIN_REF = '6db3ae94'
+const PIN_PACKAGE_VERSION = '0.4.1.49'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -190,25 +201,13 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 // rtl.css:6). The ?v= cache-bust query strings live in index.html (kept verbatim); the
 // asset server ignores them.
 const CSS_SHEETS = [
-  'css/variables.css',      // ?v=27 — @imports vazir + general-sans font-face.css (:38/:45)
-  'css/base.css',           // ?v=14
-  'css/layout.css',         // ?v=67
-  'css/dashboard.css',      // ?v=43
-  'css/dashboard-todo.css', // ?v=25
-  'css/components.css',     // ?v=9  — owns the .toast recipe's styles (:252-319)
-  'css/canvas.css',         // ?v=11
-  'css/quicknotes.css',     // ?v=51 — the .pd-detail slide-over + the S238 .pd-detail-prio weight drop (400)
-  'css/to-do-list.css',     // ?v=13
-  'css/polish-ui.css',      // ?v=39 — toast animations/positioning (:325, :582)
-  'css/calendar.css',       // ?v=10
-  'css/notifications.css',  // ?v=12
-  'css/polish-batch.css',   // ?v=30 — .toast-msg unicode-bidi (:644) + the S238 .prio-banner weight drop (400)
-  'css/project-header.css', // ?v=50 — the .pd-col column anatomy
-  'css/devboard.css',       // ?v=39 — the .db-frame mother container (S207) + the redesign (S230) + the polish pass (S231) + the focus mode (S237) + the view/sheet polish (S238: blur+greyscale backdrops, the 800×600 sheet, .db-view-*)
-  'css/misc.css',           // ?v=24
-  'css/themes.css',         // ?v=9  — the explicit LIGHT token block
-  'css/claude-dark-theme.css', // ?v=31 — html[data-theme='claude-dark']
-  'css/rtl.css',            // ?v=5  — LAST (the contract)
+  // S256 (FE-5): the island's CSS manifest is the ONE per-page bundle — the exact
+  // concatenation of board.html's previous 19-sheet <link> set, in the exact
+  // order, GENERATED + committed on the web side (scripts/build.mjs; freshness
+  // gated by the web's check-css-bundles.mjs). The LOAD ORDER contract (guide
+  // §3.1) is unchanged in meaning: rtl.css is still LAST — now as the bundle's
+  // last PART (verifyDist asserts the bundle's tail IS rtl.css's content).
+  'css/board-bundle.css',   // ?v=1 — contains variables→base→layout→dashboard→dashboard-todo→components→canvas→quicknotes→to-do-list→polish-ui→calendar→notifications→polish-batch→project-header→devboard(v46)→misc→themes→claude-dark-theme(v32)→rtl LAST
 ]
 
 // Font CSS + every woff2 those files reference, so @font-face URLs resolve inside the
@@ -251,8 +250,8 @@ const JS_FILES = [
   'js/emoji-picker.js',    // v4 (S248 re-pin @ 7f314e9, S243 NEW) — the sprint emoji picker (the §4.2 identity token). NEW to the island manifest this round — board.html + sprint.html @ the pin carry its own <script> tag (kept verbatim). ZERO fetch.
   'js/sprint-page.js',     // v28 (S250 re-pin @ 6dd40c0) — the /sprint.html page; the S235 embed + the S243 sprint management surface (the lifecycle-grouped overview, the settings panel, the conflict/finish modals — all through window.HibanaBoard, ZERO direct fetch). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
   'js/i18n-en.js',         // v111 (S250 re-pin @ 6dd40c0) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign keys + db.view.* (S238) + the S242-S247 feature keys (the sprint dropdown/quick-create, the deadline engine + presets + thresholds, the extension flows, the deps section + badges)
-  'js/i18n.js',            // v164 (S250 re-pin @ 6dd40c0) — the i18n layer; NOTE: kept VERBATIM (see KNOWN-REMAINS below — its lazy injector literal now reads /js/i18n-fa.js?v=104)
-  'js/i18n-fa.js',         // v104 (S248 re-pin @ 7f314e9) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA keys + db.view.* FA (S238) + the S242-S247 feature keys (written Persian, parity 1678=1678)
+  'js/i18n.js',            // v164 (S250 re-pin @ 6dd40c0) — the i18n layer; kept VERBATIM; its lazy injector literal reads /js/i18n-fa.js?v=105 (S250 bumped the dictionary; see KNOWN-REMAINS below)
+  'js/i18n-fa.js',         // v105 (S250 re-pin @ 6dd40c0) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA keys + db.view.* FA (S238) + the S242-S247 feature keys + the st.* strategies keys (written Persian, parity 1678=1678)
   'js/image-resize.js',    // v1 — the LAZY ≤1600px WebP prepare pass (devboard.js:307-319)
   'vendor/jalaali.min.js', // Jalali dates for FA (devboard.js calOf)
 ]
@@ -285,28 +284,18 @@ const EMPTY_STATE_ICONS = [
 const COPY_MANIFEST = [...CSS_SHEETS, ...FONT_CSS, ...FONT_FILES, ...JS_FILES, ...LOGIN_ASSETS, ...EMPTY_STATE_ICONS]
 
 // ---------------------------------------------------------------------------
-// KNOWN-REMAINS (documented, deliberate — each is a same-origin call the guide's §4.1
-// seam list does NOT cover; all are guarded and degrade cleanly inside the island):
+// KNOWN-REMAINS (documented, deliberate). S256/DT-5 PRUNE: items 1, 3 and 4 of the
+// old list are CLOSED and were removed — (1) i18n.js's /api/auth/me bootstrap: the
+// shim has defined window.__hibanaMe since the M3 login round (i18n.js:69-77 prefers
+// the hook; the direct fetch never fires on the island anymore); (3) the
+// /api/media/screenshots content URLs: bridge.MediaMiddleware serves them since
+// v0.1.15 (M4 — thumbnails load like the web's); (4) the /kanban entry routing:
+// KanbanIndexMiddleware aliases the entry since v0.1.2 (M2). The one remaining note:
 //
-//  1. i18n.js:73 `fetch('/api/auth/me')` — the language bootstrap. Guide §4.1 lists
-//     exactly 12 sites (devboard.js + board-page.js); i18n.js is copied verbatim.
-//     In the island: window.__hibanaMe is absent (app.js stripped) → the direct fetch
-//     hits the asset server → non-ok → me = null → the try/catch falls back to
-//     navigator.language (i18n.js:81-82). M3's auth work takes language resolution
-//     over Go-side WITHOUT touching the island: define window.__hibanaMe (the very
-//     hook i18n.js:69 prefers) from a Go binding.
-//  2. i18n.js:49-60 (dynamic <script> /js/i18n-fa.js?v=104) and devboard.js:307-319
+//  1. i18n.js:49-60 (dynamic <script> /js/i18n-fa.js?v=105) and devboard.js:307-319
 //     (dynamic <script> /js/image-resize.js?v=1) — STATIC-ASSET loaders over HTTP to
 //     same-origin paths. The Wails asset server serves them same-origin; left
 //     untouched by design (they are not /api traffic).
-//  3. devboard.js:511/:514/:622/:624/:713/:715 + board-page.js — <img>/<video>/href
-//     pointing at /api/media/screenshots/:id/file (content URLs, NOT fetch()). Media
-//     serving is M4's work (guide §5.4); the markup stays verbatim.
-//  4. board-page.js:29 `location.replace('/kanban')` (bare-entry guard) and :953
-//     `href = '/project.html?id='` — navigation, not network. The desktop shell owns
-//     entry routing: either launch the WebView with ?project=<id>, or alias /kanban →
-//     index.html in the Wails AssetServer handler (main.go, M2). Flagged for the M2
-//     shell owner; NOT patched here (outside the guide's recorded patch list).
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -5811,13 +5800,15 @@ function readDistText(outDir, rel) {
   }
 }
 
-function verifyDist(outDir, fileMap) {
+function verifyDist(outDir, fileMap, src) {
   const problems = []
   const devboard = fileMap['js/devboard.js']
   const boardPage = fileMap['js/board-page.js']
   const indexHtml = fileMap['index.html']
   const sprintHtml = fileMap['sprint.html'] || ''
-  const devboardCss = fileMap['css/devboard.css'] || ''
+  // S256: devboard.css's bytes live INSIDE css/board-bundle.css now (the 16th of
+  // 19 parts); every devboard marker check reads the bundle.
+  const devboardCss = fileMap['css/board-bundle.css'] || ''
 
   // (1z) THE UI-REDESIGN ISLAND SET (hibana-kanban-ui-redesign-handoff @ 073bb95 —
   // the base round aee9acf + the S230 completion): the empty-state illustrations
@@ -5835,7 +5826,7 @@ function verifyDist(outDir, fileMap) {
     if (!boardPage.includes(marker)) problems.push('js/board-page.js: the UI-redesign marker missing: "' + marker + '"')
   }
   for (const marker of ['main.board-shell .db-frame > .db-board', '.pd-empty-icon', '.db-col-menu', '.db-hint', 'data-theme="claude-dark"] .pd-empty-icon']) {
-    if (!devboardCss.includes(marker)) problems.push('css/devboard.css: the UI-redesign marker missing: "' + marker + '"')
+    if (!devboardCss.includes(marker)) problems.push('css/board-bundle.css: the UI-redesign marker missing (inside the devboard part): "' + marker + '"')
   }
 
   // (1) the seam took, exactly (guide §4.1: 7 fetch sites + 2 XHR in devboard; 4 in board-page).
@@ -5901,7 +5892,15 @@ function verifyDist(outDir, fileMap) {
   if (JSON.stringify(links) !== JSON.stringify(expectedLinks)) {
     problems.push('index.html CSS manifest mismatch:\n    expected: ' + JSON.stringify(expectedLinks) + '\n    actual:   ' + JSON.stringify(links))
   }
-  if (links[CSS_SHEETS.length - 1] !== '/css/rtl.css') problems.push('index.html: rtl.css is not the last ISLAND /css/ sheet (the desktop-owned sheets follow it)')
+  // S256: rtl-last moved INSIDE the bundle — assert the island's board-bundle.css
+  // ENDS with the pinned rtl.css's own content (its bytes are the bundle's tail).
+  {
+    const bundleCss = (fileMap['css/board-bundle.css'] || '').trimEnd()
+    const rtlCss = gitShow(src, PIN_REF, 'css/rtl.css').toString('utf8').trim()
+    if (!rtlCss || !bundleCss.endsWith(rtlCss)) {
+      problems.push('css/board-bundle.css: the bundle does not END with rtl.css\'s content — the rtl-LAST contract (guide §3.1) is broken')
+    }
+  }
   // The blocking head chain (v0.1.5 + v0.1.6 + v0.1.9 + v0.1.11 + v0.1.12 + v0.1.13 + v0.1.17 grew it): the pre-paint theme
   // bootstrap FIRST, then the transport shim, the sound engine (it wraps the
   // seam the shim just defined), the login controller, the sync
@@ -6344,7 +6343,7 @@ function verifyDist(outDir, fileMap) {
     if (!boardPage.includes(kept)) problems.push('js/board-page.js: the S237 focus layer is missing "' + kept + '"')
   }
   for (const kept of ['.db-cols[data-focus-active] .pd-col.db-dim', '.db-focus-overlay', '.db-focus-cards.db-cols', '@media (max-width: 799px)']) {
-    if (!devboardCss.includes(kept)) problems.push('css/devboard.css: the S237 focus recipe is missing "' + kept + '"')
+    if (!devboardCss.includes(kept)) problems.push('css/board-bundle.css: the S237 focus recipe is missing (inside the devboard part): "' + kept + '"')
   }
   for (const kept of ['id="db-settings-focus-seg"', 'data-seg-focus="on"', 'data-seg-focus="off"', 'id="db-settings-focus-hint"', 'id="db-settings-focus-label"']) {
     if (!indexHtml.includes(kept)) problems.push('index.html: the S237 focus-mode settings row is missing "' + kept + '"')
@@ -6369,11 +6368,13 @@ function verifyDist(outDir, fileMap) {
     // the patched trio enters the map; the manifest files are all on disk by
     // the time verifyDist runs).
     const readDist = (rel) => fs.existsSync(path.join(outDir, rel)) ? fs.readFileSync(path.join(outDir, rel), 'utf8') : ''
-    const polishCss = readDist('css/polish-batch.css')
-    const quickCss = readDist('css/quicknotes.css')
+    // S256 (FE-5): polish-batch + quicknotes ride INSIDE css/board-bundle.css (parts
+    // 13 + 8); the S238 weight gates read them from the bundle's bytes.
+    const bundleCssAll = readDist('css/board-bundle.css')
+    const polishCss = bundleCssAll
+    const quickCss = bundleCssAll
     const focusCore = readDist('js/focus-core.js')
-    if (!polishCss) problems.push('css/polish-batch.css: missing from dist (the S238 weight gate cannot run)')
-    if (!quickCss) problems.push('css/quicknotes.css: missing from dist (the S238 weight gate cannot run)')
+    if (!bundleCssAll) problems.push('css/board-bundle.css: missing from dist (the S238 weight gate cannot run)')
     if (!focusCore) problems.push('js/focus-core.js: missing from dist (the S238 escPeel gate cannot run)')
     for (const kept of ['openTaskView', 'db-view-overlay', 'data-db-view-x', 'data-db-view-edit', 'data-db-view-copy', 'data-db-sheet-copy', 'escPeel', 'viewIsOpen', 'injectSheetCopyRows', "querySelectorAll('.db-card-menu[data-ok]')"]) {
       if (!boardPage.includes(kept)) problems.push('js/board-page.js: the S238 view layer is missing "' + kept + '"')
@@ -6382,29 +6383,29 @@ function verifyDist(outDir, fileMap) {
     if (boardPage.includes('B().openEditor(card.dataset.taskCard')) problems.push('js/board-page.js: the card click must open the VIEW, not the editor (S238)')
     if (!boardPage.includes('openTaskView(card.dataset.taskCard')) problems.push('js/board-page.js: the card click must route through openTaskView (S238)')
     for (const kept of ['.db-view-overlay', '.db-view-card', '.db-view-foot', '.db-sheet-copy', 'backdrop-filter: blur(4px) grayscale(1)', 'inline-size: min(50rem, 100%)', 'block-size: min(37.5rem, 100%)']) {
-      if (!devboardCss.includes(kept)) problems.push('css/devboard.css: the S238 view/sheet recipe is missing "' + kept + '"')
+      if (!devboardCss.includes(kept)) problems.push('css/board-bundle.css: the S238 view/sheet recipe is missing (inside the devboard part): "' + kept + '"')
     }
     {
       const banner = polishCss.match(/\.prio-banner \{[^}]+\}/)
-      if (!banner) problems.push('css/polish-batch.css: the .prio-banner rule is missing')
-      else if (!banner[0].includes('font-weight: 400')) problems.push('css/polish-batch.css: the .prio-banner must read font-weight: 400 (the S238 owner ask)')
+      if (!banner) problems.push('css/board-bundle.css: the .prio-banner rule is missing (inside the polish-batch part)')
+      else if (!banner[0].includes('font-weight: 400')) problems.push('css/board-bundle.css: the .prio-banner must read font-weight: 400 (the S238 owner ask, inside the polish-batch part)')
       const pill = quickCss.match(/\.pd-detail-prio \{[^}]+\}/)
-      if (!pill) problems.push('css/quicknotes.css: the .pd-detail-prio rule is missing')
-      else if (!pill[0].includes('font-weight: 400')) problems.push('css/quicknotes.css: the .pd-detail-prio must read font-weight: 400 (the S238 owner ask)')
+      if (!pill) problems.push('css/board-bundle.css: the .pd-detail-prio rule is missing (inside the quicknotes part)')
+      else if (!pill[0].includes('font-weight: 400')) problems.push('css/board-bundle.css: the .pd-detail-prio must read font-weight: 400 (the S238 owner ask, inside the quicknotes part)')
     }
     if (!focusCore.includes('escPeel')) problems.push('js/focus-core.js: the S238 escPeel decision is missing')
     if (!indexHtml.includes('/js/focus-core.js?v=2')) problems.push('index.html: the focus-core.js tag must read ?v=2 (the S238 bump)')
-    if (!indexHtml.includes('/js/board-page.js?v=36')) problems.push('index.html: the board-page.js tag must read ?v=36 (the S255 re-pin bump)')
-    if (!indexHtml.includes('/css/devboard.css?v=46')) problems.push('index.html: the devboard.css tag must read ?v=46 (the S250 re-pin bump — the strategies section styles)')
+    if (!indexHtml.includes('/js/board-page.js?v=37')) problems.push('index.html: the board-page.js tag must read ?v=37 (the S256/FE-13 esc-twin bump)')
+    if (!indexHtml.includes('/css/board-bundle.css?v=1')) problems.push('index.html: the ONE stylesheet link must read /css/board-bundle.css?v=1 (the S256 FE-5 head swap — devboard.css v46 rides INSIDE it, part 16 of 19)')
     // S248 (the Sprint/Deadline/Dependency island round): the feature's own
     // carriers + the new manifest entries are pinned here — a drifted pin would
     // silently ship a pre-feature island, so every marker must be present.
     if (!indexHtml.includes('/js/devboard.js?v=39')) problems.push('index.html: the devboard.js tag must read ?v=39 (the S255 payload-diet round — the lean load + the doc helpers)')
-    if (!indexHtml.includes('/js/due-control.js?v=2')) problems.push('index.html: the due-control.js tag must read ?v=2 (the S254 i18n-guard round)')
+    if (!indexHtml.includes('/js/due-control.js?v=3')) problems.push('index.html: the due-control.js tag must read ?v=3 (the S256/FE-13 esc-twin bump)')
     if (!indexHtml.includes('/js/emoji-picker.js?v=4')) problems.push('index.html: the emoji-picker.js tag must read ?v=4 (the S243 emoji identity — S248 manifest entry)')
     if (!indexHtml.includes('/js/i18n-en.js?v=111')) problems.push('index.html: the i18n-en.js tag must read ?v=111 (the S242-S247 feature keys + the S250 st.* set)')
     if (!indexHtml.includes('/js/i18n.js?v=164')) problems.push('index.html: the i18n.js tag must read ?v=164 (the i18n-fa v105 injector carrier)')
-    if (!indexHtml.includes('/css/claude-dark-theme.css?v=32')) problems.push('index.html: the claude-dark-theme.css tag must read ?v=32 (the S247b dark-theme contrast block)')
+    // S256: claude-dark-theme.css?v=32 rides INSIDE board-bundle (part 18 of 19); the tag is gone — the S247b contrast block is pinned from the bundle's bytes below
     const dueCtl = readDistText(outDir, 'js/due-control.js')
     if (!dueCtl.includes('window.HibanaDueControl')) problems.push('js/due-control.js: the HibanaDueControl API is missing (the S244 shared date control)')
     // S250 (the strategies tier): the feature's own drift gates — a pre-S250
@@ -6433,12 +6434,14 @@ function verifyDist(outDir, fileMap) {
     if (!boardPage.includes('data-db-filter-sprint')) problems.push('js/board-page.js: the sprint view filter is missing (the S242 kanban integration)')
     if (!boardPage.includes('deadlineSummary') && !devboardJsV36.includes('deadlineSummary')) problems.push('the deadline summary label (deadlineSummary) is missing (the S244/S245 deadline display)')
     if (!devboardJsV36.includes('depBadgeHtml')) problems.push('js/devboard.js: the dep badge grammar (depBadgeHtml) is missing (the S246 card dep row)')
-    if (!devboardCss.includes('.st-')) problems.push('css/devboard.css: the deadline state classes (.st-*) are missing (the S244 threshold styles + the S247 AA fix)')
-    if (!devboardCss.includes('#8a6428')) problems.push('css/devboard.css: the S247 WCAG-AA approaching color (#8a6428) is missing')
-    if (!devboardCss.includes('#4d6b4d')) problems.push('css/devboard.css: the S247 WCAG-AA ready color (#4d6b4d) is missing')
-    const claudeCss = readDistText(outDir, 'css/claude-dark-theme.css')
-    if (!claudeCss.includes('#d9a45b')) problems.push('css/claude-dark-theme.css: the S247b dark-theme approaching color (#d9a45b) is missing')
-    if (!claudeCss.includes('#8fb58f')) problems.push('css/claude-dark-theme.css: the S247b dark-theme ready color (#8fb58f) is missing')
+    if (!devboardCss.includes('.st-')) problems.push('css/board-bundle.css: the deadline state classes (.st-*) are missing (inside the devboard part — the S244 threshold styles + the S247 AA fix)')
+    if (!devboardCss.includes('#8a6428')) problems.push('css/board-bundle.css: the S247 WCAG-AA approaching color (#8a6428) is missing (inside the devboard part)')
+    if (!devboardCss.includes('#4d6b4d')) problems.push('css/board-bundle.css: the S247 WCAG-AA ready color (#4d6b4d) is missing (inside the devboard part)')
+    // S256: the S247b dark-theme contrast colors read from the bundle (the
+    // claude-dark-theme part, 18th of 19)
+    const claudeCss = (fileMap['css/board-bundle.css'] || '')
+    if (!claudeCss.includes('#d9a45b')) problems.push('css/board-bundle.css: the S247b dark-theme approaching color (#d9a45b) is missing (inside the claude-dark-theme part)')
+    if (!claudeCss.includes('#8fb58f')) problems.push('css/board-bundle.css: the S247b dark-theme ready color (#8fb58f) is missing (inside the claude-dark-theme part)')
   }
 
   // NO storage anywhere in the desktop-owned generated files (v0.1.5's rule: the
@@ -6604,10 +6607,11 @@ function main() {
   const sprintHtmlRaw = gitShow(src, PIN_REF, 'sprint.html') // S235: the sprint timeline page joins the island
 
   // Patchable files as utf8 strings (the patches are exact recorded replaces).
-  // css/devboard.css joins the utf8 map VERBATIM (no patches) — verifyDist's
-  // UI-redesign markers read it from the map (writing it again is byte-identical).
+  // css/board-bundle.css joins the utf8 map VERBATIM (no patches — S256: the
+  // bundle replaced devboard.css as the CSS map member; the markers read the parts
+  // inside it; writing it again is byte-identical).
   const fileMap = {}
-  for (const rel of ['js/devboard.js', 'js/board-page.js', 'css/devboard.css']) fileMap[rel] = blobs[rel].toString('utf8')
+  for (const rel of ['js/devboard.js', 'js/board-page.js', 'css/board-bundle.css']) fileMap[rel] = blobs[rel].toString('utf8')
 
   // The HTML adaptation (guide §3.2).
   const adapted = adaptBoardHtml(boardHtmlRaw.toString('utf8'))
@@ -6661,7 +6665,7 @@ function main() {
     JSON.stringify({ ref: PIN_REF, packageVersion: PIN_PACKAGE_VERSION }, null, 2) + '\n', 'utf8')
 
   // Self-verify BEFORE writing checksums (a broken run must not stamp a green file).
-  verifyDist(outDir, fileMap)
+  verifyDist(outDir, fileMap, src)
 
   // Checksums (guide §3.3.2) — outside dist, sorted, stable.
   const hashes = hashDist(outDir)

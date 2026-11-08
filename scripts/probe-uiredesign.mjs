@@ -49,7 +49,8 @@ function parseArgs(a) {
 }
 
 const args = parseArgs(process.argv.slice(2))
-for (const f of ['index.html', 'js/board-page.js', 'css/devboard.css', 'icons/empty-state/new-ideas-lamp.png', 'icons/empty-state/problems-warning.png', 'icons/empty-state/plans-checklist.png', 'icons/empty-state/in-progress-play.png', 'icons/empty-state/implemented-check.png']) {
+// S256 (FE-5): devboard.css rides INSIDE css/board-bundle.css (part 16 of 19)
+for (const f of ['index.html', 'js/board-page.js', 'css/board-bundle.css', 'icons/empty-state/new-ideas-lamp.png', 'icons/empty-state/problems-warning.png', 'icons/empty-state/plans-checklist.png', 'icons/empty-state/in-progress-play.png', 'icons/empty-state/implemented-check.png']) {
   if (!fs.existsSync(path.join(args.dist, f))) {
     console.error('[probe] missing ' + f + ' under ' + args.dist + ' — run scripts/sync-island.mjs first.')
     process.exit(1)

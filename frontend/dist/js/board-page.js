@@ -16,7 +16,11 @@
           const s = window.hibanaI18n ? window.hibanaI18n.t(k) : null
           return s && s !== k ? s : (window.HibanaBoard ? B().t(k, f) : f)
         }
-        const escS = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+        // S256 (FE-13, audit remediation Phase 5): the byte-equal esc twin retires into
+        // chip-render.js through the existing window.HibanaChips gating — devboard.js
+        // (B()) stays the fallback root (it owns the esc on sprint.html, which carries
+        // no chip-render tag). Output identical; one definition serves the island.
+        const escS = (s) => (window.HibanaChips ? window.HibanaChips.esc(s) : B().esc(s))
 
         // S205 (spec §3.1/§3.2): /kanban is the dedicated entry point and owns the
         // no-project behavior — default-project resolution (last-used board → most-recent

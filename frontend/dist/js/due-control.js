@@ -56,7 +56,12 @@
     const s = window.hibanaI18n ? window.hibanaI18n.t(key) : null
     return s && s !== key ? s : fallback
   }
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+  // S256 (FE-13, audit remediation Phase 5): the byte-equal esc twin retires into
+  // chip-render.js through the existing window.HibanaChips gating. due-control.js rides
+  // board.html + sprint.html only; both load chip-render.js (board) or devboard.js
+  // (sprint — the fallback root, no chip-render tag there) ahead of the first render,
+  // and esc only ever runs at interaction time. Output identical.
+  const esc = (s) => (window.HibanaChips ? window.HibanaChips.esc(s) : window.HibanaBoard.esc(s))
   const DAY = 86400000
   const HOUR = 3600000
 

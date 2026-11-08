@@ -255,9 +255,10 @@ async function main() {
 
     // The S238 carriers, from the REAL dist bytes.
     const boardPageJs = fs.readFileSync(path.join(args.dist, 'js/board-page.js'), 'utf8')
-    const devCss = await page.evaluate(() => fetch('/css/devboard.css?v=39').then((r) => r.text()))
-    const polishCss = await page.evaluate(() => fetch('/css/polish-batch.css?v=30').then((r) => r.text()))
-    const quickCss = await page.evaluate(() => fetch('/css/quicknotes.css?v=51').then((r) => r.text()))
+    // S256 (FE-5): all three sheets ride INSIDE board-bundle.css (parts 16 + 13 + 8)
+    const devCss = await page.evaluate(() => fetch('/css/board-bundle.css?v=1').then((r) => r.text()))
+    const polishCss = devCss
+    const quickCss = devCss
     check('js/board-page.js carries the S238 view layer (openTaskView + db-view + the sheet copy + the data-ok strip)',
       ['openTaskView', 'db-view-overlay', 'data-db-view-edit', 'data-db-view-copy', 'data-db-sheet-copy', 'injectSheetCopyRows', "querySelectorAll('.db-card-menu[data-ok]')", 'escPeel'].every((m) => boardPageJs.includes(m)), '')
     check('css/devboard.css?v=39 carries the blur+greyscale backdrops + the FIXED 800×600 sheet + the view family + the copy button',

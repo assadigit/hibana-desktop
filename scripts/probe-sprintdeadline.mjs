@@ -319,14 +319,14 @@ async function main() {
       hasFetch: typeof window.hibanaFetch === 'function',
       hasHibana: !!(window.hibana && typeof window.hibana.toast === 'function'),
       hasDueControl: !!(window.HibanaDueControl && typeof window.HibanaDueControl.create === 'function'),
-      dueCtlTag: !!Array.from(document.querySelectorAll('script[src*="/js/due-control.js?v=2"]')).length,
+      dueCtlTag: !!Array.from(document.querySelectorAll('script[src*="/js/due-control.js?v=3"]')).length,
       emojiTag: !!Array.from(document.querySelectorAll('script[src*="/js/emoji-picker.js?v=4"]')).length,
       devboardTag: !!Array.from(document.querySelectorAll('script[src*="/js/devboard.js?v=39"]')).length,
-      boardPageTag: !!Array.from(document.querySelectorAll('script[src*="/js/board-page.js?v=36"]')).length,
+      boardPageTag: !!Array.from(document.querySelectorAll('script[src*="/js/board-page.js?v=37"]')).length,
     }))
     check('the desktop chain loaded (hibanaFetch + hibana toast)', chain.hasFetch && chain.hasHibana, JSON.stringify(chain))
-    check('js/due-control.js?v=2 loaded + window.HibanaDueControl.create (the S244 shared date control — S254 i18n-guard bump)', chain.hasDueControl && chain.dueCtlTag, JSON.stringify(chain))
-    check('js/emoji-picker.js?v=4 + devboard.js?v=39 + board-page.js?v=36 tags all present (the S255 carriers)', chain.emojiTag && chain.devboardTag && chain.boardPageTag, JSON.stringify(chain))
+    check('js/due-control.js?v=3 loaded + window.HibanaDueControl.create (the S244 shared date control — the S256/FE-13 esc-twin bump)', chain.hasDueControl && chain.dueCtlTag, JSON.stringify(chain))
+    check('js/emoji-picker.js?v=4 + devboard.js?v=39 + board-page.js?v=37 tags all present (the S256 carriers — FE-13 bumped board-page)', chain.emojiTag && chain.devboardTag && chain.boardPageTag, JSON.stringify(chain))
 
     // The S248 carriers, from the REAL dist bytes.
     const devboardJs = fs.readFileSync(path.join(args.dist, 'js/devboard.js'), 'utf8')
@@ -338,8 +338,9 @@ async function main() {
       ['data-db-filter-sprint', 'db-sprint-badge', 'depBadge'].every((m) => boardPageJs.includes(m)), '')
     check('js/due-control.js carries the segmented selector + presets + the ISO value (the island ships zero deadline logic)',
       ['HibanaDueControl', 'gregorian', 'jalali'].every((m) => dueCtlJs.includes(m)), '')
-    const devCss = await page.evaluate(() => fetch('/css/devboard.css?v=45').then((r) => r.text()))
-    const claudeCss = await page.evaluate(() => fetch('/css/claude-dark-theme.css?v=32').then((r) => r.text()))
+    // S256 (FE-5): devboard.css + claude-dark-theme.css ride INSIDE board-bundle.css
+    const devCss = await page.evaluate(() => fetch('/css/board-bundle.css?v=1').then((r) => r.text()))
+    const claudeCss = devCss // the claude-dark-theme part (18th of 19) lives in the same bundle
     check('css/devboard.css?v=45 carries the .st- state family + the S247 WCAG-AA pair',
       devCss.includes('.st-') && devCss.includes('#8a6428') && devCss.includes('#4d6b4d'), 'len=' + devCss.length)
     check('css/claude-dark-theme.css?v=32 carries the S247b dark-theme contrast block',
