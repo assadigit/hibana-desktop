@@ -190,11 +190,13 @@
           try {
             // The SAME creation call the board's editor path uses (devboard.js's
             // createTask → POST /api/projects/:id/devtasks through the one api()
-            // choke point) — the quick-add never rolls its own POST.
+            // choke point) — the quick-add never rolls its own POST. S254 (FE-1b):
+            // createTask MERGES the ack into B().state (the 201's id + final tag
+            // set) — the lane repaints from state, no refetch.
             await B().createTask({ title, status: focus.sheetStatus, priority: 'medium' })
             window.hibana?.toast(_t('db.taskAdded', 'Task added'), 'ok')
             input.value = '' // cleared + kept open for rapid entry (spec §1.3)
-            await reload() // reload → render → refreshSheet: count + cards update
+            renderColumn(focus.sheetStatus) // count + cards update (render → refreshSheet inside)
           } catch {
             window.hibana?.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
           }
@@ -352,7 +354,7 @@
           taskViewEl.querySelector('[data-db-view-edit]').addEventListener('click', () => {
             const id = taskViewTask ? taskViewTask.id : null
             closeTaskView()
-            if (id) B().openEditor(id, { onSaved: reload })
+            if (id) openEditorRepaint(id) // S254 (FE-1b): the view's Edit lands as a lane repaint
           })
           return taskViewEl
         }
@@ -441,220 +443,80 @@
           render()
         })
 
-        const render = () => {
+        // S30 batch 2 (user request): the FILTER BAR — priority toggles + label
+        // toggles above the columns. Empty selection = show everything (the default);
+        // each group is an OR within itself, the two groups AND together ("only 🔴
+        // urgent × #Security"). A task's label names resolve through tagById (the
+        // API carries tag ids on the task rows + the tag table in state).
+        // S254 (FE-1b): taskMatches is hoisted OUT of render() — the per-column
+        // repaint reuses the SAME filter model without rebuilding the bar.
+        const taskMatches = (task) => {
+          if (filterPrios.size && !filterPrios.has(task.priority || 'medium')) return false
+          if (filterTags.size) {
+            const names = (task.tags || []).map((id) => { const tg = B().tagById(id); return tg ? tg.name.toLowerCase() : '' }).filter(Boolean)
+            if (!names.some((n) => filterTags.has(n))) return false
+          }
+          if (filterQuery) {
+            if (!String(task.title || '').toLowerCase().includes(filterQuery)) return false
+          }
+          // S242: the sprint view filter — '__none' shows unassigned tasks only.
+          if (filterSprint) {
+            if (filterSprint === '__none' ? !!task.sprint_id : task.sprint_id !== filterSprint) return false
+          }
+          return true
+        }
+        const anyFilterActive = () => filterPrios.size > 0 || filterTags.size > 0 || filterQuery !== '' || filterSprint !== ''
+        // S105 (owner: "the fullscreen Project Progress box appears different from
+        //   the projects-page one — bullet placement wrong, heading not bold"): the
+        //   board's LOCAL, outdated title renderer is RETIRED. It knew nothing of
+        //   bullets/ordered lists/underline/strike/alignment and never split the
+        //   first line (S48j), so fullscreen cards drifted from the project page's.
+        //   chip-render.js (window.HibanaChips) is ALREADY loaded by board.html —
+        //   the exact same renderer the project page delegates to (project-page.js
+        //   does the same). Fullscreen now inherits EVERY rendering decision:
+        //   bullets, ordered lists, bold/underline/strike, fences, first-line-only
+        //   titles (titleHtml), the read-more clamp, the content PREVIEW line
+        //   (previewHtml — S86), and data-raw-title for the editor round-trip.
+        const CH = () => window.HibanaChips || null
+        const titleHtml = (title) => (CH() ? CH().titleHtml(title) : B().esc(title))
+        const titleAttrs = (title) => (CH() ? CH().titleAttrs(title) : '')
+        const readMoreBtn = (title) => (CH() ? CH().readMoreBtn(title) : '')
+        const previewHtml = (title) => (CH() ? CH().previewHtml(title) : '')
+        // Item 8: inline SVG icons for the export/copy buttons (board.html has no P_ICON)
+        const I_CLIPBOARD = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3.5A.5.5 0 0 1 9.5 3h5a.5.5 0 0 1 .5.5V4M9 9.5h6M9 13.5h6M9 17.5h4"/></svg>'
+        const I_DOWNLOAD = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>'
+        const I_ARCHIVE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>'
+        const I_TRASH = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+        const I_PLUS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
+        // UI-redesign: the column ellipsis (⋯) menu button — consolidates the always
+        // visible Copy/Export (+ Archive/Clear for the Done column) into ONE overflow
+        // menu per lane (spec §4). The existing data-db-copy/data-db-export/data-db-
+        // archive-done/data-db-clear-done attributes are preserved verbatim inside the
+        // menu items so the delegated handlers keep working unchanged.
+        const I_ELLIPSIS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>'
+        const I_INFO = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>'
+        // Per-lane empty-state asset + i18n key map (spec §5.1). The PNGs ship at
+        // /icons/empty-state/<name>.png (320×320 RGBA transparent → displayed ~112px).
+        const EMPTY_ICON = { idea: 'new-ideas-lamp', bug: 'problems-warning', planned: 'plans-checklist', in_progress: 'in-progress-play', done: 'implemented-check' }
+        const EMPTY_TITLE = { idea: 'db.empty.idea.title', bug: 'db.empty.bug.title', planned: 'db.empty.planned.title', in_progress: 'db.empty.inprog.title', done: 'db.empty.done.title' }
+        const EMPTY_TEXT = { idea: 'db.empty.idea.text', bug: 'db.empty.bug.text', planned: 'db.empty.planned.text', in_progress: 'db.empty.inprog.text', done: 'db.empty.done.text' }
+        // S230 completion: inline EN fallbacks for every empty-state string (the _t
+        // convention — every call carries its fallback; a dictionary that fails to
+        // load must never render an EMPTY line under the heading).
+        const EMPTY_FALLBACK = {
+          idea: ['No ideas yet', 'Capture new ideas and potential improvements.'],
+          bug: ['No problems yet', 'Track issues and blockers here.'],
+          planned: ['No plans yet', 'Plan upcoming work and define next steps.'],
+          in_progress: ['Nothing in progress', 'Move tasks here when you start working.'],
+          done: ['No completed tasks', 'Completed tasks will appear here.'],
+        }
+        // S254 (FE-1b): ONE lane's <section> — render()'s STATUSES.map callback,
+        // extracted VERBATIM (byte-identical markup). render() maps it over the five
+        // lanes; renderColumn() below re-runs it for a single lane after a task
+        // mutation, so a repaint and a full render can never drift.
+        const columnHtml = (st, anyFilter) => {
           const S = B().state
-          const titleEl = document.getElementById('db-title')
-          titleEl.textContent = S.project ? S.project.title : ''
-          // S206: the name ELLIPSIZES to one line now (devboard.css) — the full name
-          // rides the span's title so a hover always reveals it.
-          titleEl.setAttribute('title', S.project ? S.project.title : '')
-          // S64 convention (the project page): the tab title carries the project's OWN
-          // name (language-neutral user content), not a generic "Board".
-          if (S.project && S.project.title) document.title = S.project.title + ' — Hibana'
-          document.getElementById('db-sprint-link').href = '/sprint.html?project=' + projectId
-          // UI-redesign: the Project Progress summary (the "{n} of {m} done" completed/
-          // total card) is removed from the toolbar per spec §3.2. The #db-counts span
-          // stays in the markup (the sync's kept-markup check expects the toolbar ids)
-          // but is emptied + hidden so no summary renders. Reclaim the space for the board.
-          const countsEl = document.getElementById('db-counts')
-          if (countsEl) { countsEl.textContent = ''; countsEl.hidden = true }
-
           const lang = window.hibanaI18n && window.hibanaI18n.lang ? window.hibanaI18n.lang() : 'en'
-          // S30 batch 2 (user request): the FILTER BAR — priority toggles + label
-          // toggles above the columns. Empty selection = show everything (the default);
-          // each group is an OR within itself, the two groups AND together ("only 🔴
-          // urgent × #Security"). A task's label names resolve through tagById (the
-          // API carries tag ids on the task rows + the tag table in state).
-          const usedTags = []
-          const seenTag = new Set()
-          for (const task of S.tasks) {
-            for (const id of (task.tags || [])) {
-              const tg = B().tagById(id)
-              if (tg && !seenTag.has(tg.name.toLowerCase())) { seenTag.add(tg.name.toLowerCase()); usedTags.push(tg) }
-            }
-          }
-          usedTags.sort((a, b) => a.name.localeCompare(b.name))
-          const taskMatches = (task) => {
-            if (filterPrios.size && !filterPrios.has(task.priority || 'medium')) return false
-            if (filterTags.size) {
-              const names = (task.tags || []).map((id) => { const tg = B().tagById(id); return tg ? tg.name.toLowerCase() : '' }).filter(Boolean)
-              if (!names.some((n) => filterTags.has(n))) return false
-            }
-            if (filterQuery) {
-              if (!String(task.title || '').toLowerCase().includes(filterQuery)) return false
-            }
-            // S242: the sprint view filter — '__none' shows unassigned tasks only.
-            if (filterSprint) {
-              if (filterSprint === '__none' ? !!task.sprint_id : task.sprint_id !== filterSprint) return false
-            }
-            return true
-          }
-          const shownCount = S.tasks.filter(taskMatches).length
-          const anyFilter = filterPrios.size > 0 || filterTags.size > 0 || filterQuery !== '' || filterSprint !== ''
-          const filterBarHtml = S.tasks.length ? '<div class="db-filter" data-db-filter role="toolbar" aria-label="' + B().esc(_t('db.filterAria', 'Filter tasks')) + '">' +
-            // S136: the search input FIRST — the exact structure + classes of the
-            // project page's bar (project-page.js pdFilterBuild; .db-filter-search
-            // styles ship in devboard.css and were already shared).
-            '<input type="search" class="db-filter-search" data-db-filter-q placeholder="' + B().esc(_t('db.filterSearchPh', 'Search tasks…')) + '" aria-label="' + B().esc(_t('db.filterSearchPh', 'Search tasks…')) + '" autocomplete="off" spellcheck="false" dir="auto" value="' + B().esc(filterQuery) + '">' +
-            // S242 (spec §7.5/Screen A): the compact SPRINT filter — default
-            // "All tasks"; every project sprint (any lifecycle state) with its
-            // emoji-or-default glyph + name, plus "No sprint". The is-on tint
-            // marks an active (non-All) filter (devboard.css).
-            '<select class="db-filter-sprint' + (filterSprint ? ' is-on' : '') + '" data-db-filter-sprint aria-label="' + B().esc(_t('db.filterSprint', 'Sprint filter')) + '" title="' + B().esc(_t('db.filterSprint', 'Sprint filter')) + '">' +
-              '<option value="">' + B().esc(_t('db.filterSprintAll', 'All tasks')) + '</option>' +
-              '<option value="__none"' + (filterSprint === '__none' ? ' selected' : '') + '>' + B().esc(_t('db.noSprint', 'No sprint')) + '</option>' +
-              S.sprints.map((s) => '<option value="' + B().esc(s.id) + '"' + (filterSprint === s.id ? ' selected' : '') + '>' + B().esc((s.emoji ? s.emoji + ' ' : '◆ ') + s.name) + '</option>').join('') +
-            '</select>' +
-            '<span class="db-filter-label muted small">' + B().esc(_t('db.filterPrio', 'Priority')) + '</span>' +
-            B().PRIORITIES.slice().reverse().map((p) =>
-              '<button type="button" class="chip db-filter-prio prio-' + p + '" data-fp="' + p + '" aria-pressed="' + (filterPrios.has(p) ? 'true' : 'false') + '" title="' + B().esc(_t('db.filterPrioHint', 'Show only {p} tasks').replace('{p}', B().prioLabel(p))) + '"><span class="prio-dot prio-' + p + '"></span>' + B().esc(B().prioLabel(p)) + '</button>'
-            ).join('') +
-            (usedTags.length ? '<span class="db-filter-label muted small">' + B().esc(_t('db.filterLabels', 'Labels')) + '</span>' +
-              usedTags.map((tg) =>
-                '<button type="button" dir="auto" class="chip db-filter-tag" data-ft="' + B().esc(tg.name.toLowerCase()) + '" style="color:' + B().esc(tg.color) + '" aria-pressed="' + (filterTags.has(tg.name.toLowerCase()) ? 'true' : 'false') + '" title="' + B().esc(_t('db.filterTagHint', 'Click to filter by this label')) + '"><span style="color:' + B().esc(tg.color) + '">●</span> ' + B().esc(tg.name) + '</button>'
-              ).join('') : '') +
-            (anyFilter ? '<button type="button" class="chip db-filter-clear" data-db-filter-clear>✕ ' + B().esc(_t('db.filterClear', 'Clear filter')) + '</button><span class="muted small db-filter-shown">' + _t('db.filterShown', '{n} of {m} shown').replace('{n}', B().faDig(shownCount)).replace('{m}', B().faDig(S.tasks.length)) + '</span>' : '') +
-            '</div>' : ''
-          // S78 parity: the miss state under the bar — the SAME skeleton the project
-          // page mounts for an honest zero-match (devboard.css .db-filter-empty + the
-          // pg-filter-empty polish are already shared sheets on this page).
-          const filterEmptyHtml = S.tasks.length ? '<div class="empty-state empty pg-filter-empty db-filter-empty" data-db-filter-empty hidden>' +
-            '<span class="empty-state-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span>' +
-            '<p class="empty-state-title">' + B().esc(_t('db.filterEmpty', 'No tasks match your filters')) + '</p>' +
-            '<p class="empty-state-text">' + B().esc(_t('db.filterEmptyText', 'Try another word, or clear the filters to see every task.')) + '</p>' +
-            '<button type="button" class="empty-state-cta btn ghost" data-db-filter-empty-clear>' + B().esc(_t('db.filterClear', 'Clear filter')) + '</button>' +
-          '</div>' : ''
-          // S243 (spec §7.4 + Screen G — the compact sprint overview): selecting a
-          // NAMED sprint in the view filter mounts its overview panel under the bar —
-          // identity + lifecycle state, the five lane counts + total (the §12.5
-          // CLIENT fold over the loaded payload — ZERO new fetches), and the
-          // lifecycle actions the state permits (Start/Resume, Pause, Finish) +
-          // Settings (deep-links the Sprints page's detail panel). No percentages,
-          // no analytics — the restrained distribution the spec pins.
-          let sprintOvHtml = ''
-          const ovSprint = filterSprint && filterSprint !== '__none' ? B().findSprint(filterSprint) : null
-          if (ovSprint) {
-            const ovSt = B().sprintStatusOf(ovSprint)
-            const fold = B().sprintLaneCounts(ovSprint.id)
-            const badgeMap = {
-              active: ['sp-st-active', _t('db.sprintSt.active', 'Active')],
-              planned: ['sp-st-planned', _t('db.sprintSt.planned', 'Planned')],
-              paused: ['sp-st-paused', _t('db.sprintSt.paused', 'Paused')],
-              completed: ['sp-st-completed', _t('db.sprintSt.completed', 'Completed')],
-            }
-            const bm = badgeMap[ovSt] || badgeMap.planned
-            const dueTxt = ovSprint.due_at
-              ? '<span class="db-sprint-ov-due muted small">' + B().esc(_t('db.ov.due', 'Due {d}').replace('{d}', new Date(ovSprint.due_at).toLocaleDateString(document.documentElement.lang === 'fa' ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }))) + '</span>'
-              : ''
-            const acts = []
-            if (ovSt === 'planned') acts.push('<button type="button" class="btn small" data-db-ov-start>▸ ' + B().esc(_t('db.startSprint', 'Start sprint')) + '</button>')
-            if (ovSt === 'paused') acts.push('<button type="button" class="btn small" data-db-ov-resume>▸ ' + B().esc(_t('db.resumeSprint', 'Resume')) + '</button>')
-            if (ovSt === 'active') {
-              acts.push('<button type="button" class="btn ghost small" data-db-ov-pause>⏸ ' + B().esc(_t('db.pauseSprint', 'Pause sprint')) + '</button>')
-              acts.push('<button type="button" class="btn ghost small" data-db-ov-finish>⏹ ' + B().esc(_t('db.finishSprint', 'Finish sprint')) + '</button>')
-            }
-            // S245 (spec pack Phase 6 — §13.2 + Screen J1): the overview's Extend
-            // affordance — any NON-COMPLETED sprint carrying a deadline (a
-            // completed sprint's deadline is historical, §10.3 — no extension).
-            // Opens the shared J1 dialog (identity + current deadline + the four
-            // choices + the BEFORE-confirmation impact counts).
-            if (ovSt !== 'completed' && ovSprint.due_at) {
-              acts.push('<button type="button" class="btn ghost small" data-db-ov-extend>⏱ ' + B().esc(_t('db.extendSprint', 'Extend')) + '</button>')
-            }
-            acts.push('<a class="btn ghost small" data-db-ov-settings href="/sprint.html?project=' + encodeURIComponent(projectId) + '&sprint=' + encodeURIComponent(ovSprint.id) + '">⚙ ' + B().esc(_t('db.ov.settings', 'Settings')) + '</a>')
-            sprintOvHtml =
-              '<div class="db-sprint-ov" data-db-sprint-ov data-sprint-id="' + B().esc(ovSprint.id) + '">' +
-                '<div class="row db-sprint-ov-head">' +
-                  '<span class="db-sprint-ov-glyph" aria-hidden="true">' + B().esc(B().sprintGlyph(ovSprint)) + '</span>' +
-                  '<span class="db-sprint-ov-name" dir="auto">' + B().esc(ovSprint.name || '') + '</span>' +
-                  '<span class="sp-list-badge ' + bm[0] + '">' + B().esc(bm[1]) + '</span>' +
-                  dueTxt +
-                  '<span class="db-flex-gap"></span>' +
-                  '<div class="row db-sprint-ov-actions">' + acts.join('') + '</div>' +
-                '</div>' +
-                '<div class="db-sprint-ov-counts" role="table" aria-label="' + B().esc(_t('db.ov.counts', 'Task counts by Kanban column')) + '">' +
-                  B().STATUSES.map((st) =>
-                    '<span class="db-sprint-ov-count" role="row"><span class="db-sprint-ov-lane" role="cell">' + B().esc(B().statusLabel(st)) + '</span><b role="cell">' + B().faDig(fold.counts[st] || 0) + '</b></span>').join('') +
-                  '<span class="db-sprint-ov-count db-sprint-ov-total" role="row"><span class="db-sprint-ov-lane" role="cell">' + B().esc(_t('db.ov.total', 'Total')) + '</span><b role="cell">' + B().faDig(fold.total) + '</b></span>' +
-                '</div>' +
-              '</div>'
-          }
-          // Session 22 (user request): unlimited task titles clamp at 150 CHARS — same
-          // recipe as the project page's progress boxes: first 150 chars visible, the
-          // rest in a hidden .pd-title-rest span INSIDE the title element (so
-          // textContent keeps reading the FULL title — copy/export, delete-confirm,
-          // the wand all consume it), + a read-more button. The two boards read as ONE
-          // system now.
-          const TITLE_CLAMP = 150
-          // Session 23 (user request): titles may carry fenced ``` CODE blocks, **bold**
-          // and manual line breaks — SAME renderer as project.html / routes/projects.ts:
-          // fence lines open/close a <code class="t-code" dir="ltr"> mono container with
-          // the fence LINES kept in <span hidden class="t-fence"> markers INSIDE it, so
-          // textContent round-trips the RAW title exactly (copy/export/delete/wand all
-          // consume textContent). Prose lines get **pair** → <strong>. Unclosed fences
-          // render as code till end (self-healing).
-          // S105 (owner: "the fullscreen Project Progress box appears different from
-          //   the projects-page one — bullet placement wrong, heading not bold"): the
-          //   board's LOCAL, outdated title renderer is RETIRED. It knew nothing of
-          //   bullets/ordered lists/underline/strike/alignment and never split the
-          //   first line (S48j), so fullscreen cards drifted from the project page's.
-          //   chip-render.js (window.HibanaChips) is ALREADY loaded by board.html —
-          //   the exact same renderer the project page delegates to (project-page.js
-          //   does the same). Fullscreen now inherits EVERY rendering decision:
-          //   bullets, ordered lists, bold/underline/strike, fences, first-line-only
-          //   titles (titleHtml), the read-more clamp, the content PREVIEW line
-          //   (previewHtml — S86), and data-raw-title for the editor round-trip.
-          const CH = () => window.HibanaChips || null
-          const renderTitle = (raw) => (CH() ? CH().renderTitle(raw) : B().esc(raw))
-          const titleHtml = (title) => (CH() ? CH().titleHtml(title) : B().esc(title))
-          const titleAttrs = (title) => (CH() ? CH().titleAttrs(title) : '')
-          const readMoreBtn = (title) => (CH() ? CH().readMoreBtn(title) : '')
-          const previewHtml = (title) => (CH() ? CH().previewHtml(title) : '')
-          // Item 8: inline SVG icons for the export/copy buttons (board.html has no P_ICON)
-          const I_CLIPBOARD = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3.5A.5.5 0 0 1 9.5 3h5a.5.5 0 0 1 .5.5V4M9 9.5h6M9 13.5h6M9 17.5h4"/></svg>'
-          const I_DOWNLOAD = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>'
-          const I_ARCHIVE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>'
-          const I_TRASH = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
-          const I_PLUS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
-          // UI-redesign: the column ellipsis (⋯) menu button — consolidates the always-
-          // visible Copy/Export (+ Archive/Clear for the Done column) into ONE overflow
-          // menu per lane (spec §4). The existing data-db-copy/data-db-export/data-db-
-          // archive-done/data-db-clear-done attributes are preserved verbatim inside the
-          // menu items so the delegated handlers (board-page.js:714/724/743/761) keep
-          // working unchanged.
-          const I_ELLIPSIS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>'
-          const I_INFO = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>'
-          // Per-lane empty-state asset + i18n key map (spec §5.1). The PNGs ship at
-          // /icons/empty-state/<name>.png (320×320 RGBA transparent → displayed ~112px).
-          const EMPTY_ICON = { idea: 'new-ideas-lamp', bug: 'problems-warning', planned: 'plans-checklist', in_progress: 'in-progress-play', done: 'implemented-check' }
-          const EMPTY_TITLE = { idea: 'db.empty.idea.title', bug: 'db.empty.bug.title', planned: 'db.empty.planned.title', in_progress: 'db.empty.inprog.title', done: 'db.empty.done.title' }
-          const EMPTY_TEXT = { idea: 'db.empty.idea.text', bug: 'db.empty.bug.text', planned: 'db.empty.planned.text', in_progress: 'db.empty.inprog.text', done: 'db.empty.done.text' }
-          // S230 completion: inline EN fallbacks for every empty-state string (the _t
-          // convention — every call carries its fallback; a dictionary that fails to
-          // load must never render an EMPTY line under the heading).
-          const EMPTY_FALLBACK = {
-            idea: ['No ideas yet', 'Capture new ideas and potential improvements.'],
-            bug: ['No problems yet', 'Track issues and blockers here.'],
-            planned: ['No plans yet', 'Plan upcoming work and define next steps.'],
-            in_progress: ['Nothing in progress', 'Move tasks here when you start working.'],
-            done: ['No completed tasks', 'Completed tasks will appear here.'],
-          }
-          // S136 (owner report: the fullscreen board's cards, columns and filter bar
-          // don't match the project page's .pd-board): the board now renders the EXACT
-          // anatomy of the project page's kanban (routes/projects/detail-helpers.ts) —
-          // .pd-col[data-status] columns with the TINTED .pd-col-head strip (colored
-          // dot via ::before + the dark .detail-tab-count badge), .pd-task-wrap >
-          // .pd-task cards (.pd-task-body > .pd-task-title-row carrying the DOT-ONLY
-          // priority indicator — the left-border accent lives on the WRAP via the
-          // shared polish-batch recipe, not the card), the chip-render preview +
-          // .pd-read-more, .pd-task-tags label chips and the .pd-task-meta line.
-          // devboard.css's duplicate .db-card / .db-col / .db-add rules are RETIRED —
-          // project-header.css + polish-batch.css style both surfaces from one place,
-          // so they can never drift again. Board-only affordances survive:
-          // data-task-card (drag/drop + editor), the ⋯ menu (anchored to the wrap,
-          // the quicknotes.css project recipe), Archive/Clear/Copy/Export in
-          // .pd-col-actions, and .db-cat-chip / .db-sprint-badge (no pd counterpart).
-          root.innerHTML = filterBarHtml + filterEmptyHtml + sprintOvHtml + '<div class="db-cols">' + B().STATUSES.map((st) => {
             const items = S.tasks.filter((x) => x.status === st && taskMatches(x))
             const isDone = st === 'done'
             // UI-redesign (spec §4): ONE ellipsis menu per lane replaces the always-
@@ -815,7 +677,136 @@
                   : '<button type="button" class="pd-task-add" data-add="' + st + '">' + I_PLUS + ' <span>' + B().esc(_t('db.addTask', 'Add task')) + '</span></button>') +
               '</div>' +
             '</section>'
-          }).join('') + '</div>' +
+        }
+
+        const render = () => {
+          const S = B().state
+          const titleEl = document.getElementById('db-title')
+          titleEl.textContent = S.project ? S.project.title : ''
+          // S206: the name ELLIPSIZES to one line now (devboard.css) — the full name
+          // rides the span's title so a hover always reveals it.
+          titleEl.setAttribute('title', S.project ? S.project.title : '')
+          // S64 convention (the project page): the tab title carries the project's OWN
+          // name (language-neutral user content), not a generic "Board".
+          if (S.project && S.project.title) document.title = S.project.title + ' — Hibana'
+          document.getElementById('db-sprint-link').href = '/sprint.html?project=' + projectId
+          // UI-redesign: the Project Progress summary (the "{n} of {m} done" completed/
+          // total card) is removed from the toolbar per spec §3.2. The #db-counts span
+          // stays in the markup (the sync's kept-markup check expects the toolbar ids)
+          // but is emptied + hidden so no summary renders. Reclaim the space for the board.
+          const countsEl = document.getElementById('db-counts')
+          if (countsEl) { countsEl.textContent = ''; countsEl.hidden = true }
+
+          const lang = window.hibanaI18n && window.hibanaI18n.lang ? window.hibanaI18n.lang() : 'en'
+          // S30 batch 2 (user request): the FILTER BAR — priority toggles + label
+          // toggles above the columns. Empty selection = show everything (the default);
+          // each group is an OR within itself, the two groups AND together ("only 🔴
+          // urgent × #Security"). A task's label names resolve through tagById (the
+          // API carries tag ids on the task rows + the tag table in state).
+          const usedTags = []
+          const seenTag = new Set()
+          for (const task of S.tasks) {
+            for (const id of (task.tags || [])) {
+              const tg = B().tagById(id)
+              if (tg && !seenTag.has(tg.name.toLowerCase())) { seenTag.add(tg.name.toLowerCase()); usedTags.push(tg) }
+            }
+          }
+          usedTags.sort((a, b) => a.name.localeCompare(b.name))
+          const shownCount = S.tasks.filter(taskMatches).length
+          const anyFilter = filterPrios.size > 0 || filterTags.size > 0 || filterQuery !== '' || filterSprint !== ''
+          const filterBarHtml = S.tasks.length ? '<div class="db-filter" data-db-filter role="toolbar" aria-label="' + B().esc(_t('db.filterAria', 'Filter tasks')) + '">' +
+            // S136: the search input FIRST — the exact structure + classes of the
+            // project page's bar (project-page.js pdFilterBuild; .db-filter-search
+            // styles ship in devboard.css and were already shared).
+            '<input type="search" class="db-filter-search" data-db-filter-q placeholder="' + B().esc(_t('db.filterSearchPh', 'Search tasks…')) + '" aria-label="' + B().esc(_t('db.filterSearchPh', 'Search tasks…')) + '" autocomplete="off" spellcheck="false" dir="auto" value="' + B().esc(filterQuery) + '">' +
+            // S242 (spec §7.5/Screen A): the compact SPRINT filter — default
+            // "All tasks"; every project sprint (any lifecycle state) with its
+            // emoji-or-default glyph + name, plus "No sprint". The is-on tint
+            // marks an active (non-All) filter (devboard.css).
+            '<select class="db-filter-sprint' + (filterSprint ? ' is-on' : '') + '" data-db-filter-sprint aria-label="' + B().esc(_t('db.filterSprint', 'Sprint filter')) + '" title="' + B().esc(_t('db.filterSprint', 'Sprint filter')) + '">' +
+              '<option value="">' + B().esc(_t('db.filterSprintAll', 'All tasks')) + '</option>' +
+              '<option value="__none"' + (filterSprint === '__none' ? ' selected' : '') + '>' + B().esc(_t('db.noSprint', 'No sprint')) + '</option>' +
+              S.sprints.map((s) => '<option value="' + B().esc(s.id) + '"' + (filterSprint === s.id ? ' selected' : '') + '>' + B().esc((s.emoji ? s.emoji + ' ' : '◆ ') + s.name) + '</option>').join('') +
+            '</select>' +
+            '<span class="db-filter-label muted small">' + B().esc(_t('db.filterPrio', 'Priority')) + '</span>' +
+            B().PRIORITIES.slice().reverse().map((p) =>
+              '<button type="button" class="chip db-filter-prio prio-' + p + '" data-fp="' + p + '" aria-pressed="' + (filterPrios.has(p) ? 'true' : 'false') + '" title="' + B().esc(_t('db.filterPrioHint', 'Show only {p} tasks').replace('{p}', B().prioLabel(p))) + '"><span class="prio-dot prio-' + p + '"></span>' + B().esc(B().prioLabel(p)) + '</button>'
+            ).join('') +
+            (usedTags.length ? '<span class="db-filter-label muted small">' + B().esc(_t('db.filterLabels', 'Labels')) + '</span>' +
+              usedTags.map((tg) =>
+                '<button type="button" dir="auto" class="chip db-filter-tag" data-ft="' + B().esc(tg.name.toLowerCase()) + '" style="color:' + B().esc(tg.color) + '" aria-pressed="' + (filterTags.has(tg.name.toLowerCase()) ? 'true' : 'false') + '" title="' + B().esc(_t('db.filterTagHint', 'Click to filter by this label')) + '"><span style="color:' + B().esc(tg.color) + '">●</span> ' + B().esc(tg.name) + '</button>'
+              ).join('') : '') +
+            (anyFilter ? '<button type="button" class="chip db-filter-clear" data-db-filter-clear>✕ ' + B().esc(_t('db.filterClear', 'Clear filter')) + '</button><span class="muted small db-filter-shown">' + _t('db.filterShown', '{n} of {m} shown').replace('{n}', B().faDig(shownCount)).replace('{m}', B().faDig(S.tasks.length)) + '</span>' : '') +
+            '</div>' : ''
+          // S78 parity: the miss state under the bar — the SAME skeleton the project
+          // page mounts for an honest zero-match (devboard.css .db-filter-empty + the
+          // pg-filter-empty polish are already shared sheets on this page).
+          const filterEmptyHtml = S.tasks.length ? '<div class="empty-state empty pg-filter-empty db-filter-empty" data-db-filter-empty hidden>' +
+            '<span class="empty-state-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span>' +
+            '<p class="empty-state-title">' + B().esc(_t('db.filterEmpty', 'No tasks match your filters')) + '</p>' +
+            '<p class="empty-state-text">' + B().esc(_t('db.filterEmptyText', 'Try another word, or clear the filters to see every task.')) + '</p>' +
+            '<button type="button" class="empty-state-cta btn ghost" data-db-filter-empty-clear>' + B().esc(_t('db.filterClear', 'Clear filter')) + '</button>' +
+          '</div>' : ''
+          // S243 (spec §7.4 + Screen G — the compact sprint overview): selecting a
+          // NAMED sprint in the view filter mounts its overview panel under the bar —
+          // identity + lifecycle state, the five lane counts + total (the §12.5
+          // CLIENT fold over the loaded payload — ZERO new fetches), and the
+          // lifecycle actions the state permits (Start/Resume, Pause, Finish) +
+          // Settings (deep-links the Sprints page's detail panel). No percentages,
+          // no analytics — the restrained distribution the spec pins.
+          let sprintOvHtml = ''
+          const ovSprint = filterSprint && filterSprint !== '__none' ? B().findSprint(filterSprint) : null
+          if (ovSprint) {
+            const ovSt = B().sprintStatusOf(ovSprint)
+            const fold = B().sprintLaneCounts(ovSprint.id)
+            const badgeMap = {
+              active: ['sp-st-active', _t('db.sprintSt.active', 'Active')],
+              planned: ['sp-st-planned', _t('db.sprintSt.planned', 'Planned')],
+              paused: ['sp-st-paused', _t('db.sprintSt.paused', 'Paused')],
+              completed: ['sp-st-completed', _t('db.sprintSt.completed', 'Completed')],
+            }
+            const bm = badgeMap[ovSt] || badgeMap.planned
+            const dueTxt = ovSprint.due_at
+              ? '<span class="db-sprint-ov-due muted small">' + B().esc(_t('db.ov.due', 'Due {d}').replace('{d}', new Date(ovSprint.due_at).toLocaleDateString(document.documentElement.lang === 'fa' ? 'fa-IR' : 'en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }))) + '</span>'
+              : ''
+            const acts = []
+            if (ovSt === 'planned') acts.push('<button type="button" class="btn small" data-db-ov-start>▸ ' + B().esc(_t('db.startSprint', 'Start sprint')) + '</button>')
+            if (ovSt === 'paused') acts.push('<button type="button" class="btn small" data-db-ov-resume>▸ ' + B().esc(_t('db.resumeSprint', 'Resume')) + '</button>')
+            if (ovSt === 'active') {
+              acts.push('<button type="button" class="btn ghost small" data-db-ov-pause>⏸ ' + B().esc(_t('db.pauseSprint', 'Pause sprint')) + '</button>')
+              acts.push('<button type="button" class="btn ghost small" data-db-ov-finish>⏹ ' + B().esc(_t('db.finishSprint', 'Finish sprint')) + '</button>')
+            }
+            // S245 (spec pack Phase 6 — §13.2 + Screen J1): the overview's Extend
+            // affordance — any NON-COMPLETED sprint carrying a deadline (a
+            // completed sprint's deadline is historical, §10.3 — no extension).
+            // Opens the shared J1 dialog (identity + current deadline + the four
+            // choices + the BEFORE-confirmation impact counts).
+            if (ovSt !== 'completed' && ovSprint.due_at) {
+              acts.push('<button type="button" class="btn ghost small" data-db-ov-extend>⏱ ' + B().esc(_t('db.extendSprint', 'Extend')) + '</button>')
+            }
+            acts.push('<a class="btn ghost small" data-db-ov-settings href="/sprint.html?project=' + encodeURIComponent(projectId) + '&sprint=' + encodeURIComponent(ovSprint.id) + '">⚙ ' + B().esc(_t('db.ov.settings', 'Settings')) + '</a>')
+            sprintOvHtml =
+              '<div class="db-sprint-ov" data-db-sprint-ov data-sprint-id="' + B().esc(ovSprint.id) + '">' +
+                '<div class="row db-sprint-ov-head">' +
+                  '<span class="db-sprint-ov-glyph" aria-hidden="true">' + B().esc(B().sprintGlyph(ovSprint)) + '</span>' +
+                  '<span class="db-sprint-ov-name" dir="auto">' + B().esc(ovSprint.name || '') + '</span>' +
+                  '<span class="sp-list-badge ' + bm[0] + '">' + B().esc(bm[1]) + '</span>' +
+                  dueTxt +
+                  '<span class="db-flex-gap"></span>' +
+                  '<div class="row db-sprint-ov-actions">' + acts.join('') + '</div>' +
+                '</div>' +
+                '<div class="db-sprint-ov-counts" role="table" aria-label="' + B().esc(_t('db.ov.counts', 'Task counts by Kanban column')) + '">' +
+                  B().STATUSES.map((st) =>
+                    '<span class="db-sprint-ov-count" role="row"><span class="db-sprint-ov-lane" role="cell">' + B().esc(B().statusLabel(st)) + '</span><b role="cell">' + B().faDig(fold.counts[st] || 0) + '</b></span>').join('') +
+                  '<span class="db-sprint-ov-count db-sprint-ov-total" role="row"><span class="db-sprint-ov-lane" role="cell">' + B().esc(_t('db.ov.total', 'Total')) + '</span><b role="cell">' + B().faDig(fold.total) + '</b></span>' +
+                '</div>' +
+              '</div>'
+          }
+          // (S254/FE-1b: the title-render helpers, the lane icon/empty-state maps and
+          // taskMatches are hoisted ABOVE render(); columnHtml() — also hoisted — is
+          // this map's callback EXTRACTED VERBATIM (byte-identical markup) so the
+          // per-column repaint renders the exact same lane render() does.)
+          root.innerHTML = filterBarHtml + filterEmptyHtml + sprintOvHtml + '<div class="db-cols">' + B().STATUSES.map((st) => columnHtml(st, anyFilter)).join('') + '</div>' +
           // UI-redesign (spec §7): the bottom board helper hint — monochrome, low
           // emphasis, never in a colored pill. A quiet persistent nudge below the lanes.
           '<p class="db-hint" role="note">' + I_INFO + '<span>' + B().esc(_t('db.helperHint', 'Start by adding a task to move your work forward.')) + '</span></p>'
@@ -835,6 +826,63 @@
         }
 
         const reload = async () => { await B().load(projectId); render() }
+
+        // ---- S254 (FE-1b): the single-column repaint ---------------------------------
+        // After a task mutation (patchTask/createTask/reorder/delete), the affected
+        // lane's <section> is rebuilt from B().state (already merged by devboard.js's
+        // helpers — the client twin of the server's write semantics) and swapped in
+        // place. The toolbar, the filter bar, the search caret and the overview panel
+        // keep their DOM; the syncs that DO depend on task truth re-run cheaply. Full
+        // render() stays for structural changes (project switch, filter/sprint-library
+        // edits) — and as the fallback whenever the fast path's preconditions fail.
+        const syncFilterMeta = () => {
+          const S = B().state
+          const anyFilter = anyFilterActive()
+          const shownCount = S.tasks.filter(taskMatches).length
+          const shownEl = document.querySelector('.db-filter-shown')
+          if (shownEl) shownEl.textContent = _t('db.filterShown', '{n} of {m} shown').replace('{n}', B().faDig(shownCount)).replace('{m}', B().faDig(S.tasks.length))
+          const emptyEl = document.querySelector('[data-db-filter-empty]')
+          if (emptyEl) emptyEl.hidden = !(anyFilter && shownCount === 0)
+        }
+        const renderColumn = (st) => {
+          const S = B().state
+          const colEl = root.querySelector('.pd-col[data-status="' + st + '"]')
+          // structural fallbacks: no rendered lane (first paint racing), the filter
+          // bar's presence would flip (zero tasks ⇄ some), or the sprint OVERVIEW is
+          // mounted (its lane counts are task-derived — the full render owns it)
+          if (!colEl) return render()
+          if (!!root.querySelector('[data-db-filter]') !== (S.tasks.length > 0)) return render()
+          if (root.querySelector('[data-db-sprint-ov]')) return render()
+          const tmp = document.createElement('div')
+          tmp.innerHTML = columnHtml(st, anyFilterActive())
+          const fresh = tmp.firstElementChild
+          if (!fresh) return render()
+          colEl.replaceWith(fresh)
+          refreshSheet() // an open enlarge sheet mirrors its lane
+          applyFocus() // the dim classes ride the column elements
+          syncFilterMeta()
+        }
+        // repaint the lanes a task mutation touched (status move → old + new lanes)
+        const repaintTaskColumns = (task, prevStatus) => {
+          if (!task) return
+          renderColumn(task.status)
+          if (prevStatus && prevStatus !== task.status) renderColumn(prevStatus)
+        }
+        // S254 (FE-1b): the EDITOR's save, as a repaint. EDIT mode → every field it
+        // patches is column-local (title/status/priority/category/sprint/due — all
+        // merged into state by patchTask) → the touched lanes repaint; CREATE mode
+        // keeps the full reload (the staged shots/deps/tags are not in the 201 ack).
+        const openEditorRepaint = (tid) => {
+          const prev = tid ? (B().findTask(tid) ? B().findTask(tid).status : null) : null
+          return B().openEditor(tid, {
+            onSaved: async () => {
+              if (!tid) { await reload(); return }
+              const t = B().findTask(tid)
+              if (!t) { await reload(); return }
+              repaintTaskColumns(t, prev)
+            },
+          })
+        }
 
         // ---- S205 (spec §3.2): the PROJECT SWITCHER ----
         // One click from the toolbar: a searchable list of every project the user can
@@ -1047,9 +1095,19 @@
         // closest('.pd-task-wrap') still resolves the task id from within it.
         const I_MENU_DOTS = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/></svg>'
         const I_EDIT = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
-        const I_TRASH = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+        // (S254/FE-1b: I_TRASH was redeclared here — byte-identical to the hoisted
+        // render-icon const; the local declaration retired with the hoist.)
         const I_COPY = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
         function injectDbCardMenus() {
+          // S254 (FE-1a): the menus are EVENT-DELEGATED — this pass only fills the
+          // markup placeholders (the innerHTML + the data-ok marker); ZERO per-card
+          // listeners (the old injector bound 4 handlers per card on EVERY render —
+          // a 100-card board re-bound 400). The buttons ride the board root's
+          // document-level delegation: the [data-menu-open] / [data-db-copy-card] /
+          // [data-db-edit-card] / [data-db-del-card] branches in the main click
+          // handler below. The document-level outside-click closer + the Esc layer
+          // are unchanged, and the SHEET's cloned menus (body-appended) work through
+          // the same delegation (ctx.on is document-level).
           document.querySelectorAll('.db-card-menu:not([data-ok])').forEach((menu) => {
             const card = menu.closest('.pd-task-wrap')
             if (!card) return
@@ -1066,42 +1124,6 @@
               '</div>'
             menu.hidden = false
             menu.setAttribute('data-ok', '')
-            // Direct handlers (the card is draggable + the menu is inside it — preventDefault
-            // stops drag + any parent navigation)
-            const openBtn = menu.querySelector('[data-menu-open]')
-            openBtn.addEventListener('click', (ev) => {
-              ev.preventDefault(); ev.stopPropagation()
-              const pop = menu.querySelector('.spark-menu-pop')
-              if (!pop) return
-              const willOpen = pop.hidden
-              closeAllDbMenus()
-              pop.hidden = !willOpen
-              if (willOpen) openBtn.setAttribute('data-open', '')
-              else openBtn.removeAttribute('data-open')
-            })
-            // S208 (S48p parity): Copy the RAW title (data-raw-title first — the
-            // full multi-line definition), textContent as the belt.
-            menu.querySelector('[data-db-copy-card]').addEventListener('click', async (ev) => {
-              ev.preventDefault(); ev.stopPropagation()
-              closeAllDbMenus()
-              const titleEl = card.querySelector('.pd-task-title')
-              const raw = titleEl ? titleEl.getAttribute('data-raw-title') : null
-              const text = raw || (titleEl ? titleEl.textContent : '')
-              try {
-                await navigator.clipboard.writeText(text)
-                window.hibana && window.hibana.toast(_t('common.copied', 'Copied to clipboard'), 'ok')
-              } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't copy"), 'err') }
-            })
-            menu.querySelector('[data-db-edit-card]').addEventListener('click', (ev) => {
-              ev.preventDefault(); ev.stopPropagation()
-              closeAllDbMenus()
-              B().openEditor(tid, { onSaved: reload })
-            })
-            menu.querySelector('[data-db-del-card]').addEventListener('click', (ev) => {
-              ev.preventDefault(); ev.stopPropagation()
-              closeAllDbMenus()
-              showDeleteConfirm(tid, card.querySelector('.pd-task-title')?.textContent || '')
-            })
           })
         }
         function closeAllDbMenus() {
@@ -1189,7 +1211,13 @@
                 if (!r.ok) throw new Error('delete failed')
                 window.hibana?.toast(B().esc(_t('db.taskDeleted', 'Task deleted')), 'ok')
                 delConfirmDlg.close()
-                reload()
+                // S254 (FE-1b): the deleted task leaves state locally + the ONE
+                // lane repaints — no full board refetch.
+                const gone = B().findTask(id)
+                const goneStatus = gone ? gone.status : null
+                if (gone) B().removeTaskLocal(id)
+                if (goneStatus) renderColumn(goneStatus)
+                else reload()
               } catch {
                 window.hibana?.toast(B().esc(_t('notes.deleteFailed', "Couldn't delete")), 'err')
                 delConfirmDlg.querySelector('#db-del-ok').disabled = false
@@ -1210,11 +1238,16 @@
             return
           }
           // S30 batch 2 — the FILTER BAR toggles (priority × label, clear).
+          // S254 (FE-10): the chip toggles restore KEYBOARD FOCUS to the re-rendered
+          // chip (the search input's :1596 restore, mirrored) — a keyboard user
+          // flipping filters with Tab+Enter kept losing their place before.
           const fp = e.target.closest('[data-fp]')
           if (fp) {
             const p = fp.dataset.fp
             if (filterPrios.has(p)) filterPrios.delete(p); else filterPrios.add(p)
             render()
+            const freshFp = document.querySelector('[data-fp="' + p + '"]')
+            if (freshFp) freshFp.focus()
             return
           }
           const ft = e.target.closest('[data-ft]')
@@ -1222,6 +1255,8 @@
             const n = ft.dataset.ft
             if (filterTags.has(n)) filterTags.delete(n); else filterTags.add(n)
             render()
+            const freshFt = document.querySelector('[data-ft="' + n + '"]')
+            if (freshFt) freshFt.focus()
             return
           }
           if (e.target.closest('[data-db-filter-clear]') || e.target.closest('[data-db-filter-empty-clear]')) {
@@ -1244,7 +1279,8 @@
           }
           // S30 batch 2 — click the priority dot: cycle low → medium → high → urgent
           // without opening the editor. PATCH + optimistic state mutation + re-render
-          // (the re-render re-sorts the column for free).
+          // (the re-render re-sorts the column for free). S254 (FE-1b): the re-render
+          // is the ONE lane's repaint — the priority tier lives inside a column.
           const cycleDot = e.target.closest('[data-db-cycle-prio]')
           if (cycleDot) {
             e.preventDefault()
@@ -1253,7 +1289,7 @@
             if (!task) return
             const next = B().cyclePriority(task.priority)
             task.priority = next
-            render()
+            renderColumn(task.status)
             B().patchTask(tid, { priority: next }).catch(() => {
               window.hibana?.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
               reload()
@@ -1293,6 +1329,54 @@
             closeAllColMenus()
             menu.hidden = !willOpen
             colMenuBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false')
+            return
+          }
+          // S254 (FE-1a): the card ⋯ menus, EVENT-DELEGATED (zero per-card listeners —
+          // the branches serve BOTH the board lanes AND the body-appended enlarge
+          // sheet's cloned menus; the markup is byte-identical to the old injector's).
+          const menuOpenBtn = e.target.closest('.db-card-menu [data-menu-open]')
+          if (menuOpenBtn) {
+            e.preventDefault(); e.stopPropagation()
+            const menu = menuOpenBtn.closest('.db-card-menu')
+            const pop = menu ? menu.querySelector('.spark-menu-pop') : null
+            if (pop) {
+              const willOpen = pop.hidden
+              closeAllDbMenus()
+              pop.hidden = !willOpen
+              if (willOpen) menuOpenBtn.setAttribute('data-open', '')
+              else menuOpenBtn.removeAttribute('data-open')
+            }
+            return
+          }
+          const copyCardBtn = e.target.closest('[data-db-copy-card]')
+          if (copyCardBtn) {
+            e.preventDefault(); e.stopPropagation()
+            closeAllDbMenus()
+            // S208 (S48p parity): copy the RAW title (data-raw-title first — the
+            // full multi-line definition), textContent as the belt.
+            const card = copyCardBtn.closest('.pd-task-wrap')
+            const titleEl = card ? card.querySelector('.pd-task-title') : null
+            const raw = titleEl ? titleEl.getAttribute('data-raw-title') : null
+            const text = raw || (titleEl ? titleEl.textContent : '')
+            try {
+              await navigator.clipboard.writeText(text)
+              window.hibana && window.hibana.toast(_t('common.copied', 'Copied to clipboard'), 'ok')
+            } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't copy"), 'err') }
+            return
+          }
+          const editCardBtn = e.target.closest('[data-db-edit-card]')
+          if (editCardBtn) {
+            e.preventDefault(); e.stopPropagation()
+            closeAllDbMenus()
+            openEditorRepaint(editCardBtn.dataset.dbEditCard)
+            return
+          }
+          const delCardBtn = e.target.closest('[data-db-del-card]')
+          if (delCardBtn) {
+            e.preventDefault(); e.stopPropagation()
+            closeAllDbMenus()
+            const card = delCardBtn.closest('.pd-task-wrap')
+            showDeleteConfirm(delCardBtn.dataset.dbDelCard, (card ? card.querySelector('.pd-task-title')?.textContent : '') || '')
             return
           }
           // Session 22: read-more / read-less toggle — must run BEFORE the card branch
@@ -1472,25 +1556,81 @@
         }
         // Live-place the dragged card inside a column's list (visual feedback + ensures
         // the drop below reads the destination the pointer named, not the card's origin).
-        const placeInList = (col, x, y) => {
-          const list = col.querySelector('.pd-tasks')
-          if (!list || !drag) return
-          const hit = (Number.isFinite(x) && Number.isFinite(y)) ? document.elementFromPoint(x, y) : null
-          const target = hit && hit.closest ? hit.closest('[data-task-card]') : null
-          const addBtn = list.querySelector('.pd-task-add')
-          // guard list.contains(target): elementFromPoint can return a card that lives
-          // in a DIFFERENT column (a tall neighbor bleeding into the pointer) —
-          // insertBefore would throw NotFoundError. Only place relative to a target that
-          // is genuinely a child of THIS list.
-          if (target && target !== drag && list.contains(target)) {
-            const r = target.getBoundingClientRect()
-            const after = y > r.top + r.height / 2
-            list.insertBefore(drag, after ? target.nextSibling : target)
-          } else if (addBtn) {
-            list.insertBefore(drag, addBtn) // append to the end (just above Add task)
-          } else {
-            list.appendChild(drag)
+        // S254 (FE-2): the placement work is rAF-BATCHED — dragover fires at pointer
+        // frequency (per-pointermove on touch, continuously on mouse) and the old
+        // unbatched handler ran an elementFromPoint hit-test + a getBoundingClientRect
+        // + an insertBefore on EVERY event (layout thrash: every insert invalidated
+        // layout, forcing the next event's hit-test into a full relayout). One
+        // scheduled frame now does the work with the LATEST sample; the RECT CACHE
+        // below answers "which card is under the pointer" with pure math while the
+        // pointer hovers one column (zero layout reads per frame), rebuilt only when
+        // the column changes, an insert actually shifts siblings, or a scroll moves
+        // the viewport (the capture listener below). preventDefault stays SYNCHRONOUS
+        // per event — the browser refuses drops where dragover didn't cancel.
+        let dndFrame = 0
+        let dndPending = null // { target, clientX, clientY } — the latest dragover sample
+        let dndRects = null // { col, list, cards: [{el, top, mid, bottom}], stale }
+        const dndBuildRects = (col, list) => {
+          const cards = []
+          for (const el of list.querySelectorAll('[data-task-card]')) {
+            if (el === drag) continue // the dragged card's own rect never places it
+            const r = el.getBoundingClientRect()
+            cards.push({ el, top: r.top, mid: r.top + r.height / 2, bottom: r.bottom })
           }
+          return { col, list, cards, stale: false }
+        }
+        // the viewport can scroll DURING a native drag (browser auto-scroll near the
+        // edges) — cached client rects go stale the moment it does. Capture phase:
+        // scroll events don't bubble.
+        const dndOnScroll = () => { if (dndRects) dndRects.stale = true }
+        const dndPlace = (p) => {
+          const col = colAt(p)
+          if (!col) return
+          const list = col.querySelector('.pd-tasks')
+          if (!list) return
+          if (over !== col) { clearOver(); over = col; col.classList.add('drag-over') } // the S136 column cue
+          if (!dndRects || dndRects.col !== col || dndRects.stale) dndRects = dndBuildRects(col, list)
+          const y = p.clientY
+          const cards = dndRects.cards
+          // which card does the pointer sit on? (the cache's pure-math twin of the old
+          // elementFromPoint + closest + getBoundingClientRect chain — including the
+          // cross-column guard: only THIS list's own cards are candidates)
+          let desired = null // the insertBefore anchor (null = append)
+          for (let i = 0; i < cards.length; i++) {
+            const c = cards[i]
+            if (y < c.top) { desired = c.el; break }
+            if (y <= c.bottom) { desired = y > c.mid ? c.el.nextSibling : c.el; break }
+          }
+          if (!desired && cards.length) {
+            const addBtn = list.querySelector('.pd-task-add')
+            desired = addBtn || null // below the last card → just above Add task
+          }
+          // insert ONLY when the position actually changed — a same-position
+          // insertBefore is still a DOM mutation (layout invalidation per frame)
+          const anchorEl = desired === drag ? null : desired
+          if (anchorEl === null) {
+            if (drag !== list.lastElementChild) { list.appendChild(drag); dndRects.stale = true }
+          } else if (drag.nextSibling !== anchorEl) {
+            list.insertBefore(drag, anchorEl)
+            dndRects.stale = true
+          }
+        }
+        const dndSchedule = (e) => {
+          dndPending = { target: e.target, clientX: e.clientX, clientY: e.clientY }
+          if (dndFrame) return
+          dndFrame = requestAnimationFrame(() => {
+            dndFrame = 0
+            if (!drag || !dndPending) return
+            dndPlace(dndPending)
+          })
+        }
+        // the drop/dragend contract: the LAST dragover's placement must land BEFORE
+        // the ids are read (the e2e suite fires dragover→drop synchronously — the
+        // pending frame would otherwise still be queued when drop runs)
+        const dndFlush = () => {
+          if (dndFrame) { cancelAnimationFrame(dndFrame); dndFrame = 0 }
+          if (drag && dndPending) dndPlace(dndPending)
+          dndPending = null
         }
         ctx.on('dragstart', (e) => {
           const card = e.target.closest('[data-task-card]')
@@ -1499,6 +1639,8 @@
           // same markup but never start a board drag.
           if (card.closest('.db-focus-sheet')) return
           drag = card
+          dndRects = null // a fresh drag invalidates any prior cache
+          window.addEventListener('scroll', dndOnScroll, true)
           e.dataTransfer.effectAllowed = 'move'
           e.dataTransfer.setData('text/plain', card.dataset.taskCard)
           card.classList.add('dragging')
@@ -1513,19 +1655,16 @@
           e.preventDefault()
           // S136: the drop CUE is the COLUMN (.pd-col.drag-over — the pd recipe,
           // project-header.css), not a dashed body outline; the live-reorder still
-          // inserts inside the column's .pd-tasks list.
-          const col = colAt(e)
-          if (!col) return
-          const list = col.querySelector('.pd-tasks')
-          if (!list) return
-          clearOver()
-          over = col
-          col.classList.add('drag-over')
-          placeInList(col, e.clientX, e.clientY)
+          // inserts inside the column's .pd-tasks list — now inside the rAF batch.
+          dndSchedule(e)
         })
         ctx.on('drop', async (e) => {
           if (!drag) return
           e.preventDefault()
+          // FE-2: apply the LAST dragover sample NOW — the reorder ids below read the
+          // live DOM, exactly what the old synchronous handler left behind (the e2e
+          // suite's dragover→drop pairs are synchronous; the frame would be too late).
+          dndFlush()
           const id = drag.dataset.taskCard
           // The destination is the column under the POINTER (not the dragged card's
           // current parent — the live placement above usually relocates it, but a drop
@@ -1570,18 +1709,29 @@
           drag.classList.remove('dragging')
           drag = null
           if (!task || !newStatus) return
+          const prevStatus = task.status
           try {
+            // S254 (FE-1b): every mutation here MERGES into B().state (devboard.js's
+            // patchTask/reorderTasks merge on success) — the repaint below renders
+            // ONLY the touched lanes instead of refetching the whole board.
             if (newStatus !== task.status) await B().patchTask(id, { status: newStatus })
             if (adoptedPrio) await B().patchTask(id, { priority: adoptedPrio })
             const ids = [...(list ? list.querySelectorAll('[data-task-card]') : [])].map((x) => x.dataset.taskCard)
             if (ids.length > 1) await B().reorderTasks(ids)
-            await reload()
+            repaintTaskColumns(task, prevStatus)
           } catch {
             window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
             await reload()
           }
         })
-        ctx.on('dragend', () => { clearOver(); if (drag) { drag.classList.remove('dragging'); drag = null } })
+        ctx.on('dragend', () => {
+          dndFlush() // the pending placement (if any) lands before the drag tears down
+          window.removeEventListener('scroll', dndOnScroll, true)
+          dndRects = null
+          dndPending = null
+          clearOver()
+          if (drag) { drag.classList.remove('dragging'); drag = null }
+        })
 
         // S136: the SEARCH INPUT — debounced like the project page's (pdFilterSearch
         // timer); a full render keeps ONE filtering model (the bar's value attr carries
@@ -1662,16 +1812,30 @@
             el.src = src
             document.head.appendChild(el)
           }
+          // S254 (FE-19): a head <script> that ERRORS (network 404, a stale deploy's
+          // mismatched ?v=) self-injects IMMEDIATELY — no 1.2s poll wait. Resource
+          // error events don't bubble but DO ride the capture phase to window; only
+          // the board's own lib scripts trip it, and the once-set `injected` flag
+          // keeps a failed SELF-injection from looping (the 9s ceiling still rules).
+          const injectAll = () => {
+            if (injected || window.HibanaBoard) return
+            injected = true
+            inject('/js/devboard.js?v=38') // keep in sync with the <head> tag + sw SHELL
+            if (!window.HibanaFocusCore) inject('/js/focus-core.js?v=2') // S237/S238: the focus + view decision core — keep in sync with the <head> tag
+            if (!window.HibanaChips) inject('/js/chip-render.js?v=14') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
+            if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA
+          }
+          const onResErr = (e) => {
+            const el = e.target
+            if (!el || el.tagName !== 'SCRIPT') return
+            const src = String(el.getAttribute('src') || '')
+            if (/\/js\/(devboard|focus-core|chip-render)\.js/.test(src)) injectAll()
+          }
+          window.addEventListener('error', onResErr, true)
           const tick = () => {
-            if (window.HibanaBoard) return resolve(true)
-            if (!injected && waited >= 1200) {
-              injected = true
-              inject('/js/devboard.js?v=37') // keep in sync with the <head> tag + sw SHELL
-              if (!window.HibanaFocusCore) inject('/js/focus-core.js?v=2') // S237/S238: the focus + view decision core — keep in sync with the <head> tag
-              if (!window.HibanaChips) inject('/js/chip-render.js?v=13') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
-              if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA
-            }
-            if (waited >= 9000) return resolve(false)
+            if (window.HibanaBoard) { window.removeEventListener('error', onResErr, true); return resolve(true) }
+            if (!injected && waited >= 1200) injectAll()
+            if (waited >= 9000) { window.removeEventListener('error', onResErr, true); return resolve(false) }
             waited += 150
             setTimeout(tick, 150)
           }
@@ -1695,7 +1859,7 @@
         }
         const boot = async () => {
           const ok = await ensureLib()
-          if (!ok) return fail()
+          if (!ok) { await i18nReady; return fail() }
           // S237: the probe surface — window.HibanaBoard.focusState() reports the live
           // { enabled, focusedStatus, sheetStatus } triple (scripts/probe-focus.mjs
           // reads it; the desktop island ships this same controller verbatim).
@@ -1717,7 +1881,7 @@
               }
               if (!projectId) {
                 const list = await fetchProjects()
-                if (!list.length) return renderNoProjects()
+                if (!list.length) { await i18nReady; return renderNoProjects() }
                 projectId = list[0].id
               }
               // Canonicalize the bare entry URL (replaceState — no history entry): a
@@ -1726,15 +1890,22 @@
               u.searchParams.set('project', projectId)
               history.replaceState(null, '', u)
             } catch {
+              await i18nReady
               return fail()
             }
           }
           document.querySelector('[data-back-link]').href = '/project.html?id=' + projectId
           try {
-            if (preloaded) render()
-            else await reload()
+            // S254 (FE-8): the board GET and the i18n bootstrap run IN PARALLEL — the
+            // old wrapper awaited hibanaI18n.ready (the /api/auth/me round trip + the
+            // lazy FA dictionary fetch) BEFORE boot() even started the load, a serial
+            // waterfall on every cold visit. The first render still waits for BOTH:
+            // an FA user must never see an English flash (the S30 batch 5 rule).
+            if (preloaded) { await i18nReady; render() }
+            else { await Promise.all([B().load(projectId), i18nReady]); render() }
             recordBoard()
           } catch (err) {
+            await i18nReady
             if (err && err.status === 404) return gone()
             return fail()
           }
@@ -1748,12 +1919,17 @@
           if (openTask && B().findTask(openTask)) openTaskView(openTask) // S238: the deep link OPENS THE TASK (the view) — the editor stays behind ⋯ > Edit
           else if (addStatus) B().openEditor(null, { defaults: { status: addStatus }, onSaved: reload })
         }
-        // S30 batch 5 (FA-guard find): `ready` is a PROMISE (always truthy) — the old
-        // truthy-check booted BEFORE apply() resolved the language, so FA users got an
-        // English first render. Await it: it resolves AFTER the lazy FA dictionary
-        // lands (i18n.js's apply awaits ensureFaDict before resolving).
-        if (window.hibanaI18n && window.hibanaI18n.ready) window.hibanaI18n.ready.then(boot).catch(boot)
-        else document.addEventListener('hibana:i18n', boot, { once: true })
+        // S254 (FE-8): the i18n gate as a PROMISE — boot() runs IMMEDIATELY (the
+        // data fetches start the moment HibanaBoard exists, no i18n wait) and the
+        // first render awaits data + i18n TOGETHER. The .catch(() => {}) belt keeps
+        // the old .then(boot).catch(boot) resilience: a failed i18n bootstrap never
+        // kills the board — the English fallbacks carry it. (The S30 batch 5 rule
+        // stands: `ready` resolves only AFTER the lazy FA dictionary lands, so an
+        // awaited render can never flash English at an FA user.)
+        const i18nReady = (window.hibanaI18n && window.hibanaI18n.ready)
+          ? Promise.resolve(window.hibanaI18n.ready).catch(() => {})
+          : new Promise((res) => document.addEventListener('hibana:i18n', () => res(), { once: true }))
+        boot()
 
         // S205: the switcher popover is appended to <body> (positioning + stacking);
         // the page-lifecycle contract calls this on unmount so soft-navigations away

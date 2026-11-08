@@ -175,8 +175,8 @@ import { fileURLToPath } from 'node:url'
 // internal/store/schema.go) + the payload's 8th key decoded verbatim
 // (internal/api/types.go + internal/sync/convert.go). The version ladder:
 // 0.1.37 → 0.1.38.
-const PIN_REF = '6dd40c0'
-const PIN_PACKAGE_VERSION = '0.4.1.44'
+const PIN_REF = 'c556e3a1'
+const PIN_PACKAGE_VERSION = '0.4.1.47'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -361,7 +361,7 @@ const HTML_STRIP_LINES = [
   { name: 'strip vendor/alpine.min.js', cite: 'guide §3.2 (board.html:33)', line: '<script src="/vendor/alpine.min.js" defer></script>' },
   { name: 'strip js/app.js (the web shell — its toast contract moves to desktop-shim.js)', cite: 'guide §3.1+§3.2+§4.3 (board.html:34; S233 re-record: app.js v220 → v221 — the confirm ✕ round bumped the carrier)', line: '<script src="/js/app.js?v=221" defer></script>' },
   { name: 'strip js/hib-init.js', cite: 'guide §3.2 (board.html:35)', line: '<script src="/js/hib-init.js?v=13" defer></script>' },
-  { name: 'strip js/touch-drag.js (touch long-press — irrelevant on desktop)', cite: 'guide §3.2 (board.html:36; UI-UX §7.2)', line: '<script src="/js/touch-drag.js?v=1" defer></script>' },
+  { name: 'strip js/touch-drag.js (touch long-press — irrelevant on desktop)', cite: 'guide §3.2 (board.html:36; UI-UX §7.2)', line: '<script src="/js/touch-drag.js?v=2" defer></script>' },
   { name: 'strip js/nav.js (browser-history rail; its __hibanaPage mount consumer is re-owned by desktop-shim.js)', cite: 'guide §3.2 (board.html:37)', line: '<script src="/js/nav.js?v=45" defer></script>' },
   { name: 'strip js/command-palette.js', cite: 'guide §3.2 (board.html:38)', line: '<script src="/js/command-palette.js?v=19" defer></script>' },
   { name: 'strip js/mobile-nav.js', cite: 'guide §3.2 (board.html:39)', line: '<script src="/js/mobile-nav.js?v=17" defer></script>' },
@@ -383,7 +383,7 @@ const HTML_STRIP_LINES = [
 const HTML_INSERT = {
   name: 'insert /js/desktop-shim.js before devboard.js',
   cite: 'guide §3.2 + §4.3',
-  anchor: '<script src="/js/devboard.js?v=37" defer></script>',
+  anchor: '<script src="/js/devboard.js?v=38" defer></script>',
   insert: '<script src="/js/desktop-shim.js"></script>',
 }
 
@@ -487,7 +487,7 @@ const HTML_THEME_OPS = [
   {
     name: 'insert /js/desktop-theme.js after the chip-render.js tag — the FIRST blocking head script (immediately before desktop-shim.js)',
     cite: 'v0.1.5 (S216); desktop-theme.js: the pre-paint resolution must beat the first render',
-    anchor: `    <script src="/js/chip-render.js?v=13" defer></script>`,
+    anchor: `    <script src="/js/chip-render.js?v=14" defer></script>`,
     insert: `<script src="/js/desktop-theme.js"></script>`,
   },
   {
@@ -1441,7 +1441,7 @@ const SPRINT_INSERTS = [
   // loads sprint-page.js instead (from its own body <script> tag, kept verbatim).
   {
     name: 'insert the desktop-owned script block (theme + shim + audio + login) before devboard.js (sprint page)',
-    anchor: '<script src="/js/devboard.js?v=37" defer></script>',
+    anchor: '<script src="/js/devboard.js?v=38" defer></script>',
     insert: '<script src="/js/desktop-theme.js"></script>\n<script src="/js/desktop-shim.js"></script>\n<script src="/js/desktop-audio.js"></script>\n<script src="/js/desktop-login.js"></script>',
     position: 'before',
   },
@@ -6394,13 +6394,13 @@ function verifyDist(outDir, fileMap) {
     }
     if (!focusCore.includes('escPeel')) problems.push('js/focus-core.js: the S238 escPeel decision is missing')
     if (!indexHtml.includes('/js/focus-core.js?v=2')) problems.push('index.html: the focus-core.js tag must read ?v=2 (the S238 bump)')
-    if (!indexHtml.includes('/js/board-page.js?v=34')) problems.push('index.html: the board-page.js tag must read ?v=34 (the S250 re-pin bump)')
+    if (!indexHtml.includes('/js/board-page.js?v=35')) problems.push('index.html: the board-page.js tag must read ?v=35 (the S254 re-pin bump)')
     if (!indexHtml.includes('/css/devboard.css?v=46')) problems.push('index.html: the devboard.css tag must read ?v=46 (the S250 re-pin bump — the strategies section styles)')
     // S248 (the Sprint/Deadline/Dependency island round): the feature's own
     // carriers + the new manifest entries are pinned here — a drifted pin would
     // silently ship a pre-feature island, so every marker must be present.
-    if (!indexHtml.includes('/js/devboard.js?v=37')) problems.push('index.html: the devboard.js tag must read ?v=37 (the S250 strategies wrappers ride the S248 feature stack)')
-    if (!indexHtml.includes('/js/due-control.js?v=1')) problems.push('index.html: the due-control.js tag must read ?v=1 (the S244 shared date control — S248 manifest entry)')
+    if (!indexHtml.includes('/js/devboard.js?v=38')) problems.push('index.html: the devboard.js tag must read ?v=38 (the S254 interaction-performance round — the state-merge layer)')
+    if (!indexHtml.includes('/js/due-control.js?v=2')) problems.push('index.html: the due-control.js tag must read ?v=2 (the S254 i18n-guard round)')
     if (!indexHtml.includes('/js/emoji-picker.js?v=4')) problems.push('index.html: the emoji-picker.js tag must read ?v=4 (the S243 emoji identity — S248 manifest entry)')
     if (!indexHtml.includes('/js/i18n-en.js?v=111')) problems.push('index.html: the i18n-en.js tag must read ?v=111 (the S242-S247 feature keys + the S250 st.* set)')
     if (!indexHtml.includes('/js/i18n.js?v=164')) problems.push('index.html: the i18n.js tag must read ?v=164 (the i18n-fa v105 injector carrier)')

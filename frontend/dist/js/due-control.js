@@ -49,7 +49,13 @@
 (function () {
   'use strict'
 
-  const t = (key, fallback) => (window.hibanaI18n && window.hibanaI18n.t(key)) || fallback
+  // S254 (FE-15): the s !== k guard — a missing key must fall back to the local
+  // English, never leak the raw key (hibanaI18n.t returns the key when both
+  // dictionaries miss — truthy, so `|| fallback` never fired on that path).
+  const t = (key, fallback) => {
+    const s = window.hibanaI18n ? window.hibanaI18n.t(key) : null
+    return s && s !== key ? s : fallback
+  }
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
   const DAY = 86400000
   const HOUR = 3600000

@@ -27,7 +27,13 @@
   'use strict'
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
-  const t = (k, f) => (window.hibanaI18n && window.hibanaI18n.t(k)) || f
+  // S254 (FE-15): the s !== k guard — a missing key must fall back to the local
+  // English, never leak the raw key (hibanaI18n.t returns the key when both
+  // dictionaries miss — truthy, so `|| fallback` never fired on that path).
+  const t = (k, f) => {
+    const s = window.hibanaI18n ? window.hibanaI18n.t(k) : null
+    return s && s !== k ? s : f
+  }
 
   const TITLE_CLAMP = 150
 

@@ -34,7 +34,11 @@
     const isMutation = !!(opts && opts.method && opts.method !== 'GET')
     const fetchOnce = isMutation ? send() : new Promise((resolve, reject) => {
       const ctl = new AbortController()
-      const timer = setTimeout(() => ctl.abort(), 3000)
+      // S254 (FE-12): the GET first deadline is 8s (was 3s). A 3s abort + retry
+      // DOUBLED the felt latency on genuinely slow networks (the first request
+      // was usually about to land). The signal-wrapped dispatch stays — that's
+      // the actual edge-bug mitigation — and the one retry on abort stays too.
+      const timer = setTimeout(() => ctl.abort(), 8000)
       send(ctl.signal).then(
         (r) => { clearTimeout(timer); resolve(r) },
         (e) => {
@@ -74,7 +78,15 @@
     })
   }
 
-  const t = (key, fallback) => (window.hibanaI18n && window.hibanaI18n.t(key)) || fallback
+  // S254 (FE-15): the s !== k guard — hibanaI18n.t() returns the KEY itself when
+  // both dictionaries miss it (e.g. the dict script never loaded), which is
+  // truthy — the old `|| fallback` shape leaked the raw key ('db.foo') into the
+  // UI instead of this library's own English fallback. board-page.js's _t has
+  // carried the correct guard since S30 batch 5; the library twins adopt it.
+  const t = (key, fallback) => {
+    const s = window.hibanaI18n ? window.hibanaI18n.t(key) : null
+    return s && s !== key ? s : fallback
+  }
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
   // 0031: 'bug' closes the loop — a red Problems column on both boards.
@@ -238,6 +250,146 @@
       total++
     }
     return { counts, total }
+  }
+
+  // ---- S254 (FE-1): the client-side state merges for task mutations ----------
+  // The per-column repaint (board) and the no-refetch render (sprint) need the
+  // PATCH / POST / reorder outcomes folded into state WITHOUT the full board
+  // GET. Each helper replicates the SERVER's own field semantics exactly
+  // (src/routes/devboard.ts): the done_at stamp rule, due_at's origin rules,
+  // the PRIO_ORDER_SQL → sort_order → created_at ORDER BY, and the quick-add
+  // draft/open-sprint auto-assign. Pure state work — zero fetches, zero seams.
+  const PRIO_RANK = { urgent: 0, high: 1, medium: 2, low: 3 }
+  // the board GET's ORDER BY, as a comparator (devboard-helpers.ts PRIO_ORDER_SQL:
+  // CASE priority urgent/high/medium/low ELSE 4 — a NULL priority sorts LAST on
+  // the server even though every renderer displays it as 'medium')
+  const sortTasksLikeServer = () => {
+    state.tasks.sort((a, b) => {
+      const pa = PRIO_RANK[a.priority] !== undefined ? PRIO_RANK[a.priority] : 4
+      const pb = PRIO_RANK[b.priority] !== undefined ? PRIO_RANK[b.priority] : 4
+      if (pa !== pb) return pa - pb
+      const sa = Number(a.sort_order || 0)
+      const sb = Number(b.sort_order || 0)
+      if (sa !== sb) return sa - sb
+      return String(a.created_at || '').localeCompare(String(b.created_at || ''))
+    })
+  }
+  // effectiveDeadlineOf's client twin (devboard-helpers.ts §10 precedence):
+  // personal override → non-completed sprint inheritance → none.
+  const recomputeEffectiveDeadline = (task) => {
+    const sprint = task.sprint_id != null ? findSprint(task.sprint_id) : null
+    if (task.due_at != null) {
+      task.effective_due_at = task.due_at
+      task.effective_due_source = 'task'
+      task.effective_due_origin_at = task.due_origin_at ?? task.due_at
+    } else if (sprint && sprint.due_at != null && sprintStatusOf(sprint) !== 'completed') {
+      task.effective_due_at = sprint.due_at
+      task.effective_due_source = 'sprint'
+      task.effective_due_origin_at = sprint.due_origin_at ?? sprint.due_at
+    } else {
+      task.effective_due_at = null
+      task.effective_due_source = null
+      task.effective_due_origin_at = null
+    }
+  }
+  // fold a successful PATCH body into the state row (devboard.ts PATCH semantics)
+  const mergeTaskPatch = (id, body, res) => {
+    const task = findTask(id)
+    if (!task || !body) return null
+    const now = new Date().toISOString()
+    const prevStatus = task.status
+    const hadDue = task.due_at != null
+    for (const [k, v] of Object.entries(body)) {
+      if (k === 'tags' || k === 'due_origin_at') continue // handled below
+      if (v === undefined) continue
+      task[k] = v
+    }
+    // the date rule: entering 'done' stamps done_at (only when empty); leaving
+    // 'done' clears it; created_at never moves.
+    if (body.status && body.status !== prevStatus) {
+      if (body.status === 'done' && !task.done_at) task.done_at = now
+      else if (body.status !== 'done' && task.done_at) task.done_at = null
+    }
+    // §13.4's origin rules: null clears both; null→value stamps (the body's
+    // ride-along honored); value→value preserves the origin (an edit ≠ a reset).
+    if (body.due_at !== undefined) {
+      if (body.due_at === null) task.due_origin_at = null
+      else if (!hadDue) task.due_origin_at = body.due_origin_at ?? now
+    }
+    // the labels ride the PATCH as a replace-set; the response carries the FINAL
+    // link set (server-assigned palette colors included)
+    if (body.tags !== undefined && res && Array.isArray(res.tags)) {
+      task.tags = res.tags.map((r) => String(r.id))
+      syncTagLibrary(res.tags, now)
+    }
+    task.updated_at = now
+    recomputeEffectiveDeadline(task)
+    sortTasksLikeServer()
+    return task
+  }
+  // fold a successful POST ack into state (devboard.ts POST semantics): sort_order
+  // 0, stamps now, the draft/open-sprint auto-assign for an undefined sprint_id
+  // (the exact sibling ORDER BYs), and the created tags join the local library.
+  const mergeCreatedTask = (res, body) => {
+    if (!res || !res.id || findTask(res.id)) return null
+    const b = body || {}
+    const now = new Date().toISOString()
+    const status = b.status ?? 'idea'
+    let sprintId = b.sprint_id ?? null
+    if (b.sprint_id === undefined) {
+      const drafts = state.sprints.filter((s) => s.is_draft)
+        .sort((a2, b2) => String(b2.created_at || '').localeCompare(String(a2.created_at || '')))
+      if (drafts[0]) sprintId = drafts[0].id
+      else {
+        const open = state.sprints.filter((s) => !s.is_draft && s.ended_at == null)
+          .sort((a2, b2) => String(b2.started_at || '').localeCompare(String(a2.started_at || '')))
+        if (open[0]) sprintId = open[0].id
+      }
+    }
+    const task = {
+      id: res.id,
+      project_id: state.projectId,
+      title: b.title,
+      status,
+      priority: b.priority ?? 'medium',
+      category_id: b.category_id ?? null,
+      sprint_id: sprintId,
+      sort_order: 0,
+      created_at: now,
+      updated_at: now,
+      done_at: status === 'done' ? now : null,
+      start_at: b.start_at ?? null,
+      end_at: b.end_at ?? null,
+      due_at: b.due_at ?? null,
+      due_origin_at: b.due_at != null ? now : null,
+      shot_count: 0,
+      tags: (Array.isArray(res.tags) ? res.tags : []).map((r) => String(r.id)),
+    }
+    if (Array.isArray(res.tags)) syncTagLibrary(res.tags, now)
+    state.tasks.push(task)
+    recomputeEffectiveDeadline(task)
+    sortTasksLikeServer()
+    return task
+  }
+  // link rows the library doesn't know yet (freshly find-or-created tags) — the
+  // board's chip lookups (tagById) stay truthful without a re-pull
+  const syncTagLibrary = (rows, now) => {
+    for (const r of rows || []) {
+      if (!r || !r.id || tagById(r.id)) continue
+      state.tags.push({ id: r.id, name: r.name, color: r.color, user_id: null, usage_count: 1, created_at: now })
+    }
+  }
+  // the reorder writes sort_order = array index for the listed ids only
+  const applyReorder = (ids) => {
+    if (!Array.isArray(ids)) return
+    const byId = new Map(ids.map((id, i) => [id, i]))
+    for (const t of state.tasks) if (byId.has(t.id)) t.sort_order = byId.get(t.id)
+    sortTasksLikeServer()
+  }
+  // a local delete (the board's per-column repaint path) — the SERVER delete
+  // already succeeded when this runs
+  const removeTaskLocal = (id) => {
+    state.tasks = state.tasks.filter((t) => t.id !== id)
   }
 
   // ---------------------------------------------------------------- deadline render
@@ -500,12 +652,16 @@
   // createTask is deliberately untracked: a fresh card renders from the server's
   // own creation ack (synced by definition — spec §2).
   const tracked = (id, run) => (window.HibanaSyncState && id ? window.HibanaSyncState.track(id, run) : run())
+  // S254 (FE-1): createTask/patchTask/reorderTasks MERGE their outcome into
+  // state on success (the client twin of the server's own write semantics —
+  // see the merge helpers above) so the pages repaint from state without the
+  // full board GET. The response shapes are unchanged for every caller.
   const createTask = (body) => api('/api/projects/' + state.projectId + '/devtasks', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  })
+  }).then((res) => { mergeCreatedTask(res, body); return res })
   const patchTask = (id, body) => tracked(id, () => api('/api/devtasks/' + id, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  }))
+  }).then((res) => { mergeTaskPatch(id, body, res); return res }))
   const deleteTask = (id) => tracked(id, () => api('/api/devtasks/' + id, { method: 'DELETE' }))
   // S246 (spec pack Phase 7 — contract §12.3's WRITE surface): the dep edge
   // wrappers, the patchTask shape. They ride the SHARED api() wrapper (ZERO new
@@ -528,7 +684,8 @@
       }))
     : api('/api/projects/' + state.projectId + '/devtasks/reorder', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
-      }))
+      })
+  ).then((res) => { applyReorder(ids); return res })
   const addTaskTag = (id, name, color) => tracked(id, () => api('/api/devtasks/' + id + '/tags', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color }),
   }))
@@ -2998,6 +3155,9 @@
     STATUSES, PRIORITIES, PRIO_CYCLE, cyclePriority, mdTaskLine, statusLabel, prioLabel, openLabels,
     DAY, dayIdx, todayIdx, calOf, monthLabel, dayLabel, fullLabel, weekdayIdx,
     findTask, findCategory, findSprint, tagById,
+    // S254 (FE-1): the state-merge stack for the per-column repaint (board) and
+    // the no-refetch render (sprint) — exported for the pages' repaint flows.
+    mergeTaskPatch, mergeCreatedTask, applyReorder, removeTaskLocal, sortTasksLikeServer,
     createTask, patchTask, deleteTask, reorderTasks, addTaskTag, removeTaskTag,
     createCategory, patchCategory, deleteCategory, reorderCategories,
     createSprint, startSprint, patchSprint, renameSprint, finishSprint, reopenSprint, deleteSprint,

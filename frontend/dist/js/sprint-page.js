@@ -1279,7 +1279,9 @@
         ctx.on('click', (e) => {
           const t = e.target.closest('[data-sp-detail-open-task]')
           if (!t) return
-          B().openEditor(t.dataset.task, { onSaved: () => { const id = sprintDetailCtx; closeSprintDetail(); reload().then(() => { if (id) openSprintDetail(id, 'tasks') }) } })
+          // S254 (FE-1): the editor's save MERGED into state (patchTask) — the pure
+          // render + the detail reopen replace the full board refetch.
+          B().openEditor(t.dataset.task, { onSaved: () => { const id = sprintDetailCtx; closeSprintDetail(); render(); if (id) openSprintDetail(id, 'tasks') } })
         })
 
         // ---- floating date tooltip shared by every drag -----------------------------
@@ -1377,7 +1379,9 @@
                     const body = (cur >= today && task.status !== 'done') ? { end_at: null } : { end_at: dayIso(cur) }
                     await B().patchTask(task.id, body)
                   }
-                  await reload()
+                  // S254 (FE-1): patchTask MERGED the trim into state — the render
+                  // is pure (no board GET; the timeline geometry recomputes from state)
+                  render()
                 } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err'); await reload() }
               },
             }
@@ -1725,7 +1729,8 @@
           const edit = e.target.closest('[data-cat-edit]')
           if (edit) { openCatPop(edit); return }
           const bar = e.target.closest('[data-bar],[data-sptask]')
-          if (bar && !e.target.closest('[data-trim]')) B().openEditor(bar.dataset.task, { onSaved: reload })
+          // S254 (FE-1): the editor's save MERGES into state (patchTask) — pure render
+          if (bar && !e.target.closest('[data-trim]')) B().openEditor(bar.dataset.task, { onSaved: render })
           const newCat = e.target.closest('[data-new-category]')
           if (newCat) {
             const form = document.querySelector('[data-cat-form]')
@@ -1758,8 +1763,10 @@
           if (!title) return
           const catId = input.dataset.quickadd
           try {
+            // S254 (FE-1): createTask MERGES the ack into state (id + auto-sprint
+            // + tags) — the render is pure, no board GET.
             await B().createTask({ title, status: 'idea', category_id: catId === 'none' ? undefined : catId })
-            await reload()
+            render()
           } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err') }
         })
 
@@ -2029,33 +2036,94 @@
           else if (bar) { dragKind = 'bar'; dragEl = bar; dragTaskId = bar.dataset.task }
           else if (cat && cat.dataset.spcat !== 'none') { dragKind = 'cat'; dragEl = cat; dragTaskId = null }
           else return
+          spDndRects = null // a fresh drag invalidates any prior cache
           e.dataTransfer.effectAllowed = 'move'
           e.dataTransfer.setData('text/plain', dragTaskId || dragEl.dataset.spcat)
           dragEl.classList.add('dragging')
         })
+        // S254 (FE-2): the two PLACEMENT branches (the category reorder + the sidebar
+        // task reorder) are rAF-BATCHED with cached target rects — the old handler ran
+        // a getBoundingClientRect + insertBefore on EVERY dragover event (layout
+        // thrash at pointer frequency; touch fires per pointermove). One frame does
+        // the work with the LATEST sample; hover-in-place costs zero layout reads, and
+        // the cache rebuilds when the list changes or an insert shifts siblings. The
+        // timeline-target branches below stay synchronous: closest walks + class
+        // toggles only — no layout reads — and the drop contract reads dropTarget live.
+        let spDndFrame = 0
+        let spDndPending = null // { kind:'cat'|'task', over?, target?, list?, y }
+        let spDndRects = null // { key, rects:[{el,top,mid,bottom}], stale }
+        const spDndBuildRects = (key, els) => {
+          const rects = []
+          for (const el of els) {
+            if (el === dragEl) continue
+            const r = el.getBoundingClientRect()
+            rects.push({ el, top: r.top, mid: r.top + r.height / 2, bottom: r.bottom })
+          }
+          return { key, rects, stale: false }
+        }
+        const spDndPlace = (p) => {
+          if (p.kind === 'cat') {
+            const over = p.over
+            if (!over || !over.isConnected || over === dragEl || over.dataset.spcat === 'none' || !over.parentElement) return
+            if (!spDndRects || spDndRects.key !== 'cat' || spDndRects.stale) spDndRects = spDndBuildRects('cat', sideEl.querySelectorAll('.sp-cat'))
+            const c = spDndRects.rects.find((x) => x.el === over)
+            if (!c) { spDndRects = null; return } // a re-render raced the cache — rebuild next frame
+            const desired = p.y > c.mid ? over.nextSibling : over
+            if (desired !== dragEl && dragEl.nextSibling !== desired) {
+              over.parentElement.insertBefore(dragEl, desired)
+              spDndRects.stale = true
+            }
+          } else if (p.kind === 'task') {
+            const list = p.list
+            if (!list || !list.isConnected) return
+            if (!spDndRects || spDndRects.key !== list || spDndRects.stale) spDndRects = spDndBuildRects(list, list.querySelectorAll('[data-sptask]'))
+            let desired = null
+            if (p.target && p.target !== dragEl) {
+              const c = spDndRects.rects.find((x) => x.el === p.target)
+              if (!c) { spDndRects = null; return }
+              desired = p.y > c.mid ? p.target.nextSibling : p.target
+            } else {
+              const addRow = list.querySelector('.sp-task-addrow')
+              desired = addRow || null
+            }
+            const anchorEl = desired === dragEl ? null : desired
+            if (anchorEl === null) {
+              if (dragEl !== list.lastElementChild) { list.appendChild(dragEl); spDndRects.stale = true }
+            } else if (dragEl.nextSibling !== anchorEl) {
+              list.insertBefore(dragEl, anchorEl)
+              spDndRects.stale = true
+            }
+          }
+        }
+        const spDndSchedule = (p) => {
+          spDndPending = p
+          if (spDndFrame) return
+          spDndFrame = requestAnimationFrame(() => {
+            spDndFrame = 0
+            if (!dragEl || !spDndPending) return
+            spDndPlace(spDndPending)
+          })
+        }
+        // the drop/dragend contract: the LAST sample's placement lands BEFORE the
+        // reorder ids are read (the e2e suite fires dragover→drop synchronously)
+        const spDndFlush = () => {
+          if (spDndFrame) { cancelAnimationFrame(spDndFrame); spDndFrame = 0 }
+          if (dragEl && spDndPending) spDndPlace(spDndPending)
+          spDndPending = null
+        }
         ctx.on('dragover', (e) => {
           if (!dragEl) return
           if (dragKind === 'cat') {
             const over = e.target.closest('.sp-cat')
             if (!over || over === dragEl || over.dataset.spcat === 'none') return
             e.preventDefault()
-            const r = over.getBoundingClientRect()
-            const after = e.clientY > r.top + r.height / 2
-            over.parentElement.insertBefore(dragEl, after ? over.nextSibling : over)
+            spDndSchedule({ kind: 'cat', over, y: e.clientY })
           } else if (dragKind === 'side-task') {
             const list = e.target.closest('.sp-cat-tasks')
             if (list) {
               // the sidebar's own lists: the reorder/move-across-categories path
               e.preventDefault()
-              const target = e.target.closest('[data-sptask]')
-              const addRow = list.querySelector('.sp-task-addrow')
-              if (target && target !== dragEl) {
-                const r = target.getBoundingClientRect()
-                const after = e.clientY > r.top + r.height / 2
-                list.insertBefore(dragEl, after ? target.nextSibling : target)
-              } else if (addRow) {
-                list.insertBefore(dragEl, addRow)
-              }
+              spDndSchedule({ kind: 'task', list, target: e.target.closest('[data-sptask]'), y: e.clientY })
               return
             }
             // S206 (owner: "the sprint system is buggy" — probe-confirmed): a sidebar
@@ -2088,6 +2156,9 @@
         ctx.on('drop', async (e) => {
           if (!dragEl) return
           e.preventDefault()
+          // FE-2: the LAST dragover sample's placement lands NOW — the reorder ids
+          // below read the live sidebar DOM (sync dragover→drop pairs, e2e included)
+          spDndFlush()
           const kind = dragKind
           const el = dragEl
           const taskId = dragTaskId
@@ -2118,7 +2189,7 @@
                       const catId = target.id === 'none' ? null : target.id
                       if (task.category_id !== catId) await B().patchTask(task.id, { category_id: catId })
                     }
-                  } finally { await reload() }
+                  } finally { render() } // S254 (FE-1): the merge already landed — pure render
                   return
                 }
               }
@@ -2132,7 +2203,8 @@
               }
               const ids = [...sideEl.querySelectorAll('[data-sptask]')].map((x) => x.dataset.sptask)
               if (ids.length > 1) await B().reorderTasks(ids)
-              await reload()
+              // S254 (FE-1): the category move + reorder MERGED into state — pure render
+              render()
             } else if (kind === 'bar' && target && taskId) {
               const task = B().findTask(taskId)
               if (task) {
@@ -2145,12 +2217,16 @@
                   const catId = target.id === 'none' ? null : target.id
                   if (task.category_id !== catId) await B().patchTask(task.id, { category_id: catId })
                 }
-                await reload()
+                // S254 (FE-1): the assignment/patch MERGED into state — pure render
+                render()
               }
             }
           } catch { window.hibana && window.hibana.toast(_t('sparks.saveFailed', "Couldn't save"), 'err'); await reload() }
         })
         ctx.on('dragend', () => {
+          spDndFlush() // the pending placement (if any) lands before the teardown
+          spDndRects = null
+          spDndPending = null
           if (dragEl) dragEl.classList.remove('dragging')
           dragKind = null; dragEl = null; dragTaskId = null
           clearDropUi()
@@ -2184,14 +2260,27 @@
             el.src = src
             document.head.appendChild(el)
           }
+          // S254 (FE-19, the board twin): a failed head <script> self-injects
+          // immediately (capture-phase resource error) instead of waiting out the
+          // 1.2s poll; the `injected` flag keeps a failed self-injection from
+          // looping and the 9s ceiling still rules.
+          const injectAll = () => {
+            if (injected || window.HibanaBoard) return
+            injected = true
+            inject('/js/devboard.js?v=38') // keep in sync with the <head> tag + sw SHELL
+            if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali timeline for FA
+          }
+          const onResErr = (e) => {
+            const el = e.target
+            if (!el || el.tagName !== 'SCRIPT') return
+            const src = String(el.getAttribute('src') || '')
+            if (/\/js\/devboard\.js/.test(src)) injectAll()
+          }
+          window.addEventListener('error', onResErr, true)
           const tick = () => {
-            if (window.HibanaBoard) return resolve(true)
-            if (!injected && waited >= 1200) {
-              injected = true
-              inject('/js/devboard.js?v=37') // keep in sync with the <head> tag + sw SHELL
-              if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali timeline for FA
-            }
-            if (waited >= 9000) return resolve(false)
+            if (window.HibanaBoard) { window.removeEventListener('error', onResErr, true); return resolve(true) }
+            if (!injected && waited >= 1200) injectAll()
+            if (waited >= 9000) { window.removeEventListener('error', onResErr, true); return resolve(false) }
             waited += 150
             setTimeout(tick, 150)
           }
@@ -2220,24 +2309,34 @@
           document.getElementById('sp-board-link').href = '/kanban?project=' + projectId
           document.title = 'Sprints — Hibana'
           const ok = await ensureLib()
-          if (!ok) return fail()
+          if (!ok) { await i18nReady; return fail() }
           try {
-            await reload()
+            // S254 (FE-8, the board twin): the devboard GET starts IMMEDIATELY and
+            // the first render awaits data + hibanaI18n.ready TOGETHER — the old
+            // wrapper made the load wait out the /api/auth/me + FA-dictionary dance
+            // first (a serial waterfall on every cold visit; the render itself still
+            // needs the language, so BOTH are awaited — no English flash for FA).
+            await Promise.all([B().load(projectId), i18nReady])
+            render()
             document.getElementById('sp-title').textContent = B().state.project ? B().state.project.title : ''
             // S243 (Screen G's Settings entry): ?sprint=<id> deep-links the detail
             // panel open (the Kanban compact overview's Settings action targets it).
             const deep = qs.get('sprint')
             if (deep && B().findSprint(deep)) openSprintDetail(deep, 'settings')
           } catch (err) {
+            await i18nReady
             if (err && err.status === 404) return gone()
             fail()
           }
         }
-        // S30 batch 5 (FA-guard find): `ready` is a PROMISE (always truthy) — the old
-        // truthy-check booted BEFORE apply() resolved the language, so FA users got an
-        // English first render. Await it: it resolves AFTER the lazy FA dictionary
-        // lands (i18n.js's apply awaits ensureFaDict before resolving).
-        if (window.hibanaI18n && window.hibanaI18n.ready) window.hibanaI18n.ready.then(boot).catch(boot)
-        else document.addEventListener('hibana:i18n', boot, { once: true })
+        // S254 (FE-8): the i18n gate as a PROMISE — boot() runs IMMEDIATELY (the
+        // devboard GET rides out the moment HibanaBoard exists); the first render
+        // awaits it alongside the data. The .catch(() => {}) belt keeps the old
+        // .then(boot).catch(boot) resilience: a failed i18n bootstrap never kills the
+        // page — the English fallbacks carry it.
+        const i18nReady = (window.hibanaI18n && window.hibanaI18n.ready)
+          ? Promise.resolve(window.hibanaI18n.ready).catch(() => {})
+          : new Promise((res) => document.addEventListener('hibana:i18n', () => res(), { once: true }))
+        boot()
       },
     })
