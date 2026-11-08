@@ -363,3 +363,29 @@ released** (installer + portable zip + checksums, the auto-release lane).
 The web half went live the same session (be43ccb → CD): the 13-probe live verification
 on hibana.ir is recorded in hibana-source's worklog. Owner-side: the desktop app picks
 up 0.1.39 on the next update check; the Sprints page carries the strategies tier.
+
+## Session S254 close — the interaction-performance re-pin (2026-11-08)
+
+The desktop half of hibana-source's Phase 3 (S254): the island moves `6dd40c0` (web
+v0.4.1.44) → **`c556e3a1` (web v0.4.1.47)** — the FEEL round (rAF-batched dragover +
+cached rects on all three DnD surfaces, touch-action only on the 250 ms arm, parallel
+boot, delegated card menus + the state-merge layer with single-column repaint, chip
+focus restore, the 8 s first-deadline, the i18n guards, the error-event ensureLib).
+Zero desktop-owned Go/code change — the pure island re-pin.
+
+The ritual, all green: PIN_REF/PIN_PACKAGE_VERSION bumped; four drifted HTML anchors
+re-recorded (touch-drag v1→v2 strip, devboard v37→v38 shim + sprint inserts,
+chip-render v13→v14 theme anchor) + the three index.html verify needles (board-page
+v35 / devboard v38 / due-control v2) + the sprintdeadline probe's carrier needles;
+`sync-island --check` OK (76 files byte-identical); desktop.yml WEB_REF+WEB_VERSION
+twins moved together; **ALL 14 probes GREEN** on the real island bytes. Note: the
+root-tidy PR's push had already auto-cut 0.1.45 on the OLD pin — this re-pin's push
+cut **v0.1.46-desktop**, which is the release that actually carries the round
+(verified: portable zip + embedded exe sha256 both match checksums.txt, WebRef
+stamp `c556e3a1` ×4, main.Version 0.1.46, the S254 carriers devboard?v=38 /
+board-page?v=35 / due-control?v=2 / chip-render?v=14 inside the embedded island).
+
+Owner-side: the app picks up 0.1.46 on the next update check; the board FEELS
+different — drags are smooth, mutations repaint one column instead of reloading the
+board, quick-adds don't refetch, and mobile scrolling works from draggable cards
+(the web half's full record is hibana-source's worklog S254).
