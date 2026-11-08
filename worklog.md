@@ -389,3 +389,36 @@ Owner-side: the app picks up 0.1.46 on the next update check; the board FEELS
 different — drags are smooth, mutations repaint one column instead of reloading the
 board, quick-adds don't refetch, and mobile scrolling works from draggable cards
 (the web half's full record is hibana-source's worklog S254).
+
+## Session S255 close — the payload & network diet re-pin (2026-11-08)
+
+The desktop half of hibana-source's Phase 4 (S255): the island moves `c556e3a1`
+(web v0.4.1.47) → **`8ef1ffa9` (web v0.4.1.48)** — the BYTES round (BE-3's
+opt-in `?lean=1` board payload: description omitted, the derived `doc_checked`
+rides — the island's boots/reloads all carry it through the api() choke point
+with the seam count STAYING 7; BE-25's version-stamp weak ETag on the board GET
+— the Go sync's conditional `get()` poll now 304s past unchanged boards with
+zero assembly; FE-4's project-page repaint (web-only file); FE-7's dead
+timeline bars retired). Zero desktop-owned Go/code change — the pure island
+re-pin.
+
+The honest probe work this round (DT-2's doctrine: the probes are the only
+browser-level gate): **ALL 12 devboard-matching mock bridges gained the lean
+query** — the island's boot now fetches `devboard?lean=1` and the mocks' anchored
+`/devboard$` regexes let it fall through to the generic `{}` response (the first
+re-pin run failed newproject/refresh on exactly that). The REAL Go bridge needs
+no change (the Request path allow-list checks the `/api/` prefix — query strings
+ride through to the live server). The sprintdeadline probe's carrier needles
+re-pinned (devboard v38→v39, board-page v35→v36).
+
+The ritual, all green: PIN_REF/PIN_PACKAGE_VERSION bumped; two drifted shim-insert
+anchors re-recorded (the devboard v38→v39 anchor, board + sprint) + the two
+index.html verify needles; `sync-island --check` OK (76 files byte-identical);
+desktop.yml WEB_REF+WEB_VERSION twins moved together (8ef1ffa9 / 0.4.1.48);
+**ALL 14 probes GREEN** on the real island bytes. The push cut
+**v0.1.48-desktop** (the windows runner builds installer + portable + checksums).
+
+The desktop sync stays on the DEFAULT board payload (the web spec's call — the
+mirror keeps `sprints[].description`; the conditional poll's ETag store is what
+BE-25's 304s ride). Adopting `lean=1` in the Go mirror is a later optional round
+(the doc endpoint `GET /api/sprints/:id/doc` is its fetch-on-open counterpart).
