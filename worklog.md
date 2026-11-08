@@ -6,10 +6,10 @@
 > secret here, ever.
 >
 > NOTE (S237, 2026-11-04): this file STARTS at S237. The desktop repo's previous
-> sessions tracked their journal in the rich commit messages + TAG-NOTES.md
+> sessions tracked their journal in the rich commit messages + docs/TAG-NOTES.md
 > instead (see `git log` — every round carries its full scope in the message).
 > The S237 brief asked for a worklog.md per repo going forward, so it begins
-> here; the pre-S237 history lives in git log + TAG-NOTES.md.
+> here; the pre-S237 history lives in git log + docs/TAG-NOTES.md.
 
 ## Session S237 — Focus Mode: the island round (2026-11-04)
 
