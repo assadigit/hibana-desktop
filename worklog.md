@@ -525,3 +525,33 @@ bytes, not just shipped.
 
 **The release:** pushed 7f2a23d → the autorelease lane cut v0.1.52-desktop
 (lockstep bump + the windows runner's build + publish).
+
+## Session S260 — the S259-finding re-pin (2026-11-09)
+
+**The round:** the desktop half of the web's S260 (hibana-source @ ea549418,
+web v0.4.1.52 — the Phase-8 row's named follow-up: the S259 finding's
+micro-fix, the editor's immediate tag add/remove on an EXISTING task now
+merging into state.tasks[].tags so the post-save repaint paints the card chip
+in the same beat). The version ladder: 0.1.53 → 0.1.54.
+
+**The pin bump (the double-lock):** PIN_REF 2f3aac14 → ea549418;
+PIN_PACKAGE_VERSION 0.4.1.51 → 0.4.1.52; desktop.yml's WEB_REF/WEB_VERSION
+twins moved together.
+
+**The anchors re-recorded:** the devboard insert anchors v40 → v41 (board +
+sprint), the JS_FILES note, the index.html tag pin, and
+probe-sprintdeadline's devboard carrier needle (the S258-pattern drift
+re-record — the one probe that pins the tag).
+
+**THE FIX RIDES THE ISLAND:** devboard.js v41 carries the stTask merges —
+the editor's tag Enter/✕ handlers merge into state.tasks (the S259 finding's
+fix rides the SAME api() choke point, so SEAM_PATCHES is untouched and the
+seam counts hold at 7+2/3/0). The new verifyDist needle (1f) pins exactly 2
+`stTask = findTask` occurrences (the add + the remove twin). Sync round-1
+clean; `sync-island.mjs --check` OK.
+
+**The probes:** ALL 14 GREEN on the real island bytes.
+
+**The release:** pushed 24d6506 → the autorelease lane cut v0.1.54-desktop
+(lockstep bump + the windows runner's build + publish: installer + portable +
+checksums.txt; the 5 lockstep files @ 0.1.54).
