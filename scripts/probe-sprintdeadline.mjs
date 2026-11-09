@@ -321,12 +321,12 @@ async function main() {
       hasDueControl: !!(window.HibanaDueControl && typeof window.HibanaDueControl.create === 'function'),
       dueCtlTag: !!Array.from(document.querySelectorAll('script[src*="/js/due-control.js?v=3"]')).length,
       emojiTag: !!Array.from(document.querySelectorAll('script[src*="/js/emoji-picker.js?v=4"]')).length,
-      devboardTag: !!Array.from(document.querySelectorAll('script[src*="/js/devboard.js?v=40"]')).length,
+      devboardTag: !!Array.from(document.querySelectorAll('script[src*="/js/devboard.js?v=41"]')).length,
       boardPageTag: !!Array.from(document.querySelectorAll('script[src*="/js/board-page.js?v=38"]')).length,
     }))
     check('the desktop chain loaded (hibanaFetch + hibana toast)', chain.hasFetch && chain.hasHibana, JSON.stringify(chain))
     check('js/due-control.js?v=3 loaded + window.HibanaDueControl.create (the S244 shared date control — the S256/FE-13 esc-twin bump)', chain.hasDueControl && chain.dueCtlTag, JSON.stringify(chain))
-    check('js/emoji-picker.js?v=4 + devboard.js?v=40 + board-page.js?v=38 tags all present (the S258 carriers — FE-6/18 bumped devboard + board-page)', chain.emojiTag && chain.devboardTag && chain.boardPageTag, JSON.stringify(chain))
+    check('js/emoji-picker.js?v=4 + devboard.js?v=41 + board-page.js?v=38 tags all present (the S258 carriers + the S260 devboard re-bump — the stTask tag-merge fix)', chain.emojiTag && chain.devboardTag && chain.boardPageTag, JSON.stringify(chain))
 
     // The S248 carriers, from the REAL dist bytes.
     const devboardJs = fs.readFileSync(path.join(args.dist, 'js/devboard.js'), 'utf8')

@@ -213,8 +213,20 @@ import { fileURLToPath } from 'node:url'
 // rides the live hibanaFetch transport seam, never the offline outbox (zero
 // production enqueue sites; .Enqueue( is test-only), documented in the web
 // repo's API-AND-SYNC-CONTRACT.md §3.2. The version ladder: 0.1.51 → 0.1.52.
-const PIN_REF = '2f3aac14'
-const PIN_PACKAGE_VERSION = '0.4.1.51'
+// S260 (the S259 finding's tag-merge micro-fix): the pin moved to ea549418 (web
+// v0.4.1.52) — the editor's immediate tag add/remove on an EXISTING task now
+// merges into state.tasks[].tags (push the returned id / splice on remove)
+// beside the editor draft, so Phase 3's post-save repaint paints the card chip
+// in the same beat (pre-fix: chipless until the next reload; the ✕ path left a
+// stale chip). The drifted anchors re-recorded: devboard.js v40 → v41 (the
+// board + sprint insert anchors + the index.html tag pin; board-page.js +
+// sprint-page.js only carry the ?v=41 injector literal in their verbatim
+// copies). sw.js v465 is NOT part of the island copy. ZERO seam drift — the
+// tag handlers ride the api() choke point, so SEAM_PATCHES is untouched and
+// the counts hold at 7+2/3/0; a new verifyDist needle pins the fix (exactly 2
+// stTask = findTask merges). The version ladder: 0.1.53 → 0.1.54.
+const PIN_REF = 'ea549418'
+const PIN_PACKAGE_VERSION = '0.4.1.52'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -271,7 +283,7 @@ const FONT_FILES = [
 // first editor open) — the embedded asset server serves those exact paths.
 const JS_FILES = [
   'js/sync-state.js',      // v2 (v0.4.1.37) — the per-card sync tracker (hibana-sync-status-spec §14: ONE source; devboard.js's task mutations report in, the badges + the Sync button count derive from it)
-  'js/devboard.js',        // v40 (S258 re-pin @ 2f3aac14) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked(); the S242-S247 feature stack rides the SAME api() choke point (the sprint dropdown/quick-create, the deadline engine + due-control mount, the extension flows, the deps multi-select + write wrappers — ZERO new fetch sites, the 7+2 counts HELD through the whole feature); S258 (FE-6): buildModal wires the shared focus-trap (modalTrap — the shim's focusTrap port), openEditor takes restoreEl, closeModal releases + restores to the opener
+  'js/devboard.js',        // v41 (S260 re-pin @ ea549418) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked(); the S242-S247 feature stack rides the SAME api() choke point (the sprint dropdown/quick-create, the deadline engine + due-control mount, the extension flows, the deps multi-select + write wrappers — ZERO new fetch sites, the 7+2 counts HELD through the whole feature); S258 (FE-6): buildModal wires the shared focus-trap (modalTrap — the shim's focusTrap port), openEditor takes restoreEl, closeModal releases + restores to the opener; S260: the editor's immediate tag add/remove on an EXISTING task merges into state.tasks (the stTask = findTask twins — the S259 finding's fix, rides the SAME choke point)
   'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
   'js/board-page.js',      // v38 (S258 re-pin @ 2f3aac14) — the /kanban page; PATCHED (§4.2: 3 direct fetches — FE-11 retired the clear-done DELETE fan-out: "Clear done" rides ONE bulk POST …/devtasks/clear-done through B().api(), so the seam count goes 4→3) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion + the S237 focus block + the S238 view + the S242-S246 feature renders (the sprint view filter + card sprint row, the deadline row + bar + thresholds, the dep badges — still ZERO new fetch: everything folds from the loaded payload); S258: FE-6 the task-view + enlarge-sheet traps (taskViewTrap/sheetTrap — the shim's focusTrap), FE-18 the ⋯ menu's Move-to submenu (the keyboard lane change, renderColumn re-arms the menus on repaint)
   'js/focus-core.js',      // v2 (v0.4.1.43, S237 NEW + S238 escPeel) — the focus + view decision core. board.html @ the pin carries its own <script> tag between sync-state.js and devboard.js (kept verbatim); board-page.js's ensureLib self-heals it at the same ?v=2.
@@ -401,7 +413,7 @@ const HTML_STRIP_LINES = [
 const HTML_INSERT = {
   name: 'insert /js/desktop-shim.js before devboard.js',
   cite: 'guide §3.2 + §4.3',
-  anchor: '<script src="/js/devboard.js?v=40" defer></script>',
+  anchor: '<script src="/js/devboard.js?v=41" defer></script>',
   insert: '<script src="/js/desktop-shim.js"></script>',
 }
 
@@ -1459,7 +1471,7 @@ const SPRINT_INSERTS = [
   // loads sprint-page.js instead (from its own body <script> tag, kept verbatim).
   {
     name: 'insert the desktop-owned script block (theme + shim + audio + login) before devboard.js (sprint page)',
-    anchor: '<script src="/js/devboard.js?v=40" defer></script>',
+    anchor: '<script src="/js/devboard.js?v=41" defer></script>',
     insert: '<script src="/js/desktop-theme.js"></script>\n<script src="/js/desktop-shim.js"></script>\n<script src="/js/desktop-audio.js"></script>\n<script src="/js/desktop-login.js"></script>',
     position: 'before',
   },
@@ -5963,6 +5975,13 @@ function verifyDist(outDir, fileMap, src) {
   if (!devboardCss.includes('.sp-filter-strip')) problems.push('css/board-bundle.css: the FE-9 strip styles are missing (inside the devboard part)')
   if (!devboardCss.includes('.db-move-submenu')) problems.push('css/board-bundle.css: the FE-18 submenu styles are missing (inside the devboard part)')
 
+  // (1f) THE S260 TAG-MERGE MICRO-FIX (the S259 finding @ ea549418): the editor's
+  // immediate tag add/remove on an EXISTING task merges into state.tasks[].tags
+  // beside the editor draft (push the returned id / splice-filter on remove), so
+  // Phase 3's post-save repaint paints the card chip in the same beat. Exactly 2
+  // stTask = findTask merges (the add + the remove twin) must ride the island.
+  if (count(devboard, 'stTask = findTask') !== 2) problems.push('js/devboard.js: expected exactly 2 stTask = findTask merges (the S260 tag-merge fix — add + remove), found ' + count(devboard, 'stTask = findTask'))
+
   // (1b) THE v0.1.15 UPLOAD BRIDGE (the owner's dogfood: "it doesn't show
   // whether it was successful or not"): the XHR proxy must call the bound
   // Upload with the callID FIRST (the progress events are addressed by id —
@@ -6523,7 +6542,7 @@ function verifyDist(outDir, fileMap, src) {
     // S248 (the Sprint/Deadline/Dependency island round): the feature's own
     // carriers + the new manifest entries are pinned here — a drifted pin would
     // silently ship a pre-feature island, so every marker must be present.
-    if (!indexHtml.includes('/js/devboard.js?v=40')) problems.push('index.html: the devboard.js tag must read ?v=40 (the S258 round — the FE-6 editor trap)')
+    if (!indexHtml.includes('/js/devboard.js?v=41')) problems.push('index.html: the devboard.js tag must read ?v=41 (the S260 round — the S259 finding\'s tag-merge fix)')
     if (!indexHtml.includes('/js/due-control.js?v=3')) problems.push('index.html: the due-control.js tag must read ?v=3 (the S256/FE-13 esc-twin bump)')
     if (!indexHtml.includes('/js/emoji-picker.js?v=4')) problems.push('index.html: the emoji-picker.js tag must read ?v=4 (the S243 emoji identity — S248 manifest entry)')
     if (!indexHtml.includes('/js/i18n-en.js?v=112')) problems.push('index.html: the i18n-en.js tag must read ?v=112 (the S258 st.filteredBy/filterReset + db.moveTo/movedTo keys)')

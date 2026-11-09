@@ -2332,7 +2332,7 @@
           const injectAll = () => {
             if (injected || window.HibanaBoard) return
             injected = true
-            inject('/js/devboard.js?v=40') // keep in sync with the <head> tag + sw SHELL
+            inject('/js/devboard.js?v=41') // keep in sync with the <head> tag + sw SHELL
             if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali timeline for FA
           }
           const onResErr = (e) => {

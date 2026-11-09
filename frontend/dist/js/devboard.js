@@ -1951,6 +1951,14 @@
         syncTitleToDraft()
         syncDueToDraft()
         if (!d.tags.includes(r.id)) d.tags.push(r.id)
+        // S260 (the S259 finding's micro-fix): the immediate add must ALSO land
+        // in state.tasks — the post-save repaint (FE-1) renders the card from
+        // state, so without this merge the chip only appeared after the next
+        // reload (pre-S254 the save's full reload() refetched it). One merge in
+        // the shared state closes every surface that renders from it (the board
+        // lane repaint + the sprint page's pure render).
+        const stTask = findTask(modalCtx.taskId)
+        if (stTask && Array.isArray(stTask.tags) && !stTask.tags.includes(r.id)) stTask.tags.push(r.id)
         if (!tagById(r.id)) state.tags.push({ id: r.id, name, color: '#8AB8F0' })
         tagIn.value = ''
         renderModal()
@@ -1963,6 +1971,11 @@
           syncTitleToDraft()
           syncDueToDraft()
           modalCtx.draft.tags = modalCtx.draft.tags.filter((x) => x !== b.dataset.untag)
+          // S260: the remove twin — splice the id from the state row too, or the
+          // post-save repaint leaves a STALE chip on the card in the same window
+          // (the finding's second half).
+          const stTask = findTask(modalCtx.taskId)
+          if (stTask && Array.isArray(stTask.tags)) stTask.tags = stTask.tags.filter((x) => x !== b.dataset.untag)
           renderModal()
         } catch { window.hibana && window.hibana.toast(t('sparks.saveFailed', "Couldn't save"), 'err') }
       }
