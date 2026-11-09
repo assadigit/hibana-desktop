@@ -180,6 +180,23 @@
         // sidebar ----------------------------------------------------------------
         function renderSide() {
           const S = B().state
+          // S258 (FE-17): harvest the LIVE sidebar state BEFORE the rebuild — a
+          // concurrent mutation's re-render used to wipe the open/closed folds
+          // (the markup hardcoded data-open="0" + is-collapsed) and every
+          // quick-add draft (empty <input>), so un-prompting a checkbox on the
+          // timeline collapsed what you had open and ate what you were typing.
+          // The harvest is read from the DOM (the source of truth for in-flight
+          // UI state), then re-applied in the markup below; the focused quick-add
+          // keeps its focus + caret (a re-render mid-typing must not blind the
+          // typist).
+          const openCats = new Set()
+          const quickVals = new Map()
+          const focusKey = (document.activeElement instanceof Element && sideEl.contains(document.activeElement) && document.activeElement.dataset && document.activeElement.dataset.quickadd) || null
+          sideEl.querySelectorAll('.sp-cat').forEach((cat) => {
+            const head = cat.querySelector('[data-cat-toggle]')
+            if (head && head.dataset.open === '1') openCats.add(head.dataset.catToggle)
+            cat.querySelectorAll('[data-quickadd]').forEach((inp) => { if (inp.value) quickVals.set(inp.dataset.quickadd, inp.value) })
+          })
           const groups = S.categories.filter((c) => !c.is_archived).map((c) => ({ cat: c, tasks: S.tasks.filter((x) => x.category_id === c.id) })) // S152: archived leaves the grouping
           const uncategorized = S.tasks.filter((x) => !x.category_id || !B().findCategory(x.category_id))
           groups.push({ cat: null, tasks: uncategorized })
@@ -194,9 +211,10 @@
               const name = g.cat ? g.cat.name : _t('db.uncategorized', 'Uncategorized')
               const gid = g.cat ? g.cat.id : 'none'
               const hid = g.cat ? laneHidden(g.cat.id) : false
+              const isOpen = openCats.has(gid) // S258 (FE-17): the fold survives the re-render
               return '<div class="sp-cat' + (hid ? ' is-lane-hidden' : '') + '" data-spcat="' + gid + '">' +
-                '<div class="sp-cat-head" data-cat-toggle="' + gid + '" data-open="0">' +
-                  '<button type="button" class="sp-cat-chevron" tabindex="-1" aria-hidden="true" style="transform:rotate(-90deg)">▾</button>' +
+                '<div class="sp-cat-head" data-cat-toggle="' + gid + '" data-open="' + (isOpen ? '1' : '0') + '">' +
+                  '<button type="button" class="sp-cat-chevron" tabindex="-1" aria-hidden="true" style="transform:' + (isOpen ? '' : 'rotate(-90deg)') + '">▾</button>' +
                   '<span class="sp-cat-badge" style="background:' + color + '2E;color:' + ink + '">' + B().esc(name) + '</span>' +
                   '<span class="detail-tab-count">' + B().faDig(g.tasks.length) + '</span>' +
                   (g.cat
@@ -207,14 +225,14 @@
                       '</span>'
                     : '') +
                 '</div>' +
-                '<ul class="sp-cat-tasks is-collapsed">' +
+                '<ul class="sp-cat-tasks' + (isOpen ? '' : ' is-collapsed') + '">' +
                   g.tasks.map((task) =>
                     '<li class="sp-task" draggable="true" data-sptask="' + task.id + '" data-task="' + task.id + '">' +
                       '<span class="sp-task-st st-' + task.status + '"></span>' +
                       '<span class="sp-task-title">' + B().esc(task.title) + '</span>' +
                       (task.sprint_id && B().findSprint(task.sprint_id) ? '<span class="db-sprint-badge">◆</span>' : '') +
                     '</li>').join('') +
-                  '<li class="sp-task-addrow"><input maxlength="300" dir="auto" data-quickadd="' + gid + '" placeholder="' + B().esc(_t('db.quickAdd', '+ task')) + '"></li>' +
+                  '<li class="sp-task-addrow"><input maxlength="300" dir="auto" data-quickadd="' + gid + '" value="' + B().esc(quickVals.get(gid) || '') + '" placeholder="' + B().esc(_t('db.quickAdd', '+ task')) + '"></li>' +
                 '</ul>' +
               '</div>'
             }).join('') +
@@ -227,6 +245,16 @@
               }).join('') + '</div>' +
               '<div class="row"><button type="button" class="ghost small" data-cat-cancel>' + B().esc(_t('common.cancel', 'Cancel')) + '</button><button type="submit" class="small">' + B().esc(_t('common.add', 'Add')) + '</button></div>' +
             '</form></div>'
+          // S258 (FE-17): the focused quick-add keeps its focus + caret (end of
+          // text) across the rebuild — a re-render mid-typing stays invisible.
+          if (focusKey) {
+            const again = sideEl.querySelector('[data-quickadd="' + focusKey + '"]')
+            if (again) {
+              again.focus()
+              const v = again.value
+              if (v) { try { again.setSelectionRange(v.length, v.length) } catch { /* type=text always supports it */ } }
+            }
+          }
         }
 
         // timeline ----------------------------------------------------------------
@@ -508,7 +536,7 @@
           }
         }
 
-        const render = () => { computeRange(); renderSide(); renderTimeline(); renderDraft(); renderTimeNav(); renderFinishBtn(); renderStrategies(); renderSprintsList(); wrap.hidden = false; if (loading) loading.hidden = true }
+        const render = () => { computeRange(); renderSide(); renderTimeline(); renderDraft(); renderTimeNav(); renderFinishBtn(); renderStrategies(); renderFilterStrip(); renderSprintsList(); wrap.hidden = false; if (loading) loading.hidden = true }
         // S255 (BE-3): the reload rides the LEAN payload — the ☑ stat reads the
         // derived doc_checked (sprintDocChecked), so nothing on this page needs
         // the heavy description field on the re-pull either.
@@ -760,10 +788,39 @@
           }).join('')
         }
 
+        // S258 (FE-9, the audit's silent-hiding gap): the strategy focus-filter
+        // explainer strip — the filter narrows the timeline chips, the clips and
+        // the All-sprints list to ONE strategy, which silently HIDES every
+        // sprint-less task (a task with no sprint can never match a strategy).
+        // This strip names the active filter and says exactly that, with the
+        // always-reachable Clear (the audit's "weak reset discoverability" —
+        // before, the only reset was re-clicking the strategy card, invisible
+        // once the section scrolled away). The board filter bar's own grammar:
+        // .db-filter-shown (the muted explainer) + .db-filter-clear (the chip).
+        function renderFilterStrip() {
+          const el = document.getElementById('sp-filter-strip')
+          if (!el) return
+          const st = strategyFilter ? B().findStrategy(strategyFilter) : null
+          if (!st) { el.hidden = true; el.textContent = ''; return }
+          el.innerHTML =
+            '<span class="sp-filter-glyph" aria-hidden="true">' + B().esc(B().strategyGlyph(st)) + '</span>' +
+            '<span class="muted small db-filter-shown sp-filter-explain" dir="auto">' + B().esc(_t('st.filteredBy', 'Filtered by {name} — tasks without sprints are hidden').replace('{name}', st.name)) + '</span>' +
+            '<button type="button" class="chip db-filter-clear" data-sp-filter-clear>✕ ' + B().esc(_t('st.filterReset', 'Clear')) + '</button>'
+          el.hidden = false
+        }
+
         // The strategy editor (create + edit share ONE modal — the sprint-detail
         // grammar): name, priority select, emoji picker, description textarea.
         let strategyModal = null
-        const closeStrategyEditor = () => { if (strategyModal) { strategyModal.remove(); strategyModal = null } }
+        let strategyTrap = null // S258 (FE-6): the shared focus-trap's release fn while the editor is open
+        const closeStrategyEditor = () => {
+          if (strategyModal) {
+            strategyModal.remove(); strategyModal = null
+            // S258 (FE-6): unbind the wrap + restore focus to the opener (the ⋯
+            // quick-actions button / the New strategy button).
+            if (strategyTrap) { strategyTrap(); strategyTrap = null }
+          }
+        }
         function openStrategyEditor(st) {
           closeStrategyEditor()
           const L = lang()
@@ -805,6 +862,12 @@
               '</div>' +
             '</div>'
           document.body.appendChild(strategyModal)
+          // S258 (FE-6): the shared trap — Tab wraps inside the strategy card;
+          // close (any path) restores focus to the opener. The name field takes
+          // focus on open (the s247 doctrine: focus lands on the primary field).
+          if (window.hibana && window.hibana.focusTrap) strategyTrap = window.hibana.focusTrap(strategyModal)
+          const nameField = strategyModal.querySelector('[data-stg-name]')
+          if (nameField) nameField.focus()
           let prio = st ? st.priority : 'medium'
           let emoji = st ? st.emoji || '' : ''
           const paintEmoji = () => {
@@ -1922,6 +1985,12 @@
         // The focus filter: card body click toggles (⋯ menu stops propagation); the
         // card is also keyboard-operable (role=button + Enter/Space — the S136 recipe).
         ctx.on('click', (e) => {
+          // S258 (FE-9): the strip's Clear — the filter's one-click reset
+          if (e.target.closest('[data-sp-filter-clear]')) {
+            strategyFilter = null
+            render()
+            return
+          }
           const more = e.target.closest('[data-strategy-menu]')
           if (more) {
             e.stopPropagation()
@@ -2263,7 +2332,7 @@
           const injectAll = () => {
             if (injected || window.HibanaBoard) return
             injected = true
-            inject('/js/devboard.js?v=39') // keep in sync with the <head> tag + sw SHELL
+            inject('/js/devboard.js?v=40') // keep in sync with the <head> tag + sw SHELL
             if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali timeline for FA
           }
           const onResErr = (e) => {

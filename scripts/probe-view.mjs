@@ -305,11 +305,31 @@ async function main() {
     check('the meta row carries the Created line', /created/i.test(String(v2.metaText)), '')
     await page.screenshot({ path: path.join(args.out, '01-leg2-view.png') })
 
+    // S258 (FE-6 — the UI/UX-polish round): the shim's focusTrap port is LIVE and
+    // the view rides it — Tab never leaves the overlay (containment), and the
+    // close restores focus to the card that opened the view (the trap's
+    // restoreTo), mirroring the web's e2e s247-a11y assertion on the island.
+    {
+      const hasTrap = await page.evaluate(() => typeof (window.hibana && window.hibana.focusTrap) === 'function')
+      check('S258/FE-6: the shim exports window.hibana.focusTrap (the app.js port)', hasTrap, hasTrap ? 'function' : 'MISSING')
+      for (let i = 0; i < 10; i++) await page.keyboard.press('Tab')
+      const contained = await page.evaluate(() => {
+        const ov = document.getElementById('db-view-overlay')
+        return !!ov && !ov.hidden && ov.contains(document.activeElement)
+      })
+      check('S258/FE-6: 10 Tabs never leave the view overlay (the trap wraps)', contained, '')
+    }
+
     // Esc closes the view (one layer, nothing else was open).
     await page.keyboard.press('Escape')
     await page.waitForTimeout(250)
     const v2b = await viewShape(page)
     check('Esc closed the view', v2b.viewOpen === false && (v2b.state ? v2b.state.viewTaskId === null : true), JSON.stringify(v2b.state))
+    const restored = await page.evaluate(() => {
+      const el = document.activeElement
+      return !!el && el.classList && el.classList.contains('pd-task')
+    })
+    check('S258/FE-6: the close restored focus to the card that opened the view', restored, 'activeElement=' + String(await page.evaluate(() => document.activeElement && (document.activeElement.className || document.activeElement.tagName))))
     check('ZERO page errors (leg 2)', pageErrors.length === 0, pageErrors.join(' | '))
     await context.close()
   }

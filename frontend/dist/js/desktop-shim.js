@@ -36,6 +36,17 @@
 //      window.__hibanaPage (board-page.js:1-2 self-stubs a queue); without a consumer
 //      here the def stays queued forever and the island NEVER BOOTS. This is the one
 //      addition beyond the guide's §4.3 skeleton trio, forced by the §3.2 strip list.
+//   6. window.hibana.focusTrap — the S258 (FE-6, audit remediation Phase 7) shared
+//      focus-trap + focus-restore helper, ported 1:1 from web app.js (hibana.focusTrap
+//      @ 2f3aac14): Tab wraps past the last focusable back to the first (Shift+Tab the
+//      mirror), a Tab issued while focus sits OUTSIDE the overlay is pulled back in,
+//      and release() unbinds + restores focus to the remembered opener (best-effort —
+//      document.contains guards a re-rendered opener; opts.restoreTo pins a more
+//      precise opener; opts.restore === false skips the restore on purpose). The
+//      shim's own confirm wires it (the superseded opener gets its focus back too);
+//      the island's modal family calls it through the same guards the web uses
+//      (devboard.js's editor modalTrap, board-page.js's task view + enlarge sheet,
+//      sprint-page.js's strategy modal — every one degrade-safe if absent).
 //
 // WHAT IT MUST NEVER OWN (guide §4.3: "Owns NOTHING else"):
 //   - No theme bootstrap (boot.js's job on the web — the desktop shell owns theme
@@ -328,6 +339,48 @@
     } catch (e) { return fb }
   }
   var confirmOverlay = null
+  // --------------------------------------- window.hibana.focusTrap (S258/FE-6)
+  // The ONE shared focus-trap + focus-restore helper, ported 1:1 from web app.js
+  // (@ 2f3aac14 — the S258 UI/UX-polish round). The web's app.js is stripped from
+  // the island (§3.2), so the shim owns the contract — the established toast/
+  // confirm pattern. Callers: the shim's own confirm below + the island's modal
+  // family (devboard.js's editor, board-page.js's task view + enlarge sheet,
+  // sprint-page.js's strategy modal — all through the same
+  // 'if (window.hibana && window.hibana.focusTrap)' guards the web uses, degrade-safe).
+  //   focusTrap(overlay, { restoreTo?, restore? }) -> release()
+  var FOCUSABLE_SEL = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  function focusTrap(overlay, opts) {
+    if (!(overlay instanceof Element)) return function () {}
+    var o = opts || {}
+    var prev = o.restoreTo instanceof Element ? o.restoreTo : (document.activeElement instanceof Element ? document.activeElement : null)
+    var focusables = function () {
+      return Array.prototype.filter.call(overlay.querySelectorAll(FOCUSABLE_SEL), function (el) {
+        // visible = has layout (the hidden overlay's own display:none makes every
+        // child answer false — the trap is only consulted while open anyway)
+        return el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0
+      })
+    }
+    var onKeydown = function (e) {
+      if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return
+      var list = focusables()
+      if (!list.length) { e.preventDefault(); return }
+      var first = list[0]
+      var last = list[list.length - 1]
+      var active = document.activeElement
+      if (!overlay.contains(active)) { e.preventDefault(); first.focus(); return } // escaped → pull back in
+      if (e.shiftKey && (active === first || !overlay.contains(active))) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus() }
+    }
+    overlay.addEventListener('keydown', onKeydown)
+    var released = false
+    return function release() {
+      if (released) return
+      released = true
+      overlay.removeEventListener('keydown', onKeydown)
+      if (o.restore === false) return
+      if (prev && document.contains(prev)) { try { prev.focus() } catch (e) { /* detached/unfocusable — leave focus where the browser has it */ } }
+    }
+  }
   function confirm(message, opts) {
     var o = opts || {}
     var title = o.title ? escText(o.title) : ''
@@ -335,6 +388,7 @@
     var cancelLabel = o.cancelLabel ? escText(o.cancelLabel) : hibLabel('common.cancel', 'Cancel')
     if (confirmOverlay) {
       if (confirmOverlay._resolve) confirmOverlay._resolve(false)
+      if (confirmOverlay._releaseTrap) confirmOverlay._releaseTrap() // S258 (FE-6): the superseded opener gets its focus back too
       confirmOverlay.remove()
       confirmOverlay = null
     }
@@ -371,11 +425,17 @@
       overlay.appendChild(card)
       document.body.appendChild(overlay)
       confirmOverlay = overlay
+      // S258 (FE-6): the trap wraps Tab inside the card + remembers the opener —
+      // release() (close) restores focus there, mirroring the web app.js confirm.
+      var releaseTrap = focusTrap(overlay)
+      overlay._releaseTrap = releaseTrap
       overlay._resolve = function (val) { resolve(val); confirmOverlay = null }
       var close = function (val) {
         if (!overlay.parentNode) return
         overlay._resolve(val)
         overlay.remove()
+        // S258 (FE-6): unbind the wrap + restore focus to the opener
+        if (overlay._releaseTrap) overlay._releaseTrap()
       }
       card.querySelector('[data-hib-confirm="cancel"]').addEventListener('click', function () { close(false) })
       card.querySelector('[data-hib-confirm="ok"]').addEventListener('click', function () { close(true) })
@@ -392,7 +452,7 @@
       })
     })
   }
-  window.hibana = { toast: toast, confirm: confirm }
+  window.hibana = { toast: toast, confirm: confirm, focusTrap: focusTrap }
 
   // ----------------------------------------------------- window.__hibanaPage
   // The minimal mount consumer (see the header WHY). The contract below is nav.js's

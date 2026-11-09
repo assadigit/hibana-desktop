@@ -186,8 +186,35 @@ import { fileURLToPath } from 'node:url'
 // not in the island); devboard.js + chip-render.js + sprint-page.js are
 // byte-untouched, so every strip/seam anchor held. DT-5 closed in the same edit:
 // the stale KNOWN-REMAINS items pruned + the v104/v105 comment drift fixed.
-const PIN_REF = '6db3ae94'
-const PIN_PACKAGE_VERSION = '0.4.1.49'
+// S258 (audit remediation Phase 7 — the UI/UX polish round): the pin moved to
+// 2f3aac14 (web v0.4.1.51) — FE-6 the ONE shared focus-trap + focus-restore
+// helper (web app.js hibana.focusTrap) lands in the island as the shim's 1:1
+// port (app.js is stripped by §3.2 — the established toast/confirm pattern):
+// the shim owns focusTrap, wires it into its own confirm (the supersede path
+// releases too; close restores to the opener — the body-park retired web-side
+// in the same round), and exports it so devboard.js's editor (buildModal's
+// modalTrap), board-page.js's task view + enlarge sheet, and sprint-page.js's
+// strategy modal all trap on the desktop exactly as on the web (every call
+// site guards `if (window.hibana && window.hibana.focusTrap)` — degrade-safe).
+// FE-9 the strategy focus-filter explainer strip + FE-17 the sidebar state
+// survival + FE-18 the ⋯ menu's Move-to submenu ride sprint-page.js (v28→v31)
+// + board-page.js (v34-sha → v38) + the regenerated board-bundle.css (?v=1→v2,
+// devboard.css v47 inside). FE-11 scoped: the board's "Clear done" now rides
+// ONE bulk POST /api/projects/:id/devtasks/clear-done through B().api() — the
+// per-task DELETE fan-out is RETIRED web-side, so board-page.js loses one of
+// its four direct fetch sites: SEAM_PATCHES drops site 12 (the fan-out) and
+// the seam count goes 7+2/4/0 → 7+2/3/0 (verifyDist re-pinned). The bridge
+// needs ZERO Go changes (Request allow-lists any /api/ POST; the call rides
+// the api() choke point = the seam). The drifted anchors re-recorded:
+// app.js v221→v222 (the strip line — FE-6 bumped the carrier), devboard.js
+// v39→v40 (board + sprint insert anchors), the JS manifest notes (i18n trio
+// v112/v165/v106 — i18n.js's lazy injector literal now ?v=106). The FE-11
+// desktop-outbox verdict (spec §10.3): NO pathFor case — the island call
+// rides the live hibanaFetch transport seam, never the offline outbox (zero
+// production enqueue sites; .Enqueue( is test-only), documented in the web
+// repo's API-AND-SYNC-CONTRACT.md §3.2. The version ladder: 0.1.51 → 0.1.52.
+const PIN_REF = '2f3aac14'
+const PIN_PACKAGE_VERSION = '0.4.1.51'
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -207,7 +234,9 @@ const CSS_SHEETS = [
   // gated by the web's check-css-bundles.mjs). The LOAD ORDER contract (guide
   // §3.1) is unchanged in meaning: rtl.css is still LAST — now as the bundle's
   // last PART (verifyDist asserts the bundle's tail IS rtl.css's content).
-  'css/board-bundle.css',   // ?v=1 — contains variables→base→layout→dashboard→dashboard-todo→components→canvas→quicknotes→to-do-list→polish-ui→calendar→notifications→polish-batch→project-header→devboard(v46)→misc→themes→claude-dark-theme(v32)→rtl LAST
+  // S258: regenerated at ?v=2 — devboard.css v47 inside carries FE-9's
+  // .sp-filter-strip + FE-18's .db-move-submenu additions.
+  'css/board-bundle.css',   // ?v=2 — contains variables→base→layout→dashboard→dashboard-todo→components→canvas→quicknotes→to-do-list→polish-ui→calendar→notifications→polish-batch→project-header→devboard(v47)→misc→themes→claude-dark-theme(v32)→rtl LAST
 ]
 
 // Font CSS + every woff2 those files reference, so @font-face URLs resolve inside the
@@ -242,16 +271,16 @@ const FONT_FILES = [
 // first editor open) — the embedded asset server serves those exact paths.
 const JS_FILES = [
   'js/sync-state.js',      // v2 (v0.4.1.37) — the per-card sync tracker (hibana-sync-status-spec §14: ONE source; devboard.js's task mutations report in, the badges + the Sync button count derive from it)
-  'js/devboard.js',        // v37 (v0.4.1.44 + S250 re-pin @ 6dd40c0) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked(); the S242-S247 feature stack rides the SAME api() choke point (the sprint dropdown/quick-create, the deadline engine + due-control mount, the extension flows, the deps multi-select + write wrappers — ZERO new fetch sites, the 7+2/4 counts HELD through the whole feature)
+  'js/devboard.js',        // v40 (S258 re-pin @ 2f3aac14) — the data + editor modal; PATCHED (§4.2: 1 choke point + 5 labels + 2 XHR) — the sync-badge round wraps the task mutations with tracked(); the S242-S247 feature stack rides the SAME api() choke point (the sprint dropdown/quick-create, the deadline engine + due-control mount, the extension flows, the deps multi-select + write wrappers — ZERO new fetch sites, the 7+2 counts HELD through the whole feature); S258 (FE-6): buildModal wires the shared focus-trap (modalTrap — the shim's focusTrap port), openEditor takes restoreEl, closeModal releases + restores to the opener
   'js/chip-render.js',     // v13 (v0.4.1.37) — the markdown-lite title renderer (byte-parity target, UI-UX §3.3) + syncBadgeHtml/syncBadgeDetailHtml (the badge component, §4-§6)
-  'js/board-page.js',      // v34 (v0.4.1.44 + S250 re-pin @ 6dd40c0) — the /kanban page; PATCHED (§4.2: 4 direct fetches) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion + the S237 focus block + the S238 view + the S242-S246 feature renders (the sprint view filter + card sprint row, the deadline row + bar + thresholds, the dep badges — still ZERO new fetch: everything folds from the loaded payload)
+  'js/board-page.js',      // v38 (S258 re-pin @ 2f3aac14) — the /kanban page; PATCHED (§4.2: 3 direct fetches — FE-11 retired the clear-done DELETE fan-out: "Clear done" rides ONE bulk POST …/devtasks/clear-done through B().api(), so the seam count goes 4→3) — renders the badge as the meta row's LAST child + the UI-redesign empty states / ellipsis menus / helper hint + the S230 completion + the S237 focus block + the S238 view + the S242-S246 feature renders (the sprint view filter + card sprint row, the deadline row + bar + thresholds, the dep badges — still ZERO new fetch: everything folds from the loaded payload); S258: FE-6 the task-view + enlarge-sheet traps (taskViewTrap/sheetTrap — the shim's focusTrap), FE-18 the ⋯ menu's Move-to submenu (the keyboard lane change, renderColumn re-arms the menus on repaint)
   'js/focus-core.js',      // v2 (v0.4.1.43, S237 NEW + S238 escPeel) — the focus + view decision core. board.html @ the pin carries its own <script> tag between sync-state.js and devboard.js (kept verbatim); board-page.js's ensureLib self-heals it at the same ?v=2.
   'js/due-control.js',     // v1 (S248 re-pin @ 7f314e9, S244 NEW) — the shared Gregorian/Jalali date control (window.HibanaDueControl.create: the segmented calendar selector, the six §11.3 presets, the Add time toggle, ISO-8601 UTC value). NEW to the island manifest this round — board.html + sprint.html @ the pin carry its own <script> tag (kept verbatim). ZERO fetch: pure UI, mounted by devboard.js's modal + the sprint panels.
   'js/emoji-picker.js',    // v4 (S248 re-pin @ 7f314e9, S243 NEW) — the sprint emoji picker (the §4.2 identity token). NEW to the island manifest this round — board.html + sprint.html @ the pin carry its own <script> tag (kept verbatim). ZERO fetch.
-  'js/sprint-page.js',     // v28 (S250 re-pin @ 6dd40c0) — the /sprint.html page; the S235 embed + the S243 sprint management surface (the lifecycle-grouped overview, the settings panel, the conflict/finish modals — all through window.HibanaBoard, ZERO direct fetch). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing).
-  'js/i18n-en.js',         // v111 (S250 re-pin @ 6dd40c0) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign keys + db.view.* (S238) + the S242-S247 feature keys (the sprint dropdown/quick-create, the deadline engine + presets + thresholds, the extension flows, the deps section + badges)
-  'js/i18n.js',            // v164 (S250 re-pin @ 6dd40c0) — the i18n layer; kept VERBATIM; its lazy injector literal reads /js/i18n-fa.js?v=105 (S250 bumped the dictionary; see KNOWN-REMAINS below)
-  'js/i18n-fa.js',         // v105 (S250 re-pin @ 6dd40c0) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA keys + db.view.* FA (S238) + the S242-S247 feature keys + the st.* strategies keys (written Persian, parity 1678=1678)
+  'js/sprint-page.js',     // v31 (S258 re-pin @ 2f3aac14) — the /sprint.html page; the S235 embed + the S243 sprint management surface (the lifecycle-grouped overview, the settings panel, the conflict/finish modals — all through window.HibanaBoard, ZERO direct fetch). NO seam patches needed: sprint-page.js uses window.HibanaBoard (devboard.js) for ALL data access — ZERO direct fetch() calls (verified: grep "fetch(" public/js/sprint-page.js returns nothing). S258: FE-9 the strategy focus-filter explainer strip (renderFilterStrip + the #sp-filter-strip Clear), FE-17 the sidebar fold/draft/focus survival across re-renders, FE-6 the strategy modal's trap
+  'js/i18n-en.js',         // v112 (S258 re-pin @ 2f3aac14) — the EN dictionary (loaded before i18n.js; defer order) + the sync.* labels + the UI-redesign keys + db.view.* (S238) + the S242-S247 feature keys (the sprint dropdown/quick-create, the deadline engine + presets + thresholds, the extension flows, the deps section + badges) + S258's st.filteredBy/st.filterReset + db.moveTo/db.movedTo (FE-9 + FE-18)
+  'js/i18n.js',            // v165 (S258 re-pin @ 2f3aac14) — the i18n layer; kept VERBATIM; its lazy injector literal reads /js/i18n-fa.js?v=106 (S258 bumped the dictionary; see KNOWN-REMAINS below)
+  'js/i18n-fa.js',         // v106 (S258 re-pin @ 2f3aac14) — the LAZY FA dictionary (i18n.js:49-60) + the sync.* FA labels + the UI-redesign FA keys + db.view.* FA (S238) + the S242-S247 feature keys + the st.* strategies keys + S258's st.filteredBy/st.filterReset + db.moveTo/db.movedTo (written Persian, parity 1711=1711)
   'js/image-resize.js',    // v1 — the LAZY ≤1600px WebP prepare pass (devboard.js:307-319)
   'vendor/jalaali.min.js', // Jalali dates for FA (devboard.js calOf)
 ]
@@ -292,7 +321,7 @@ const COPY_MANIFEST = [...CSS_SHEETS, ...FONT_CSS, ...FONT_FILES, ...JS_FILES, .
 // v0.1.15 (M4 — thumbnails load like the web's); (4) the /kanban entry routing:
 // KanbanIndexMiddleware aliases the entry since v0.1.2 (M2). The one remaining note:
 //
-//  1. i18n.js:49-60 (dynamic <script> /js/i18n-fa.js?v=105) and devboard.js:307-319
+//  1. i18n.js:49-60 (dynamic <script> /js/i18n-fa.js?v=106) and devboard.js:307-319
 //     (dynamic <script> /js/image-resize.js?v=1) — STATIC-ASSET loaders over HTTP to
 //     same-origin paths. The Wails asset server serves them same-origin; left
 //     untouched by design (they are not /api traffic).
@@ -348,7 +377,7 @@ const HTML_STRIP_LINES = [
   { name: 'strip vendor/idiomorph-ext.min.js', cite: 'guide §3.2 (board.html:31)', line: '<script src="/vendor/idiomorph-ext.min.js" defer></script>' },
   { name: 'strip js/boot.js (SW registration)', cite: 'guide §3.2 (board.html:32; UI-UX §7.3)', line: '<script src="/js/boot.js?v=7"></script>' },
   { name: 'strip vendor/alpine.min.js', cite: 'guide §3.2 (board.html:33)', line: '<script src="/vendor/alpine.min.js" defer></script>' },
-  { name: 'strip js/app.js (the web shell — its toast contract moves to desktop-shim.js)', cite: 'guide §3.1+§3.2+§4.3 (board.html:34; S233 re-record: app.js v220 → v221 — the confirm ✕ round bumped the carrier)', line: '<script src="/js/app.js?v=221" defer></script>' },
+  { name: 'strip js/app.js (the web shell — its toast + focus-trap contracts move to desktop-shim.js)', cite: 'guide §3.1+§3.2+§4.3 (board.html:34; S233 re-record: app.js v220 → v221; S258 re-record: v221 → v222 — FE-6 added hibana.focusTrap + bumped the carrier)', line: '<script src="/js/app.js?v=222" defer></script>' },
   { name: 'strip js/hib-init.js', cite: 'guide §3.2 (board.html:35)', line: '<script src="/js/hib-init.js?v=13" defer></script>' },
   { name: 'strip js/touch-drag.js (touch long-press — irrelevant on desktop)', cite: 'guide §3.2 (board.html:36; UI-UX §7.2)', line: '<script src="/js/touch-drag.js?v=2" defer></script>' },
   { name: 'strip js/nav.js (browser-history rail; its __hibanaPage mount consumer is re-owned by desktop-shim.js)', cite: 'guide §3.2 (board.html:37)', line: '<script src="/js/nav.js?v=45" defer></script>' },
@@ -372,7 +401,7 @@ const HTML_STRIP_LINES = [
 const HTML_INSERT = {
   name: 'insert /js/desktop-shim.js before devboard.js',
   cite: 'guide §3.2 + §4.3',
-  anchor: '<script src="/js/devboard.js?v=39" defer></script>',
+  anchor: '<script src="/js/devboard.js?v=40" defer></script>',
   insert: '<script src="/js/desktop-shim.js"></script>',
 }
 
@@ -1430,7 +1459,7 @@ const SPRINT_INSERTS = [
   // loads sprint-page.js instead (from its own body <script> tag, kept verbatim).
   {
     name: 'insert the desktop-owned script block (theme + shim + audio + login) before devboard.js (sprint page)',
-    anchor: '<script src="/js/devboard.js?v=39" defer></script>',
+    anchor: '<script src="/js/devboard.js?v=40" defer></script>',
     insert: '<script src="/js/desktop-theme.js"></script>\n<script src="/js/desktop-shim.js"></script>\n<script src="/js/desktop-audio.js"></script>\n<script src="/js/desktop-login.js"></script>',
     position: 'before',
   },
@@ -1511,13 +1540,19 @@ function generateSprintHtml(html) {
 }
 
 // ---------------------------------------------------------------------------
-// The seam patches (guide §4.1 the 12 verified sites / §4.2 the patch strategy).
+// The seam patches (guide §4.1 the verified sites / §4.2 the patch strategy).
 // Each is an EXACT recorded string replace applied to the COPY in dist — hibana-source
 // is never touched. A miss = web drift = the sync FAILS LOUDLY (the tripwire).
 // The callers' opts objects (cache:'no-store', headers, signal) are kept INTACT in the
 // copies — hibanaFetch ignores cache headers; the Go client owns real caching, the
 // cookie jar, the Origin header on writes, the ETag store and the 3s+retry contract
 // (guide §4.2.1: the web's workaround becomes the desktop's real contract, §5.1).
+// S258 (FE-11): the old site 12 — the clear-done per-task DELETE fan-out — is
+// RETIRED web-side (the board's "Clear done" rides ONE bulk POST
+// …/devtasks/clear-done through B().api(), the devboard choke point = site 1), so
+// its patch is DELETED here and board-page.js's seam count goes 4 → 3 (verifyDist
+// re-pinned). 11 recorded sites now: 7 fetch + 2 XHR in devboard.js, 3 in
+// board-page.js.
 // ---------------------------------------------------------------------------
 const SEAM_PATCHES = [
   // ---- devboard.js ----
@@ -1603,12 +1638,13 @@ const SEAM_PATCHES = [
     find: "fetch('/api/projects/' + projectId + '/devtasks/archive-done', { method: 'POST' })",
     replace: "window.hibanaFetch('/api/projects/' + projectId + '/devtasks/archive-done', { method: 'POST' })",
   },
-  {
-    file: 'js/board-page.js',
-    name: 'clear-done: DELETE fan-out — board-page.js:761 (guide §4.1 site 12)',
-    find: "Promise.all(ids.map((id) => fetch('/api/devtasks/' + id, { method: 'DELETE' })))",
-    replace: "Promise.all(ids.map((id) => window.hibanaFetch('/api/devtasks/' + id, { method: 'DELETE' })))",
-  },
+  // S258 (FE-11): the OLD site 12 lived here — the clear-done per-task DELETE
+  // fan-out (Promise.all(ids.map((id) => fetch('/api/devtasks/' + id, …)))) —
+  // RETIRED web-side in the same round: the board's "Clear done" now rides ONE
+  // bulk POST /api/projects/:id/devtasks/clear-done through B().api() (the
+  // devboard.js choke point = site 1 above), so the patch is deleted and the
+  // board-page.js seam count goes 4 → 3. Zero Go changes: the bridge's Request
+  // allow-lists any /api/ POST (internal/ui/bindings.go:481).
 ]
 
 function applySeamPatches(fileMap) {
@@ -1674,6 +1710,17 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
 //      window.__hibanaPage (board-page.js:1-2 self-stubs a queue); without a consumer
 //      here the def stays queued forever and the island NEVER BOOTS. This is the one
 //      addition beyond the guide's §4.3 skeleton trio, forced by the §3.2 strip list.
+//   6. window.hibana.focusTrap — the S258 (FE-6, audit remediation Phase 7) shared
+//      focus-trap + focus-restore helper, ported 1:1 from web app.js (hibana.focusTrap
+//      @ 2f3aac14): Tab wraps past the last focusable back to the first (Shift+Tab the
+//      mirror), a Tab issued while focus sits OUTSIDE the overlay is pulled back in,
+//      and release() unbinds + restores focus to the remembered opener (best-effort —
+//      document.contains guards a re-rendered opener; opts.restoreTo pins a more
+//      precise opener; opts.restore === false skips the restore on purpose). The
+//      shim's own confirm wires it (the superseded opener gets its focus back too);
+//      the island's modal family calls it through the same guards the web uses
+//      (devboard.js's editor modalTrap, board-page.js's task view + enlarge sheet,
+//      sprint-page.js's strategy modal — every one degrade-safe if absent).
 //
 // WHAT IT MUST NEVER OWN (guide §4.3: "Owns NOTHING else"):
 //   - No theme bootstrap (boot.js's job on the web — the desktop shell owns theme
@@ -1966,6 +2013,48 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
     } catch (e) { return fb }
   }
   var confirmOverlay = null
+  // --------------------------------------- window.hibana.focusTrap (S258/FE-6)
+  // The ONE shared focus-trap + focus-restore helper, ported 1:1 from web app.js
+  // (@ 2f3aac14 — the S258 UI/UX-polish round). The web's app.js is stripped from
+  // the island (§3.2), so the shim owns the contract — the established toast/
+  // confirm pattern. Callers: the shim's own confirm below + the island's modal
+  // family (devboard.js's editor, board-page.js's task view + enlarge sheet,
+  // sprint-page.js's strategy modal — all through the same
+  // 'if (window.hibana && window.hibana.focusTrap)' guards the web uses, degrade-safe).
+  //   focusTrap(overlay, { restoreTo?, restore? }) -> release()
+  var FOCUSABLE_SEL = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  function focusTrap(overlay, opts) {
+    if (!(overlay instanceof Element)) return function () {}
+    var o = opts || {}
+    var prev = o.restoreTo instanceof Element ? o.restoreTo : (document.activeElement instanceof Element ? document.activeElement : null)
+    var focusables = function () {
+      return Array.prototype.filter.call(overlay.querySelectorAll(FOCUSABLE_SEL), function (el) {
+        // visible = has layout (the hidden overlay's own display:none makes every
+        // child answer false — the trap is only consulted while open anyway)
+        return el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0
+      })
+    }
+    var onKeydown = function (e) {
+      if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return
+      var list = focusables()
+      if (!list.length) { e.preventDefault(); return }
+      var first = list[0]
+      var last = list[list.length - 1]
+      var active = document.activeElement
+      if (!overlay.contains(active)) { e.preventDefault(); first.focus(); return } // escaped → pull back in
+      if (e.shiftKey && (active === first || !overlay.contains(active))) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus() }
+    }
+    overlay.addEventListener('keydown', onKeydown)
+    var released = false
+    return function release() {
+      if (released) return
+      released = true
+      overlay.removeEventListener('keydown', onKeydown)
+      if (o.restore === false) return
+      if (prev && document.contains(prev)) { try { prev.focus() } catch (e) { /* detached/unfocusable — leave focus where the browser has it */ } }
+    }
+  }
   function confirm(message, opts) {
     var o = opts || {}
     var title = o.title ? escText(o.title) : ''
@@ -1973,6 +2062,7 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
     var cancelLabel = o.cancelLabel ? escText(o.cancelLabel) : hibLabel('common.cancel', 'Cancel')
     if (confirmOverlay) {
       if (confirmOverlay._resolve) confirmOverlay._resolve(false)
+      if (confirmOverlay._releaseTrap) confirmOverlay._releaseTrap() // S258 (FE-6): the superseded opener gets its focus back too
       confirmOverlay.remove()
       confirmOverlay = null
     }
@@ -2009,11 +2099,17 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
       overlay.appendChild(card)
       document.body.appendChild(overlay)
       confirmOverlay = overlay
+      // S258 (FE-6): the trap wraps Tab inside the card + remembers the opener —
+      // release() (close) restores focus there, mirroring the web app.js confirm.
+      var releaseTrap = focusTrap(overlay)
+      overlay._releaseTrap = releaseTrap
       overlay._resolve = function (val) { resolve(val); confirmOverlay = null }
       var close = function (val) {
         if (!overlay.parentNode) return
         overlay._resolve(val)
         overlay.remove()
+        // S258 (FE-6): unbind the wrap + restore focus to the opener
+        if (overlay._releaseTrap) overlay._releaseTrap()
       }
       card.querySelector('[data-hib-confirm="cancel"]').addEventListener('click', function () { close(false) })
       card.querySelector('[data-hib-confirm="ok"]').addEventListener('click', function () { close(true) })
@@ -2030,7 +2126,7 @@ const DESKTOP_SHIM_JS = `// desktop-shim.js — the transport + toast + page-lif
       })
     })
   }
-  window.hibana = { toast: toast, confirm: confirm }
+  window.hibana = { toast: toast, confirm: confirm, focusTrap: focusTrap }
 
   // ----------------------------------------------------- window.__hibanaPage
   // The minimal mount consumer (see the header WHY). The contract below is nav.js's
@@ -5829,19 +5925,43 @@ function verifyDist(outDir, fileMap, src) {
     if (!devboardCss.includes(marker)) problems.push('css/board-bundle.css: the UI-redesign marker missing (inside the devboard part): "' + marker + '"')
   }
 
-  // (1) the seam took, exactly (guide §4.1: 7 fetch sites + 2 XHR in devboard; 4 in board-page).
-  // UI-redesign: 7 fetch sites = the original 6 + S211's create-label POST /api/tags
-  // (re-recorded in SEAM_PATCHES above). The count is the tripwire: a new fetch() in
-  // devboard.js that isn't covered by a seam patch fails BOTH this count AND the bare-
-  // fetch check below.
+  // (1) the seam took, exactly (guide §4.1: 7 fetch sites + 2 XHR in devboard; 3 in
+  // board-page). UI-redesign: 7 fetch sites = the original 6 + S211's create-label
+  // POST /api/tags (re-recorded in SEAM_PATCHES above). S258 (FE-11): board-page.js
+  // DROPS one site — the clear-done DELETE fan-out retired ("Clear done" rides ONE
+  // bulk POST …/devtasks/clear-done through B().api() = the devboard choke point),
+  // so 4 → 3. The count is the tripwire: a new fetch() in devboard.js that isn't
+  // covered by a seam patch fails BOTH this count AND the bare-fetch check below.
   const count = (s, needle) => s.split(needle).length - 1
   if (count(devboard, 'window.hibanaFetch(') !== 7) problems.push('devboard.js: expected 7 window.hibanaFetch( sites, found ' + count(devboard, 'window.hibanaFetch('))
   if (count(devboard, 'window.hibanaXHR(') !== 2) problems.push('devboard.js: expected 2 window.hibanaXHR( sites, found ' + count(devboard, 'window.hibanaXHR('))
   if (count(devboard, 'new XMLHttpRequest(') !== 0) problems.push('devboard.js: ' + count(devboard, 'new XMLHttpRequest(') + ' bare new XMLHttpRequest( remain')
-  if (count(boardPage, 'window.hibanaFetch(') !== 4) problems.push('board-page.js: expected 4 window.hibanaFetch( sites, found ' + count(boardPage, 'window.hibanaFetch('))
+  if (count(boardPage, 'window.hibanaFetch(') !== 3) problems.push('board-page.js: expected 3 window.hibanaFetch( sites (S258/FE-11 retired the fan-out), found ' + count(boardPage, 'window.hibanaFetch('))
   const bareFetchRe = /\bfetch\(/g
   if ((devboard.match(bareFetchRe) || []).length !== 0) problems.push('devboard.js: bare fetch( calls remain')
   if ((boardPage.match(bareFetchRe) || []).length !== 0) problems.push('board-page.js: bare fetch( calls remain')
+
+  // (1e) THE S258 UI/UX-POLISH ROUND (audit remediation Phase 7 @ 2f3aac14): the
+  // island must carry the round's five findings. FE-6: devboard.js's editor wires
+  // the shared trap (modalTrap) + the shim owns + exports focusTrap and wires it
+  // into its confirm (the supersede release + the close restore). FE-9: the sprint
+  // page's renderFilterStrip + the #sp-filter-strip Clear. FE-11: the board's
+  // "Clear done" rides the bulk endpoint through the choke point (NO per-task
+  // fan-out remains). FE-17: the sprint sidebar harvest (openCats/quickVals).
+  // FE-18: the ⋯ menu's Move-to submenu (data-db-move-menu + the lane rows) + the
+  // renderColumn menu re-arm. The styles ride the bundle's devboard part.
+  if (!devboard.includes('modalTrap')) problems.push('js/devboard.js: the FE-6 editor focus-trap wiring (modalTrap) is missing')
+  if (!boardPage.includes('data-db-move-menu')) problems.push('js/board-page.js: the FE-18 Move-to submenu parent row is missing')
+  if (!boardPage.includes('data-db-move-to')) problems.push('js/board-page.js: the FE-18 lane rows are missing')
+  if (!boardPage.includes("'/api/projects/' + projectId + '/devtasks/clear-done'")) problems.push('js/board-page.js: the FE-11 bulk clear-done ride is missing')
+  if (boardPage.includes('Promise.all(ids.map')) problems.push('js/board-page.js: the retired FE-11 per-task DELETE fan-out is still present')
+  // (sprint-page.js is a VERBATIM blob copy — read it from dist like due-control.js)
+  const sprintPage = readDistText(outDir, 'js/sprint-page.js')
+  if (!sprintPage.includes('renderFilterStrip')) problems.push('js/sprint-page.js: the FE-9 filter strip renderer is missing')
+  if (!sprintPage.includes('data-sp-filter-clear')) problems.push('js/sprint-page.js: the FE-9 Clear chip is missing')
+  if (!sprintPage.includes('quickVals')) problems.push('js/sprint-page.js: the FE-17 quick-add draft harvest is missing')
+  if (!devboardCss.includes('.sp-filter-strip')) problems.push('css/board-bundle.css: the FE-9 strip styles are missing (inside the devboard part)')
+  if (!devboardCss.includes('.db-move-submenu')) problems.push('css/board-bundle.css: the FE-18 submenu styles are missing (inside the devboard part)')
 
   // (1b) THE v0.1.15 UPLOAD BRIDGE (the owner's dogfood: "it doesn't show
   // whether it was successful or not"): the XHR proxy must call the bound
@@ -5861,7 +5981,10 @@ function verifyDist(outDir, fileMap, src) {
   // archive-done/clear-done) depend on it, and the web's app.js that owns it on the
   // web is stripped by §3.2. Without it every confirm await threw "not a function"
   // and the action died silently.
-  if (!shimJs.includes('window.hibana = { toast: toast, confirm: confirm }')) problems.push('js/desktop-shim.js: window.hibana must carry the confirm implementation (S232)')
+  if (!shimJs.includes('window.hibana = { toast: toast, confirm: confirm, focusTrap: focusTrap }')) problems.push('js/desktop-shim.js: window.hibana must carry the confirm + focusTrap implementations (S232 + S258)')
+  if (!shimJs.includes('function focusTrap(overlay, opts)')) problems.push('js/desktop-shim.js: the S258 focusTrap port is missing')
+  if (!shimJs.includes('overlay._releaseTrap = releaseTrap')) problems.push('js/desktop-shim.js: the confirm modal must wire the focus trap (S258/FE-6)')
+  if (!shimJs.includes('the superseded opener gets its focus back too')) problems.push('js/desktop-shim.js: the confirm supersede path must release the trap (S258/FE-6)')
   if (!shimJs.includes('data-hib-confirm="ok"') || !shimJs.includes('data-hib-confirm="cancel"')) problems.push('js/desktop-shim.js: the confirm modal actions are missing')
   if (!shimJs.includes('hib-confirm-overlay') || !shimJs.includes('is-danger')) problems.push('js/desktop-shim.js: the confirm modal must ride the web .hib-confirm-* grammar (components.css ships it)')
   if (!shimJs.includes("hibLabel('common.delete', 'Delete')")) problems.push('js/desktop-shim.js: the danger confirm label must resolve through the island i18n (EN fallback)')
@@ -6395,16 +6518,16 @@ function verifyDist(outDir, fileMap, src) {
     }
     if (!focusCore.includes('escPeel')) problems.push('js/focus-core.js: the S238 escPeel decision is missing')
     if (!indexHtml.includes('/js/focus-core.js?v=2')) problems.push('index.html: the focus-core.js tag must read ?v=2 (the S238 bump)')
-    if (!indexHtml.includes('/js/board-page.js?v=37')) problems.push('index.html: the board-page.js tag must read ?v=37 (the S256/FE-13 esc-twin bump)')
-    if (!indexHtml.includes('/css/board-bundle.css?v=1')) problems.push('index.html: the ONE stylesheet link must read /css/board-bundle.css?v=1 (the S256 FE-5 head swap — devboard.css v46 rides INSIDE it, part 16 of 19)')
+    if (!indexHtml.includes('/js/board-page.js?v=38')) problems.push('index.html: the board-page.js tag must read ?v=38 (the S258 UI/UX-polish round — the FE-6 traps + the FE-18 Move-to + the FE-11 bulk ride)')
+    if (!indexHtml.includes('/css/board-bundle.css?v=2')) problems.push('index.html: the ONE stylesheet link must read /css/board-bundle.css?v=2 (the S258 regeneration — devboard.css v47 rides INSIDE it, part 16 of 19)')
     // S248 (the Sprint/Deadline/Dependency island round): the feature's own
     // carriers + the new manifest entries are pinned here — a drifted pin would
     // silently ship a pre-feature island, so every marker must be present.
-    if (!indexHtml.includes('/js/devboard.js?v=39')) problems.push('index.html: the devboard.js tag must read ?v=39 (the S255 payload-diet round — the lean load + the doc helpers)')
+    if (!indexHtml.includes('/js/devboard.js?v=40')) problems.push('index.html: the devboard.js tag must read ?v=40 (the S258 round — the FE-6 editor trap)')
     if (!indexHtml.includes('/js/due-control.js?v=3')) problems.push('index.html: the due-control.js tag must read ?v=3 (the S256/FE-13 esc-twin bump)')
     if (!indexHtml.includes('/js/emoji-picker.js?v=4')) problems.push('index.html: the emoji-picker.js tag must read ?v=4 (the S243 emoji identity — S248 manifest entry)')
-    if (!indexHtml.includes('/js/i18n-en.js?v=111')) problems.push('index.html: the i18n-en.js tag must read ?v=111 (the S242-S247 feature keys + the S250 st.* set)')
-    if (!indexHtml.includes('/js/i18n.js?v=164')) problems.push('index.html: the i18n.js tag must read ?v=164 (the i18n-fa v105 injector carrier)')
+    if (!indexHtml.includes('/js/i18n-en.js?v=112')) problems.push('index.html: the i18n-en.js tag must read ?v=112 (the S258 st.filteredBy/filterReset + db.moveTo/movedTo keys)')
+    if (!indexHtml.includes('/js/i18n.js?v=165')) problems.push('index.html: the i18n.js tag must read ?v=165 (the i18n-fa v106 injector carrier)')
     // S256: claude-dark-theme.css?v=32 rides INSIDE board-bundle (part 18 of 19); the tag is gone — the S247b contrast block is pinned from the bundle's bytes below
     const dueCtl = readDistText(outDir, 'js/due-control.js')
     if (!dueCtl.includes('window.HibanaDueControl')) problems.push('js/due-control.js: the HibanaDueControl API is missing (the S244 shared date control)')

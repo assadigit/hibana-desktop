@@ -125,6 +125,11 @@
         }
 
         // ---- the enlarge sheet (spec §1.3) ---------------------------------------
+        // S258 (FE-6): the sheet rides the shared focus-trap — sheetTrap holds the
+        // release fn while open (Tab wraps inside the sheet; close restores to the
+        // enlarge button that opened it — the old manual sheetReturnBtn restore,
+        // now the trap's restoreTo).
+        let sheetTrap = null
         // A centered modal over a dimmed-board overlay: its own internal scroll, the
         // S233 close grammar (title row + corner ✕ on the inline end — RTL mirrors),
         // a sticky auto-focused quick-add whose Enter creates through the SAME
@@ -239,6 +244,12 @@
           refreshSheet()
           sheetReturnBtn = document.querySelector('.db-focus-enlarge[data-db-focus-sheet="' + st + '"]')
           sheetEl.hidden = false
+          // S258 (FE-6): the shared trap — Tab wraps inside the sheet card; close
+          // restores to the enlarge button (the explicit restoreTo — a lane
+          // re-render may replace it, the trap's document.contains guard degrades
+          // gracefully, exactly the old manual restore's behavior).
+          if (sheetTrap) { sheetTrap(); sheetTrap = null }
+          if (window.hibana && window.hibana.focusTrap) sheetTrap = window.hibana.focusTrap(sheetEl, { restoreTo: sheetReturnBtn })
           const input = sheetEl.querySelector('[data-db-focus-quick]')
           if (input) input.focus() // sticky auto-focus: ready to type immediately
         }
@@ -246,7 +257,9 @@
           if (!sheetEl || focus.sheetStatus == null) return
           focus.sheetStatus = null
           sheetEl.hidden = true
-          if (sheetReturnBtn && document.contains(sheetReturnBtn)) sheetReturnBtn.focus()
+          // S258 (FE-6): the trap's release owns the restore to the enlarge button
+          // (was the manual sheetReturnBtn.focus() — same element, same guard).
+          if (sheetTrap) { sheetTrap(); sheetTrap = null }
           sheetReturnBtn = null
         }
 
@@ -267,6 +280,7 @@
         let taskViewEl = null
         let taskViewTask = null
         let taskViewReturn = null
+        let taskViewTrap = null // S258 (FE-6): the shared trap's release fn while the view is open
         const viewIsOpen = () => !!(taskViewEl && !taskViewEl.hidden)
         const VIEW_PIN_ICON = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17v4M8.5 3.5h7l-.8 7.2 2.8 2.8v1.5H6.5v-1.5l2.8-2.8-.8-7.2Z"/></svg>'
         const renderTaskView = (task) => {
@@ -370,6 +384,12 @@
           renderTaskView(task)
           taskViewReturn = (returnEl instanceof Element && document.contains(returnEl)) ? returnEl : null
           taskViewEl.hidden = false
+          // S258 (FE-6): the shared trap — Tab wraps inside the view card; release
+          // (close) restores focus to the card that opened it (the explicit
+          // restoreTo — the opener is the .pd-task, more precise than the raw
+          // event target which may be a child span).
+          if (taskViewTrap) { taskViewTrap(); taskViewTrap = null }
+          if (window.hibana && window.hibana.focusTrap) taskViewTrap = window.hibana.focusTrap(taskViewEl, { restoreTo: taskViewReturn })
           const x = taskViewEl.querySelector('[data-db-view-x]')
           if (x) x.focus() // the escape hatch is the tab root while the view is open
         }
@@ -377,7 +397,9 @@
           if (!taskViewEl || taskViewEl.hidden) return
           taskViewEl.hidden = true
           taskViewTask = null
-          if (taskViewReturn && document.contains(taskViewReturn)) taskViewReturn.focus()
+          // S258 (FE-6): the trap's release owns the restore (was the manual
+          // taskViewReturn.focus() — same element, same document.contains guard).
+          if (taskViewTrap) { taskViewTrap(); taskViewTrap = null }
           taskViewReturn = null
         }
 
@@ -864,6 +886,12 @@
           const fresh = tmp.firstElementChild
           if (!fresh) return render()
           colEl.replaceWith(fresh)
+          // S258 (FE-18's round, the root cause it surfaced): a repainted lane's
+          // .db-card-menu placeholders are EMPTY (the injector owns their markup —
+          // render() re-arms at its own tail, but renderColumn never did, so every
+          // post-mutation card — after a move/edit/delete/drop — sat with a DEAD ⋯
+          // until the next full render). Idempotent: fills only [data-ok]-less menus.
+          injectDbCardMenus()
           refreshSheet() // an open enlarge sheet mirrors its lane
           applyFocus() // the dim classes ride the column elements
           syncFilterMeta()
@@ -878,9 +906,10 @@
         // patches is column-local (title/status/priority/category/sprint/due — all
         // merged into state by patchTask) → the touched lanes repaint; CREATE mode
         // keeps the full reload (the staged shots/deps/tags are not in the 201 ack).
-        const openEditorRepaint = (tid) => {
+        const openEditorRepaint = (tid, restoreEl) => {
           const prev = tid ? (B().findTask(tid) ? B().findTask(tid).status : null) : null
           return B().openEditor(tid, {
+            restoreEl: restoreEl || null, // S258 (FE-6): the trap's restore target (the visible ⋯ trigger)
             onSaved: async () => {
               if (!tid) { await reload(); return }
               const t = B().findTask(tid)
@@ -1104,6 +1133,8 @@
         // (S254/FE-1b: I_TRASH was redeclared here — byte-identical to the hoisted
         // render-icon const; the local declaration retired with the hoist.)
         const I_COPY = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+        // S258 (FE-18): the Move-to row's icon — an arrow into a lane edge.
+        const I_MOVE = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5v14"/><path d="M7 12h11"/><path d="m14 8 4 4-4 4"/></svg>'
         function injectDbCardMenus() {
           // S254 (FE-1a): the menus are EVENT-DELEGATED — this pass only fills the
           // markup placeholders (the innerHTML + the data-ok marker); ZERO per-card
@@ -1119,6 +1150,18 @@
             if (!card) return
             const tid = card.dataset.taskCard
             if (!tid) return
+            // S258 (FE-18): the Move-to submenu — the keyboard-reachable lane
+            // change (no DnD required; the audit's "no keyboard path for
+            // reordering / cross-lane moves"). An EXPANDING group inside the pop
+            // (accordion, not a flyout — zero edge-collision/overflow risk at the
+            // board's inline ends, RTL-native by construction): the parent row is
+            // a real aria-haspopup button; Enter/Space toggles; the lane rows are
+            // real buttons that Tab reaches naturally once revealed. The task's
+            // CURRENT lane is excluded (a move to where it already sits is noise).
+            const curTask = B().findTask(tid)
+            const curStatus = curTask ? curTask.status : null
+            const moveRows = B().STATUSES.filter((s) => s !== curStatus).map((s) =>
+              '<button type="button" role="menuitem" data-db-move-card="' + tid + '" data-db-move-to="' + s + '"><span class="db-move-lane-dot st-' + s + '" aria-hidden="true"></span><span>' + B().esc(B().statusLabel(s)) + '</span></button>').join('')
             menu.innerHTML =
               '<button type="button" data-menu-open aria-haspopup="true" aria-label="' + B().esc(_t('sparks.more', 'More actions')) + '">' + I_MENU_DOTS + '</button>' +
               '<div class="spark-menu-pop" hidden>' +
@@ -1126,6 +1169,9 @@
                 // Delete contract — copies the RAW title, data-raw-title first).
                 '<button type="button" data-db-copy-card="' + tid + '">' + I_COPY + '<span>' + B().esc(_t('common.copy', 'Copy')) + '</span></button>' +
                 '<button type="button" data-db-edit-card="' + tid + '">' + I_EDIT + '<span>' + B().esc(_t('common.edit', 'Edit')) + '</span></button>' +
+                // S258 (FE-18): Move to ▾ — the lane-change submenu's parent row.
+                '<button type="button" data-db-move-menu aria-haspopup="true" aria-expanded="false">' + I_MOVE + '<span>' + B().esc(_t('db.moveTo', 'Move to')) + '</span><span class="db-move-caret" aria-hidden="true">▾</span></button>' +
+                '<div class="db-move-submenu" hidden>' + moveRows + '</div>' +
                 '<button type="button" class="danger" data-db-del-card="' + tid + '">' + I_TRASH + '<span>' + B().esc(_t('common.delete', 'Delete')) + '</span></button>' +
               '</div>'
             menu.hidden = false
@@ -1137,6 +1183,12 @@
             pop.hidden = true
             const btn = pop.parentElement.querySelector('[data-menu-open]')
             if (btn) btn.removeAttribute('data-open')
+            // S258 (FE-18): a closing menu folds its Move-to submenu too — a
+            // re-open never starts mid-expanded.
+            const sub = pop.querySelector('.db-move-submenu')
+            if (sub) sub.hidden = true
+            const moveBtn = pop.querySelector('[data-db-move-menu]')
+            if (moveBtn) moveBtn.setAttribute('aria-expanded', 'false')
           })
         }
         // S238: the sheet's one-tap COPY row button — rides the ⋯ menu cluster's
@@ -1374,7 +1426,54 @@
           if (editCardBtn) {
             e.preventDefault(); e.stopPropagation()
             closeAllDbMenus()
-            openEditorRepaint(editCardBtn.dataset.dbEditCard)
+            // S258 (FE-6): the ⋯ TRIGGER stays visible when the pop folds — hand
+            // it to the editor as the focus-restore target (the Edit row itself
+            // hides with the menu, which would strand the restore on <body>).
+            const menuHome = editCardBtn.closest('.db-card-menu')
+            openEditorRepaint(editCardBtn.dataset.dbEditCard, menuHome ? menuHome.querySelector('[data-menu-open]') : null)
+            return
+          }
+          // S258 (FE-18): the Move-to submenu's parent row — toggles the lane
+          // list IN PLACE (the pop stays open; the audit's keyboard path).
+          const moveMenuBtn = e.target.closest('[data-db-move-menu]')
+          if (moveMenuBtn) {
+            e.preventDefault(); e.stopPropagation()
+            const pop = moveMenuBtn.closest('.spark-menu-pop')
+            const sub = pop ? pop.querySelector('.db-move-submenu') : null
+            if (sub) {
+              const willOpen = sub.hidden
+              sub.hidden = !willOpen
+              moveMenuBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false')
+              // focus the first lane row on expand — the keyboard path lands
+              // directly in the choices (one Enter, arrows/Tab walk them)
+              if (willOpen) {
+                const first = sub.querySelector('[data-db-move-to]')
+                if (first) first.focus()
+              }
+            }
+            return
+          }
+          // S258 (FE-18): the lane row — ONE patchTask through the choke point +
+          // the two touched lanes repaint (the DnD flow's own merge recipe, no
+          // refetch; done_at stamping rides the server + the merge layer).
+          const moveRow = e.target.closest('[data-db-move-to]')
+          if (moveRow) {
+            e.preventDefault(); e.stopPropagation()
+            closeAllDbMenus()
+            const tid = moveRow.dataset.dbMoveCard
+            const to = moveRow.dataset.dbMoveTo
+            const task = B().findTask(tid)
+            if (!task || !to || to === task.status) return
+            const prevStatus = task.status
+            try {
+              await B().patchTask(tid, { status: to })
+              const fresh = B().findTask(tid)
+              repaintTaskColumns(fresh || task, prevStatus)
+              window.hibana?.toast(_t('db.movedTo', 'Moved to {lane}').replace('{lane}', B().statusLabel(to)), 'ok')
+            } catch {
+              window.hibana?.toast(_t('sparks.saveFailed', "Couldn't save"), 'err')
+              await reload()
+            }
             return
           }
           const delCardBtn = e.target.closest('[data-db-del-card]')
@@ -1525,14 +1624,19 @@
             if (count === 0) return
             const msg = _t('pd.clearDoneConfirm', 'PERMANENTLY delete all {n} done tasks? This cannot be undone. Use "Archive" to keep them.').replace('{n}', B().faDig(count))
             if (!await window.hibana.confirm(msg, { title: _t('pd.clearDone', 'Clear done (delete)'), danger: true, confirmLabel: _t('pd.clearDone', 'Delete all') })) return
-            // Delete each task individually (no bulk-delete endpoint — keeps it simple)
-            const ids = Array.from(col.querySelectorAll('.pd-task-wrap')).map((c) => c.dataset.taskCard)
-            Promise.all(ids.map((id) => window.hibanaFetch('/api/devtasks/' + id, { method: 'DELETE' })))
-              .then(() => {
-                window.hibana?.toast(_t('pd.clearedDone', '{n} tasks deleted').replace('{n}', B().faDig(count)), 'ok')
-                reload()
-              })
-              .catch(() => window.hibana?.toast(_t('notes.deleteFailed', "Couldn't clear"), 'err'))
+            // S258 (FE-11 scoped): ONE bulk request — POST …/devtasks/clear-done —
+            // replaces the old per-task DELETE fan-out (N requests, half-cleared
+            // lanes on a mid-fan-out failure). Rides the ONE api() choke point
+            // (zero new fetch sites — the desktop seam counts hold; the server
+            // deletes transactionally and answers {ok, deleted:n}).
+            try {
+              const body = await B().api('/api/projects/' + projectId + '/devtasks/clear-done', { method: 'POST' })
+              const n = body && typeof body.deleted === 'number' ? body.deleted : count
+              window.hibana?.toast(_t('pd.clearedDone', '{n} tasks deleted').replace('{n}', B().faDig(n)), 'ok')
+              reload()
+            } catch {
+              window.hibana?.toast(_t('notes.deleteFailed', "Couldn't clear"), 'err')
+            }
             return
           }
         })
@@ -1826,7 +1930,7 @@
           const injectAll = () => {
             if (injected || window.HibanaBoard) return
             injected = true
-            inject('/js/devboard.js?v=39') // keep in sync with the <head> tag + sw SHELL
+            inject('/js/devboard.js?v=40') // keep in sync with the <head> tag + sw SHELL
             if (!window.HibanaFocusCore) inject('/js/focus-core.js?v=2') // S237/S238: the focus + view decision core — keep in sync with the <head> tag
             if (!window.HibanaChips) inject('/js/chip-render.js?v=14') // S36: was ?v=1 while the HTML tags say v=2 — two cache entries for one file (the cache-bust gate caught it under the sandbox's mode-bit noise). Aligned; local-dev + SW caches now share ONE url per version. S86: v8 — kept in sync with the <head> tag (previewHtml moved in). S176: v11.
             if (!window.jalaali) inject('/vendor/jalaali.min.js') // Jalali dates for FA

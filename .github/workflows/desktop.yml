@@ -26,8 +26,8 @@ env:
   # source of truth they mirror. This value had drifted to 0.4.1.43 while the
   # pin was 6dd40c0/v0.4.1.44, so every release note since v0.1.38 claimed the
   # wrong embedded web version (same class as the 16a864e WEB_REF bug).
-  WEB_REF: 6db3ae94          # the island pin (must match scripts/sync-island.mjs) — the S256 CSS/asset diet round (web v0.4.1.49)
-  WEB_VERSION: "0.4.1.49"   # the pin's package version (Release notes carry BOTH)
+  WEB_REF: 2f3aac14          # the island pin (must match scripts/sync-island.mjs) — the S258 UI/UX-polish round (web v0.4.1.51)
+  WEB_VERSION: "0.4.1.51"   # the pin's package version (Release notes carry BOTH)
 
 jobs:
   build:

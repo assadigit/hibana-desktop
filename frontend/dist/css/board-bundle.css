@@ -16908,6 +16908,30 @@ main.board-shell .db-cols { grid-template-columns: repeat(5, minmax(11rem, 1fr))
 .db-col-menu-item.danger { color: var(--danger); }
 .db-col-menu-item.danger .icon { color: var(--danger); }
 .db-col-menu-item.danger:hover { background: var(--danger-soft); }
+/* S258 (FE-18): the Move-to submenu — the card ⋯ menu's keyboard-reachable lane
+   change. An EXPANDING group inside the .spark-menu-pop (accordion, not a flyout:
+   no edge-collision at the board's inline ends, RTL-native). The parent row rides
+   the pop's own button styles (quicknotes.css .spark-menu-pop button); the caret
+   rides the inline end. The lane rows are real buttons (Tab reaches them once
+   revealed); each carries its lane's dot in the S48p palette (.sp-task-st twins). */
+.db-move-caret { margin-inline-start: auto; color: var(--muted); font-size: 0.75rem; line-height: 1; }
+.db-move-submenu {
+  display: grid;
+  gap: 2px;
+  margin-block: 2px;
+  padding-inline-start: 0.6rem;
+  border-inline-start: 2px solid var(--line);
+  margin-inline-start: 0.45rem;
+}
+.db-move-submenu[hidden] { display: none !important; }
+.db-move-submenu button { font-weight: 400; font-size: var(--fs-xs, 0.8rem); padding-block: 0.35rem; }
+.db-move-submenu button:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: -2px; }
+.db-move-lane-dot { inline-size: 8px; block-size: 8px; border-radius: 50%; flex: none; }
+.db-move-lane-dot.st-idea { background: #5B8DEF; }
+.db-move-lane-dot.st-planned { background: #F0C040; }
+.db-move-lane-dot.st-in_progress { background: #E8A27D; }
+.db-move-lane-dot.st-done { background: #6FB08D; }
+.db-move-lane-dot.st-bug { background: #E54D4D; }
 /* Ensure the menu is never clipped by a lane's overflow — the .pd-tasks scrolls, but
    the menu lives in the header (.pd-col-head, no overflow). Lift above neighbors. */
 .pd-col-head { position: relative; z-index: 5; }
@@ -17670,6 +17694,29 @@ main.board-shell .db-frame .db-toolbar { padding: 0.25rem 0.2rem 0.85rem; }
 }
 .sp-strategies-count { font-weight: 400; }
 .sp-strategies-head .btn { margin-inline-start: auto; }
+/* S258 (FE-9): the strategy focus-filter explainer strip — one quiet line under
+   the strategies section naming the active filter (glyph + text) with the Clear
+   chip. The board filter bar's own grammar rides inside (.db-filter-shown +
+   .db-filter-clear, both defined above); this container only places + paces it.
+   RTL-safe (logical properties); the strip is display:none when unfiltered. */
+.sp-filter-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.4rem 1.5rem;
+  border-block-end: 1px solid var(--line);
+  background: var(--brand-soft, rgb(42 132 96 / 0.07));
+}
+.sp-filter-glyph { font-size: 1rem; line-height: 1; }
+.sp-filter-explain { flex: 1 1 auto; min-inline-size: 0; }
+.sp-filter-strip .db-filter-clear { flex: none; margin-inline-start: auto; }
+.sp-filter-strip[hidden] { display: none !important; }
+@media (max-width: 640px) {
+  .sp-filter-strip { padding: 0.4rem 0.9rem; }
+  .sp-filter-explain { flex-basis: 100%; }
+}
+
 .sp-strategy-cards {
   display: flex;
   flex-wrap: wrap;

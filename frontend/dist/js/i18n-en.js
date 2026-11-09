@@ -852,6 +852,10 @@ window.__hibanaDictEN = {
       'st.servesStrategy': 'Serves: {name}',
       'st.filterHint': 'Show only this strategy’s sprints',
       'st.filterClear': 'Showing only this strategy — click again to show all',
+      // S258 (FE-9): the focus-filter explainer strip — names the active strategy,
+      // says sprint-less tasks are hidden, and carries the one-click Clear.
+      'st.filteredBy': 'Filtered by {name} — tasks without sprints are hidden',
+      'st.filterReset': 'Clear',
       'st.complete': 'Complete strategy', 'st.delete': 'Delete strategy',
       'st.delConfirm': 'Delete this strategy? Its sprints stay — they become unassigned.',
       'st.completed': 'Strategy completed — its sprints stay as history',
@@ -863,6 +867,9 @@ window.__hibanaDictEN = {
       // S44: the sprint timeline's today-flag chip (rides the today line)
       'db.today': 'Today',
       'db.tags': 'Tags', 'db.addTag': 'Add tag + Enter', 'db.taskAdded': 'Task added', 'db.taskDeleted': 'Task deleted',
+      // S258 (FE-18): the card ⋯ menu's Move-to submenu — the keyboard-reachable
+      // lane change (no DnD required).
+      'db.moveTo': 'Move to', 'db.movedTo': 'Moved to {lane}',
       // S208: the card's pin badge (kanban task-option parity)
       'db.taskShotsHint': 'Pinned pictures — note + proof stuck to this item',
       'db.taskShotsBadge': 'Pinned pictures ({n})',

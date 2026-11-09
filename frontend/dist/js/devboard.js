@@ -1303,6 +1303,7 @@
   let modalEl = null
   let modalCtx = null // { taskId | null, draft, onSaved }
   let modalDueCtl = null // S244: the mounted shared date control (a fresh instance per renderModal)
+  let modalTrap = null // S258 (FE-6): the shared focus-trap's release fn while the editor is open
 
   function buildModal() {
     if (modalEl) return modalEl
@@ -1339,7 +1340,7 @@
   }
 
   function openEditor(taskId, opts) {
-    modalCtx = { taskId: taskId || null, onSaved: (opts && opts.onSaved) || null, defaults: (opts && opts.defaults) || {} }
+    modalCtx = { taskId: taskId || null, onSaved: (opts && opts.onSaved) || null, defaults: (opts && opts.defaults) || {}, restoreEl: (opts && opts.restoreEl instanceof Element) ? opts.restoreEl : null }
     const task = taskId ? findTask(taskId) : null
     // S152: stash the task's CURRENT category row (resolves for enabled AND
     // referenced-later-disabled rows; an archived one falls back to the raw id so
@@ -1370,6 +1371,15 @@
     ensureImageResize() // warm the resize helper before a file gets picked
     renderModal()
     buildModal().hidden = false
+    // S258 (FE-6): the shared trap — Tab wraps inside the editor card; the
+    // release (closeModal) restores focus to the opener. Pages pass the VISIBLE
+    // trigger (the ⋯ button — the pop's rows hide with the menu, which would
+    // strand the restore on <body>); without one the trap captures
+    // document.activeElement at open (the quick-add rows' own opener). A
+    // defensive hand-off first: every open path closes before re-opening, but a
+    // stray double-open must not double-bind.
+    if (modalTrap) { modalTrap(); modalTrap = null }
+    if (window.hibana && window.hibana.focusTrap) modalTrap = window.hibana.focusTrap(modalEl, modalCtx.restoreEl ? { restoreTo: modalCtx.restoreEl } : undefined)
     if (modalCtx.taskId) renderPinnedGrid() // S208: the task's pinned shots load under the button
     const focus = modalEl.querySelector('[name=title]')
     if (focus) { focus.focus(); focus.select() }
@@ -1394,6 +1404,11 @@
       const card = modalCard()
       if (card) card.classList.remove('db-fullscreen') // a re-open never starts in focus mode
     }
+    // S258 (FE-6): unbind the wrap + restore focus to the opener (before the
+    // onSaved repaint re-renders the lane — the opener may be replaced by then,
+    // the trap's document.contains guard degrades gracefully exactly like the
+    // sheet's manual restore did).
+    if (modalTrap) { modalTrap(); modalTrap = null }
     const ctx = modalCtx
     modalCtx = null
     const cb = ctx && ctx.onSaved
