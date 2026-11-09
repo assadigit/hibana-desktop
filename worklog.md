@@ -471,3 +471,57 @@ release, the S255 pattern).
 desktop.yml WEB_REF+WEB_VERSION twins moved together (6db3ae94 / 0.4.1.49).
 The web's probe-sw-synthesis contract (the SW synthesizing the bundles at
 install) is web-only — the island has no service worker, nothing to mirror.
+
+## Session S258 — the UI/UX-polish re-pin (2026-11-09)
+
+**The round:** the desktop half of the web's S258 (hibana-source @ 2f3aac14,
+web v0.4.1.51 — the audit-remediation Phase 7 round: FE-6 the shared focus
+trap, FE-9 the filter strip, FE-11 the bulk clear-done, FE-17 the sidebar
+survival, FE-18 the Move-to submenu). The session shape was the S256/S257
+re-sent-prompt pattern: a parallel run had already shipped + live-probed the
+web half (v0.4.1.51 released, CI green) but died before THIS repo's re-pin
+and the close — this session executed the desktop half and closed.
+
+**The pin bump (the double-lock):** PIN_REF 6db3ae94 → 2f3aac14;
+PIN_PACKAGE_VERSION 0.4.1.49 → 0.4.1.51; desktop.yml's WEB_REF/WEB_VERSION
+twins moved together. The drifted anchors re-recorded: the app.js strip line
+v221 → v222 (FE-6 added hibana.focusTrap + bumped the carrier), the devboard
+insert anchors v39 → v40 (board + sprint), the index.html tag pins (board-page
+v38, board-bundle ?v=2, devboard v40, i18n-en v112, i18n v165), the manifest
+notes (i18n trio v112/v165/v106 — i18n.js's lazy injector literal now
+?v=106). The regenerated board-bundle.css (?v=2) carries devboard.css v47
+inside (FE-9's .sp-filter-strip + FE-18's .db-move-submenu styles).
+
+**THE FE-6 SHIM PORT (the round's desktop-owned addition):** app.js is
+stripped from the island (§3.2), so the shim owns `window.hibana.focusTrap` —
+the 1:1 port of the web's helper (Tab wrap both directions, pull-back-in,
+release() restores the opener best-effort; opts.restoreTo pins a precise
+opener; opts.restore === false skips on purpose). The shim's own confirm wires
+it (the supersede path releases too — the superseded opener gets its focus
+back; close restores to the opener, mirroring the web app.js confirm), and the
+export lands on `window.hibana = { toast, confirm, focusTrap }` so
+devboard.js's editor (modalTrap), board-page.js's task view + enlarge sheet,
+and sprint-page.js's strategy modal all trap on the desktop exactly as on the
+web — every call site's `if (window.hibana && window.hibana.focusTrap)` guard
+is degrade-safe, and verifyDist pins the port + the wiring + the export.
+
+**THE FE-11 SEAM CHANGE:** the web retired the clear-done per-task DELETE
+fan-out ("Clear done" now rides ONE bulk POST /api/projects/:id/devtasks/
+clear-done through B().api()), so SEAM_PATCHES drops site 12 and
+board-page.js's seam count goes 4 → 3 (7+2/3/0 — verifyDist re-pinned). ZERO
+Go changes: the bridge's Request allow-lists any /api/ POST
+(internal/ui/bindings.go:481) — verified, not assumed. The §10.3 outbox
+verdict re-verified on THIS repo's bytes: `.Enqueue(` sites are ALL in
+_test.go files (zero production enqueue sites — a devtask.clear-done outbox
+entity would be dead code; the documented verdict in the web's
+API-AND-SYNC-CONTRACT.md §3.2 stands).
+
+**The probes:** ALL 14 GREEN on the real island bytes. probe-sprintdeadline's
+carrier needle re-pinned to the S258 set (devboard v40 + board-page v38).
+probe-view grows the S258/FE-6 legs — the shim exports focusTrap (typeof
+function), 10 Tabs never leave the view overlay, and the Esc close restores
+focus to the card that opened the view: the port is PROVEN live on the island
+bytes, not just shipped.
+
+**The release:** pushed 7f2a23d → the autorelease lane cut v0.1.52-desktop
+(lockstep bump + the windows runner's build + publish).
